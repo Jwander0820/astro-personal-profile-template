@@ -6,7 +6,7 @@ const { section } = Astro.props;
 const { Content } = await render(section);
 const imageUrl = withBase(section.data.image);
 ---
-<article class="section-card">
+<article class:list={['section-card', imageUrl ? 'section-card--with-image' : 'section-card--text-only']}>
   {imageUrl && <img src={imageUrl} alt="" loading="lazy" />}
   <div class="section-copy"><h3>{section.data.title}</h3><div><Content /></div><ul>{section.data.tags.map((tag) => <li>{tag}</li>)}</ul></div>
 </article>
