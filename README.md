@@ -37,6 +37,15 @@ sectionsLayout: list # 每個區塊一列
 # sectionsLayout: grid # 兩欄卡片
 ```
 
+全站字級與說明、標籤、頁尾等小字可分開縮放：
+
+```yaml
+fontScale: 1          # 0.9～1.2，控制整體字級
+smallTextScale: 1.15 # 0.9～1.35，額外放大小字
+```
+
+兩個欄位皆可省略，預設值為 `1`。如果只覺得說明文字太小，建議先保留 `fontScale: 1`，將 `smallTextScale` 調成 `1.1`～`1.2`。
+
 ## 新增連結
 
 在 `src/content/links/` 新增 Markdown 檔：

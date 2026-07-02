@@ -11,6 +11,8 @@ const profile = defineCollection({
     background: z.string().optional(),
     location: z.string().optional(),
     sectionsLayout: z.enum(['list', 'grid']).default('list'),
+    fontScale: z.number().min(0.9).max(1.2).default(1),
+    smallTextScale: z.number().min(0.9).max(1.35).default(1),
     tagline: z.union([z.string(), z.array(z.string()).min(1)]),
   }),
 });

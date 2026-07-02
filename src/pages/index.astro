@@ -21,7 +21,13 @@ const description = `${profile.data.displayName} — ${profile.data.title}。${t
 const blocksAt = (placement: 'before-links' | 'between-links-sections' | 'after-sections') =>
   blocks.filter((block) => block.data.placement === placement);
 ---
-<BaseLayout title={`${profile.data.displayName} · ${profile.data.title}`} description={description} image={profile.data.background}>
+<BaseLayout
+  title={`${profile.data.displayName} · ${profile.data.title}`}
+  description={description}
+  image={profile.data.background}
+  fontScale={profile.data.fontScale}
+  smallTextScale={profile.data.smallTextScale}
+>
   <ProfileHeader profile={profile} />
   <SocialIcons links={iconLinks} />
   <section class="content-section" aria-labelledby="about-heading">
