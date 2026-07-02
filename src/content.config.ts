@@ -10,6 +10,7 @@ const profile = defineCollection({
     avatar: z.string().optional(),
     background: z.string().optional(),
     location: z.string().optional(),
+    sectionsLayout: z.enum(['list', 'grid']).default('list'),
     tagline: z.union([z.string(), z.array(z.string()).min(1)]),
   }),
 });

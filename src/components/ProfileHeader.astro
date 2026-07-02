@@ -17,7 +17,7 @@ const taglineItems = Array.isArray(tagline)
     {avatarUrl ? <img class="avatar" src={avatarUrl} alt={`${displayName} 的頭像`} width="112" height="112" /> : <span class="avatar avatar-fallback">{displayName.slice(0, 2)}</span>}
     <div class="identity">
       <h1>{displayName}</h1>
-      <p class="location">{location ?? 'Taiwan'}</p>
+      {location && <p class="location">{location}</p>}
     </div>
     <p class="role">{title}</p>
     <ul class="tagline-list" aria-label="個人標籤">

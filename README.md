@@ -30,6 +30,13 @@ npm run preview
 
 圖片放進 `public/images/`，並在 Markdown 中使用 `/images/檔名`。
 
+`src/content/profile/main.md` 內的 `location` 是選填欄位，刪除或以 `#` 註解後就不會顯示。About me 排版可透過以下設定切換：
+
+```yaml
+sectionsLayout: list # 每個區塊一列
+# sectionsLayout: grid # 兩欄卡片
+```
+
 ## 新增連結
 
 在 `src/content/links/` 新增 Markdown 檔：
