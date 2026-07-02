@@ -5,6 +5,7 @@ interface Props { title: string; description: string; image?: string; pageClass?
 const { title, description, image, pageClass } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const socialImage = image ? new URL(withBase(image) ?? '', Astro.site) : undefined;
+const favicon = withBase('/favicon.svg');
 ---
 <!doctype html>
 <html lang="zh-Hant">
@@ -14,7 +15,7 @@ const socialImage = image ? new URL(withBase(image) ?? '', Astro.site) : undefin
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}favicon.svg`} />
+    <link rel="icon" type="image/svg+xml" href={favicon} />
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
