@@ -1,0 +1,17 @@
+---
+import { render, type CollectionEntry } from 'astro:content';
+import { withBase } from '../lib/paths';
+
+interface Props { block: CollectionEntry<'blocks'>; }
+const { block } = Astro.props;
+const { Content } = await render(block);
+const imageUrl = withBase(block.data.image);
+---
+<section class:list={['content-section', 'custom-block', `custom-block--${block.data.layout}`]} aria-labelledby={`block-${block.id}`}>
+  <h2 id={`block-${block.id}`}>{block.data.title}</h2>
+  <div class="custom-block__body">
+    {imageUrl && <img src={imageUrl} alt="" loading="lazy" />}
+    <div class="custom-block__content"><Content /></div>
+    {block.data.tags.length > 0 && <ul>{block.data.tags.map((tag) => <li>{tag}</li>)}</ul>}
+  </div>
+</section>

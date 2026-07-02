@@ -1,0 +1,88 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Icon from '../components/Icon.astro';
+import { iconGroups } from '../lib/icons';
+import { withBase } from '../lib/paths';
+
+const iconCount = iconGroups.reduce((total, group) => total + group.names.length, 0);
+const homeUrl = withBase('/') ?? '/';
+---
+<BaseLayout
+  title="Icon 預覽 · Jw"
+  description="查看個人入口頁模板提供的所有 SVG icon 名稱與外觀。"
+  pageClass="icon-preview-page"
+>
+  <header class="preview-header">
+    <a class="back-link" href={homeUrl}>← 返回首頁</a>
+    <p class="eyebrow">Template reference · {iconCount} icons</p>
+    <h1>Icon 預覽</h1>
+    <p class="intro">把卡片中的名稱填入 Markdown 的 <code>icon:</code> 欄位即可使用。點擊「複製」會複製完整設定。</p>
+  </header>
+
+  {iconGroups.map((group) => (
+    <section class="preview-group" aria-labelledby={`group-${group.label}`}>
+      <div class="group-heading">
+        <h2 id={`group-${group.label}`}>{group.label}</h2>
+        <span>{group.names.length}</span>
+      </div>
+      <div class="icon-grid">
+        {group.names.map((name) => (
+          <article class="icon-swatch">
+            <div class="icon-tile"><Icon name={name} size={30} /></div>
+            <div class="icon-meta">
+              <strong>{name}</strong>
+              <code>icon: {name}</code>
+            </div>
+            <button class="copy-button" type="button" data-copy={`icon: ${name}`} aria-label={`複製 icon: ${name}`}>複製</button>
+          </article>
+        ))}
+      </div>
+    </section>
+  ))}
+
+  <p class="preview-note">`twitter` 與 `x`、`podcasts` 與 `applepodcasts` 分別是相同圖示的別名。</p>
+</BaseLayout>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const value = button.dataset.copy;
+      if (!value) return;
+
+      try {
+        await navigator.clipboard.writeText(value);
+        button.textContent = '已複製';
+        window.setTimeout(() => { button.textContent = '複製'; }, 1200);
+      } catch {
+        button.textContent = '請手動複製';
+      }
+    });
+  });
+</script>
+
+<style>
+  .preview-header { margin-bottom: 37px; padding: 29px 31px 31px; border: 1px solid rgba(255,255,255,.82); border-radius: 28px; background: rgba(255,255,255,.86); box-shadow: 0 16px 44px rgba(70,56,90,.09); }
+  .back-link { display: inline-block; margin-bottom: 28px; color: #6f5c97; font-size: .76rem; font-weight: 700; text-decoration: none; }
+  .back-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .eyebrow { margin: 0 0 8px; color: #8d79bc; font-size: .65rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+  .preview-header h1 { font-size: clamp(1.8rem, 5vw, 2.7rem); }
+  .intro { max-width: 570px; margin: 11px 0 0; color: #777382; font-size: .86rem; line-height: 1.75; }
+  .intro code { padding: 2px 6px; color: #655581; border-radius: 6px; background: #eee9f8; font-size: .8em; }
+  .preview-group { margin-top: 31px; }
+  .group-heading { display: flex; align-items: center; gap: 9px; margin: 0 5px 12px; }
+  .group-heading h2 { margin: 0; color: #6e6875; font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; }
+  .group-heading span { display: grid; place-items: center; min-width: 22px; height: 22px; padding-inline: 6px; color: #655581; border-radius: 999px; background: #eee9f8; font-size: .62rem; font-weight: 800; }
+  .icon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .icon-swatch { min-width: 0; display: grid; grid-template-columns: 49px minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 12px; border: 1px solid #ebe7ef; border-radius: 18px; background: rgba(255,255,255,.9); box-shadow: 0 7px 19px rgba(70,56,90,.05); }
+  .icon-tile { display: grid; place-items: center; width: 49px; height: 49px; color: #655581; border-radius: 14px; background: #eee9f8; }
+  .icon-meta { min-width: 0; }
+  .icon-meta strong, .icon-meta code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .icon-meta strong { font-size: .78rem; }
+  .icon-meta code { margin-top: 4px; color: #8a8490; font-size: .58rem; }
+  .copy-button { padding: 5px 7px; color: #6f5c97; border: 0; border-radius: 7px; background: #f4f1f8; font: inherit; font-size: .6rem; font-weight: 700; cursor: pointer; }
+  .copy-button:hover { background: #e9e2f4; }
+  .copy-button:focus-visible { outline: 3px solid #967bc2; outline-offset: 2px; }
+  .preview-note { margin: 31px 5px 0; color: #88818f; font-size: .7rem; line-height: 1.7; }
+  @media (max-width: 780px) { .icon-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 500px) { .preview-header { padding: 23px 21px 25px; border-radius: 23px; } .icon-grid { grid-template-columns: 1fr; } }
+</style>

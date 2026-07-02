@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title">
+  <title id="title">Minimal profile silhouette</title>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#e2d4eb"/>
+      <stop offset="1" stop-color="#c8dfeb"/>
+    </linearGradient>
+  </defs>
+  <rect width="240" height="240" fill="url(#background)"/>
+  <circle cx="120" cy="76" r="42" fill="#77639f"/>
+  <path d="M35 240c7-61 38-94 85-94s78 33 85 94H35Z" fill="#77639f"/>
+</svg>

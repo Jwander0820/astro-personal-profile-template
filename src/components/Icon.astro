@@ -1,0 +1,7 @@
+---
+import { icons } from '../lib/icons';
+interface Props { name?: string; size?: number; }
+const { name = 'arrow', size = 22 } = Astro.props;
+const body = icons[name] ?? icons.arrow;
+---
+<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false" set:html={body} />

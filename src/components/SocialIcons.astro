@@ -1,0 +1,10 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import Icon from './Icon.astro';
+import { withBase } from '../lib/paths';
+interface Props { links: CollectionEntry<'links'>[]; }
+const { links } = Astro.props;
+---
+{links.length > 0 && <nav class="socials" aria-label="快速連結">
+  {links.map((link) => <a href={withBase(link.data.url)} aria-label={`前往 ${link.data.title}`} title={link.data.title} target={link.data.url.startsWith('http') ? '_blank' : undefined} rel={link.data.url.startsWith('http') ? 'noopener noreferrer' : undefined}><Icon name={link.data.icon} /></a>)}
+</nav>}

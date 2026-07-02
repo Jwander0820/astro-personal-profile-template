@@ -1,0 +1,31 @@
+# Dependencies and package-manager cache
+node_modules/
+.pnpm-store/
+
+# Astro and generated output
+dist/
+.astro/
+*.tsbuildinfo
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local agent and editor state
+.agents/
+.codex/
+.vscode/
+.idea/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini

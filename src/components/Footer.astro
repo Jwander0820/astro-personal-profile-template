@@ -1,0 +1,5 @@
+---
+interface Props { name: string; }
+const { name } = Astro.props;
+---
+<footer><span>© {new Date().getFullYear()} {name}</span></footer>

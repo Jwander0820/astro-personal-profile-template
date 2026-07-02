@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 230" role="img" aria-labelledby="title">
+  <title id="title">Profile silhouette inside a circle</title>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#e9dff1"/>
+      <stop offset="1" stop-color="#dceaf3"/>
+    </linearGradient>
+    <clipPath id="portrait">
+      <circle cx="200" cy="115" r="78"/>
+    </clipPath>
+  </defs>
+  <rect width="400" height="230" fill="url(#background)"/>
+  <g fill="#fff" opacity=".38">
+    <circle cx="63" cy="52" r="24"/>
+    <circle cx="342" cy="184" r="38"/>
+  </g>
+  <circle cx="200" cy="115" r="82" fill="none" stroke="#fff" stroke-width="4" opacity=".72"/>
+  <g clip-path="url(#portrait)">
+    <circle cx="200" cy="115" r="78" fill="#fff" opacity=".9"/>
+    <circle cx="200" cy="91" r="27" fill="#77639f"/>
+    <path d="M140 194c5-51 27-78 60-78s55 27 60 78H140Z" fill="#77639f"/>
+  </g>
+</svg>

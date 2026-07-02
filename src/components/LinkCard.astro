@@ -1,0 +1,15 @@
+---
+import { render, type CollectionEntry } from 'astro:content';
+import Icon from './Icon.astro';
+import { withBase } from '../lib/paths';
+interface Props { link: CollectionEntry<'links'>; }
+const { link } = Astro.props;
+const { Content } = await render(link);
+const external = link.data.url.startsWith('http');
+const href = withBase(link.data.url);
+---
+<a class:list={['link-card', `is-${link.data.style}`]} href={href} target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined}>
+  <span class="link-icon"><Icon name={link.data.icon} size={24} /></span>
+  <span class="link-copy"><strong>{link.data.title}</strong><span class="description"><Content /></span>{link.data.tags && <span class="tags">{link.data.tags.map((tag) => <small>{tag}</small>)}</span>}</span>
+  <span class="link-arrow" aria-hidden="true">›</span>
+</a>

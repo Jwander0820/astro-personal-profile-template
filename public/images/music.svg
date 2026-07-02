@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 230" role="img" aria-labelledby="title">
+  <title id="title">Vinyl turntable</title>
+  <rect width="400" height="230" fill="#f3dfe7"/>
+  <rect x="48" y="27" width="304" height="176" rx="24" fill="#fff"/>
+  <circle cx="164" cy="115" r="68" fill="#302f3a"/>
+  <g fill="none" stroke="#5a5861" stroke-width="2" opacity=".75">
+    <circle cx="164" cy="115" r="57"/><circle cx="164" cy="115" r="48"/><circle cx="164" cy="115" r="39"/>
+  </g>
+  <circle cx="164" cy="115" r="24" fill="#77639f"/>
+  <circle cx="164" cy="115" r="5" fill="#fff"/>
+  <g fill="none" stroke="#77639f" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M298 65v76c0 16-13 29-29 29h-20" stroke-width="10"/>
+    <path d="m249 170-17-8" stroke-width="8"/>
+  </g>
+  <circle cx="298" cy="60" r="14" fill="#d9c9e7"/>
+  <circle cx="318" cy="178" r="7" fill="#c67b95"/>
+</svg>

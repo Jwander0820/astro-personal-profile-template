@@ -1,0 +1,12 @@
+---
+import { render, type CollectionEntry } from 'astro:content';
+import { withBase } from '../lib/paths';
+interface Props { section: CollectionEntry<'sections'>; }
+const { section } = Astro.props;
+const { Content } = await render(section);
+const imageUrl = withBase(section.data.image);
+---
+<article class="section-card">
+  {imageUrl && <img src={imageUrl} alt="" loading="lazy" />}
+  <div class="section-copy"><h3>{section.data.title}</h3><div><Content /></div><ul>{section.data.tags.map((tag) => <li>{tag}</li>)}</ul></div>
+</article>

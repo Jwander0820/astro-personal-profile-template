@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 230" role="img" aria-labelledby="title">
+  <title id="title">Boom microphone stand on a concert stage</title>
+  <rect width="400" height="230" fill="#e8e2f3"/>
+  <g fill="#fff" opacity=".44">
+    <path d="m72 38 72 168H34L72 38Z"/>
+    <path d="m200 38 55 168H145l55-168Z"/>
+    <path d="m328 38 38 168H256l72-168Z"/>
+  </g>
+  <g fill="#77639f">
+    <rect x="45" y="29" width="310" height="8" rx="4"/>
+    <circle cx="72" cy="39" r="13"/>
+    <circle cx="200" cy="39" r="13"/>
+    <circle cx="328" cy="39" r="13"/>
+  </g>
+  <ellipse cx="204" cy="208" rx="81" ry="7" fill="#d5cbe5"/>
+  <g fill="none" stroke="#77639f" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M164 61 269 103"/>
+    <path d="M204 77v102"/>
+    <path d="m204 179-61 29M204 179l58 29M204 179l40 8"/>
+  </g>
+  <g fill="#77639f">
+    <circle cx="204" cy="77" r="11"/>
+    <circle cx="204" cy="77" r="4" fill="#e8e2f3"/>
+    <rect x="197" y="125" width="14" height="18" rx="5"/>
+    <circle cx="204" cy="179" r="10"/>
+    <g transform="rotate(22 157 58)">
+      <rect x="144" y="52" width="25" height="12" rx="6"/>
+      <rect x="168" y="56" width="9" height="4" rx="2"/>
+      <g fill="none" stroke="#e8e2f3" stroke-width="1.6" stroke-linecap="round">
+        <path d="M149 55v6M153 54v8M157 54v8"/>
+      </g>
+    </g>
+  </g>
+  <g fill="#5f527e">
+    <circle cx="28" cy="219" r="17"/><circle cx="72" cy="214" r="21"/>
+    <circle cx="119" cy="220" r="18"/><circle cx="286" cy="219" r="18"/>
+    <circle cx="333" cy="214" r="21"/><circle cx="378" cy="219" r="17"/>
+    <path d="M0 220c56-12 108-4 151 2 36 5 65 5 100 0 47-7 94-13 149-2v10H0v-10Z"/>
+  </g>
+</svg>

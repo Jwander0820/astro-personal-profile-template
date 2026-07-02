@@ -1,0 +1,41 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ProfileHeader from '../components/ProfileHeader.astro';
+import SocialIcons from '../components/SocialIcons.astro';
+import LinkCard from '../components/LinkCard.astro';
+import SectionCard from '../components/SectionCard.astro';
+import Footer from '../components/Footer.astro';
+import CustomBlock from '../components/CustomBlock.astro';
+import { getBlocks, getLinks, getProfile, getSections } from '../lib/content';
+
+const profile = await getProfile();
+const links = await getLinks();
+const sections = await getSections();
+const blocks = await getBlocks();
+const iconLinks = links.filter((link) => link.data.group !== 'footer' && link.data.layout === 'icon');
+const featuredLinks = links.filter((link) => ['main', 'featured'].includes(link.data.group) && link.data.layout === 'card');
+const taglineText = Array.isArray(profile.data.tagline)
+  ? profile.data.tagline.join(', ')
+  : profile.data.tagline;
+const description = `${profile.data.displayName} — ${profile.data.title}。${taglineText}`;
+const blocksAt = (placement: 'before-links' | 'between-links-sections' | 'after-sections') =>
+  blocks.filter((block) => block.data.placement === placement);
+---
+<BaseLayout title={`${profile.data.displayName} · ${profile.data.title}`} description={description} image={profile.data.background}>
+  <ProfileHeader profile={profile} />
+  <SocialIcons links={iconLinks} />
+  {blocksAt('before-links').map((block) => <CustomBlock block={block} />)}
+  {featuredLinks.length > 0 && (
+    <section class="content-section" aria-labelledby="links-heading">
+      <h2 id="links-heading">Links</h2>
+      <div class="link-list">{featuredLinks.map((link) => <LinkCard link={link} />)}</div>
+    </section>
+  )}
+  {blocksAt('between-links-sections').map((block) => <CustomBlock block={block} />)}
+  <section class="content-section" aria-labelledby="about-heading">
+    <h2 id="about-heading">About me</h2>
+    <div class="section-list">{sections.map((section) => <SectionCard section={section} />)}</div>
+  </section>
+  {blocksAt('after-sections').map((block) => <CustomBlock block={block} />)}
+  <Footer name={profile.data.displayName} />
+</BaseLayout>
