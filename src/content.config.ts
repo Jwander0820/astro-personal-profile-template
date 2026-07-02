@@ -51,9 +51,20 @@ const blocks = defineCollection({
     placement: z.enum(['before-links', 'between-links-sections', 'after-sections']),
     order: z.number().default(100),
     visible: z.boolean().default(true),
-    layout: z.enum(['card', 'plain']).default('card'),
+    layout: z.enum(['card', 'plain', 'embed']).default('card'),
+    provider: z.enum(['notion']).optional(),
+    url: z.string().url().optional(),
+    height: z.number().int().min(320).max(1200).default(600),
     image: z.string().optional(),
     tags: z.array(z.string()).default([]),
+  }).superRefine((data, context) => {
+    if (data.layout === 'embed' && !data.url) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['url'],
+        message: 'Embed blocks require a public URL.',
+      });
+    }
   }),
 });
 

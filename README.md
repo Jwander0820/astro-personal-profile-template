@@ -99,6 +99,26 @@ tags: [Learning, Building]
 - `between-links-sections`：Links 與 About me 之間
 - `after-sections`：About me 後
 
+### 內嵌 Notion 頁面
+
+複製 `src/content/blocks/notion-embed.md`，再將 Notion 官方嵌入程式碼中的 `src` 網址貼到 `url`：
+
+```yaml
+---
+title: 最近動態
+placement: after-sections
+order: 20
+visible: true
+layout: embed
+provider: notion
+url: https://your-workspace.notion.site/your-page
+height: 600
+tags: []
+---
+```
+
+Notion 頁面必須先透過 `Share → Publish → Embed this page` 公開並取得嵌入網址。`height` 可設為 320–1200；修改 Notion 內容後不需要重新建置網站。
+
 `layout` 可選 `card` 或 `plain`。同一位置內使用 `order` 排序。新增文字、圖片、標籤與調整位置只需修改 Markdown；若要新增全新的視覺種類或互動行為，則需要擴充 Astro component 與 CSS。
 
 

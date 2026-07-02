@@ -6,12 +6,30 @@ interface Props { block: CollectionEntry<'blocks'>; }
 const { block } = Astro.props;
 const { Content } = await render(block);
 const imageUrl = withBase(block.data.image);
+const isEmbed = block.data.layout === 'embed';
+const embedUrl = block.data.url;
 ---
 <section class:list={['content-section', 'custom-block', `custom-block--${block.data.layout}`]} aria-labelledby={`block-${block.id}`}>
   <h2 id={`block-${block.id}`}>{block.data.title}</h2>
   <div class="custom-block__body">
     {imageUrl && <img src={imageUrl} alt="" loading="lazy" />}
     <div class="custom-block__content"><Content /></div>
+    {isEmbed && embedUrl && (
+      <>
+        <div class="custom-block__embed">
+          <iframe
+            src={embedUrl}
+            title={block.data.title}
+            height={block.data.height}
+            loading="lazy"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allow="clipboard-write; fullscreen"
+            allowfullscreen
+          ></iframe>
+        </div>
+        <a class="custom-block__embed-link" href={embedUrl} target="_blank" rel="noopener noreferrer">在 Notion 開啟 ↗</a>
+      </>
+    )}
     {block.data.tags.length > 0 && <ul>{block.data.tags.map((tag) => <li>{tag}</li>)}</ul>}
   </div>
 </section>
