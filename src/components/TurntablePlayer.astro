@@ -1,0 +1,503 @@
+---
+interface Props {
+  playlistId: string;
+  title: string;
+}
+
+const { playlistId, title } = Astro.props;
+---
+
+<div class="turntable-player" data-turntable-player data-playlist-id={playlistId}>
+  <div class="turntable-player__deck">
+    <div class="turntable-player__machine">
+      <span class="turntable-player__status-light" aria-hidden="true"></span>
+      <div class="turntable-player__platter" aria-hidden="true">
+        <div class="turntable-player__record">
+          <span class="turntable-player__spindle"></span>
+        </div>
+      </div>
+      <div
+        class="turntable-player__tonearm"
+        data-turntable-scrubber
+        role="slider"
+        tabindex="0"
+        aria-label="播放位置"
+        aria-disabled="true"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+        aria-valuetext="尚未載入曲目"
+      >
+        <span class="turntable-player__pivot" aria-hidden="true"></span>
+        <span class="turntable-player__arm" aria-hidden="true"></span>
+        <span class="turntable-player__needle" aria-hidden="true"></span>
+      </div>
+    </div>
+
+    <div class="turntable-player__controls">
+      <p class="turntable-player__eyebrow">Now spinning · YouTube</p>
+      <p class="turntable-player__track-title" data-turntable-track-title>等待唱針落下</p>
+      <p class="turntable-player__status" data-turntable-status aria-live="polite">正在準備播放清單…</p>
+      <div class="turntable-player__actions">
+        <button type="button" class="turntable-player__button turntable-player__button--primary" data-turntable-toggle aria-pressed="false" disabled>
+          <span data-turntable-toggle-label>放下唱針</span>
+        </button>
+        <button type="button" class="turntable-player__button" data-turntable-next disabled>換一首</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="turntable-player__video" aria-label={`${title} YouTube 播放器`}>
+    <div data-youtube-player></div>
+  </div>
+  <noscript><p class="turntable-player__fallback">需要啟用 JavaScript 才能使用播放器。</p></noscript>
+</div>
+
+<script>
+  type YouTubePlayer = {
+    cuePlaylist(options: { listType: 'playlist'; list: string; index: number }): void;
+    getCurrentTime(): number;
+    getDuration(): number;
+    getIframe(): HTMLIFrameElement;
+    getPlaylist(): string[];
+    getPlayerState(): number;
+    getVideoData?(): { title?: string; author?: string };
+    loadVideoById(videoId: string): void;
+    pauseVideo(): void;
+    playVideo(): void;
+    seekTo(seconds: number, allowSeekAhead: boolean): void;
+  };
+
+  type YouTubeNamespace = {
+    Player: new (
+      element: HTMLElement,
+      options: {
+        host: string;
+        width: string;
+        height: string;
+        playerVars: Record<string, string | number>;
+        events: {
+          onReady: (event: { target: YouTubePlayer }) => void;
+          onStateChange: (event: { data: number; target: YouTubePlayer }) => void;
+          onError: (event: { data: number; target: YouTubePlayer }) => void;
+          onAutoplayBlocked: (event: { target: YouTubePlayer }) => void;
+        };
+      },
+    ) => YouTubePlayer;
+  };
+
+  const browserWindow = window as typeof window & {
+    YT?: YouTubeNamespace;
+    onYouTubeIframeAPIReady?: () => void;
+  };
+
+  let youtubeApiPromise: Promise<YouTubeNamespace> | undefined;
+
+  function loadYouTubeApi(): Promise<YouTubeNamespace> {
+    if (browserWindow.YT?.Player) return Promise.resolve(browserWindow.YT);
+    if (youtubeApiPromise) return youtubeApiPromise;
+
+    youtubeApiPromise = new Promise((resolve, reject) => {
+      const previousCallback = browserWindow.onYouTubeIframeAPIReady;
+      const timeout = window.setTimeout(() => reject(new Error('YouTube API timeout')), 15000);
+
+      browserWindow.onYouTubeIframeAPIReady = () => {
+        previousCallback?.();
+        window.clearTimeout(timeout);
+        if (browserWindow.YT?.Player) resolve(browserWindow.YT);
+        else reject(new Error('YouTube API unavailable'));
+      };
+
+      if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+        const script = document.createElement('script');
+        script.src = 'https://www.youtube.com/iframe_api';
+        script.async = true;
+        script.onerror = () => {
+          window.clearTimeout(timeout);
+          reject(new Error('YouTube API failed to load'));
+        };
+        document.head.append(script);
+      }
+    });
+
+    return youtubeApiPromise;
+  }
+
+  function initializeTurntable(root: HTMLElement, YT: YouTubeNamespace) {
+    const playlistId = root.dataset.playlistId;
+    const playerHost = root.querySelector<HTMLElement>('[data-youtube-player]');
+    const status = root.querySelector<HTMLElement>('[data-turntable-status]');
+    const trackTitle = root.querySelector<HTMLElement>('[data-turntable-track-title]');
+    const scrubber = root.querySelector<HTMLElement>('[data-turntable-scrubber]');
+    const scrubberPivot = root.querySelector<HTMLElement>('.turntable-player__pivot');
+    const toggleButton = root.querySelector<HTMLButtonElement>('[data-turntable-toggle]');
+    const toggleLabel = root.querySelector<HTMLElement>('[data-turntable-toggle-label]');
+    const nextButton = root.querySelector<HTMLButtonElement>('[data-turntable-next]');
+
+    if (!playlistId || !playerHost || !status || !trackTitle || !scrubber || !scrubberPivot || !toggleButton || !toggleLabel || !nextButton) return;
+
+    let player: YouTubePlayer;
+    let playlistIds: string[] = [];
+    let currentVideoId: string | undefined;
+    let retryCount = 0;
+    let playbackBlocked = false;
+    let playlistProbeIndex = 0;
+    let playlistProbeToken = 0;
+    let progressTimer: number | undefined;
+    let scrubPreviewTime = 0;
+    let scrubWasPlaying = false;
+    let trackMetadataReady = false;
+    const failedVideoIds = new Set<string>();
+    const tonearmStartAngle = 23;
+    const tonearmEndAngle = 43;
+
+    const formatTime = (seconds: number) => {
+      const safeSeconds = Math.max(0, Math.floor(seconds));
+      const minutes = Math.floor(safeSeconds / 60);
+      const remainingSeconds = String(safeSeconds % 60).padStart(2, '0');
+      return `${minutes}:${remainingSeconds}`;
+    };
+
+    const setTonearmProgress = (progress: number) => {
+      const normalizedProgress = Math.min(1, Math.max(0, progress));
+      root.style.setProperty('--tonearm-progress', normalizedProgress.toFixed(4));
+      root.style.setProperty('--tonearm-angle', `${tonearmStartAngle + normalizedProgress * (tonearmEndAngle - tonearmStartAngle)}deg`);
+
+      const duration = trackMetadataReady && currentVideoId ? player.getDuration() : 0;
+      if (Number.isFinite(duration) && duration > 0) {
+        const currentTime = normalizedProgress * duration;
+        scrubber.setAttribute('aria-disabled', 'false');
+        scrubber.setAttribute('aria-valuenow', String(Math.round(normalizedProgress * 100)));
+        scrubber.setAttribute('aria-valuetext', `${formatTime(currentTime)} / ${formatTime(duration)}`);
+      } else {
+        scrubber.setAttribute('aria-disabled', 'true');
+        scrubber.setAttribute('aria-valuenow', '0');
+        scrubber.setAttribute('aria-valuetext', '尚未載入曲目');
+      }
+    };
+
+    const stopProgressTracker = () => {
+      if (progressTimer === undefined) return;
+      window.clearInterval(progressTimer);
+      progressTimer = undefined;
+    };
+
+    const updateTonearmProgress = () => {
+      const duration = player.getDuration();
+      if (!Number.isFinite(duration) || duration <= 0) return;
+      setTonearmProgress(player.getCurrentTime() / duration);
+    };
+
+    const startProgressTracker = () => {
+      stopProgressTracker();
+      updateTonearmProgress();
+      progressTimer = window.setInterval(updateTonearmProgress, 750);
+    };
+
+    const setStatus = (message: string, isError = false) => {
+      status.textContent = message;
+      root.classList.toggle('has-error', isError);
+    };
+
+    const updateTrackTitle = () => {
+      const videoTitle = player.getVideoData?.().title?.trim();
+      if (videoTitle) trackTitle.textContent = videoTitle;
+    };
+
+    const setReady = (ready: boolean) => {
+      toggleButton.disabled = !ready;
+      nextButton.disabled = !ready;
+    };
+
+    const setVisualState = (state: 'idle' | 'loading' | 'playing' | 'paused') => {
+      root.classList.toggle('has-track', state !== 'idle');
+      root.classList.toggle('is-playing', state === 'playing');
+      root.classList.toggle('is-paused', state === 'paused');
+      toggleButton.setAttribute('aria-pressed', String(state === 'playing'));
+
+      if (state === 'playing') toggleLabel.textContent = '暫停';
+      else if (state === 'paused') toggleLabel.textContent = '繼續播放';
+      else if (state === 'loading') toggleLabel.textContent = '載入中…';
+      else toggleLabel.textContent = currentVideoId ? '再抽一首' : '放下唱針';
+
+      if (state === 'idle') setTonearmProgress(0);
+    };
+
+    const canScrub = () => {
+      const duration = trackMetadataReady && currentVideoId ? player.getDuration() : 0;
+      return Number.isFinite(duration) && duration > 0;
+    };
+
+    const updateScrubPreview = (clientX: number, clientY: number) => {
+      const pivotRect = scrubberPivot.getBoundingClientRect();
+      const pivotX = pivotRect.left + pivotRect.width / 2;
+      const pivotY = pivotRect.top + pivotRect.height / 2;
+      const pointerAngle = Math.atan2(pivotX - clientX, clientY - pivotY) * (180 / Math.PI);
+      const clampedAngle = Math.min(tonearmEndAngle, Math.max(tonearmStartAngle, pointerAngle));
+      const progress = (clampedAngle - tonearmStartAngle) / (tonearmEndAngle - tonearmStartAngle);
+      const duration = player.getDuration();
+
+      scrubPreviewTime = progress * duration;
+      setTonearmProgress(progress);
+      setStatus(`預覽位置 · ${formatTime(scrubPreviewTime)} / ${formatTime(duration)}`);
+    };
+
+    const beginScrub = (event: PointerEvent) => {
+      if (!canScrub()) {
+        setStatus('請先播放一首歌曲，再拖曳唱針調整時間。');
+        return;
+      }
+
+      event.preventDefault();
+      scrubWasPlaying = player.getPlayerState() === 1;
+      scrubPreviewTime = player.getCurrentTime();
+      stopProgressTracker();
+      setVisualState('paused');
+      root.classList.add('is-scrubbing');
+      scrubber.setPointerCapture(event.pointerId);
+      player.pauseVideo();
+      updateScrubPreview(event.clientX, event.clientY);
+    };
+
+    const moveScrub = (event: PointerEvent) => {
+      if (!root.classList.contains('is-scrubbing')) return;
+      event.preventDefault();
+      updateScrubPreview(event.clientX, event.clientY);
+    };
+
+    const finishScrub = (event: PointerEvent) => {
+      if (!root.classList.contains('is-scrubbing')) return;
+      event.preventDefault();
+
+      if (scrubWasPlaying) setVisualState('loading');
+      else setVisualState('paused');
+      root.classList.remove('is-scrubbing');
+
+      if (scrubber.hasPointerCapture(event.pointerId)) scrubber.releasePointerCapture(event.pointerId);
+      player.seekTo(scrubPreviewTime, true);
+
+      if (scrubWasPlaying) {
+        setStatus(`已移至 ${formatTime(scrubPreviewTime)} · 正在繼續播放`);
+        player.playVideo();
+      } else {
+        setStatus(`已移至 ${formatTime(scrubPreviewTime)} · 播放維持暫停`);
+      }
+
+      scrubWasPlaying = false;
+    };
+
+    const cancelScrub = (event: PointerEvent) => {
+      if (!root.classList.contains('is-scrubbing')) return;
+      root.classList.remove('is-scrubbing');
+      if (scrubber.hasPointerCapture(event.pointerId)) scrubber.releasePointerCapture(event.pointerId);
+      updateTonearmProgress();
+
+      if (scrubWasPlaying) player.playVideo();
+      else setVisualState('paused');
+      scrubWasPlaying = false;
+    };
+
+    const seekWithKeyboard = (event: KeyboardEvent) => {
+      if (!canScrub()) return;
+
+      const duration = player.getDuration();
+      const step = event.shiftKey ? 15 : 5;
+      let targetTime: number | undefined;
+
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') targetTime = player.getCurrentTime() - step;
+      else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') targetTime = player.getCurrentTime() + step;
+      else if (event.key === 'Home') targetTime = 0;
+      else if (event.key === 'End') targetTime = duration;
+      else return;
+
+      event.preventDefault();
+      const clampedTime = Math.min(duration, Math.max(0, targetTime));
+      player.seekTo(clampedTime, true);
+      setTonearmProgress(clampedTime / duration);
+      setStatus(`已移至 ${formatTime(clampedTime)} / ${formatTime(duration)}`);
+    };
+
+    const refreshPlaylistIds = () => {
+      playlistIds = (player.getPlaylist() ?? []).filter((id) => typeof id === 'string' && id.length > 0);
+      if (playlistIds.length > 0) {
+        setReady(true);
+        setStatus(`唱針就緒 · ${playlistIds.length} 首候選`);
+        setVisualState('idle');
+        return true;
+      }
+
+      return false;
+    };
+
+    const waitForPlaylist = (token: number, attemptsLeft = 12) => {
+      if (token !== playlistProbeToken) return;
+      if (refreshPlaylistIds()) return;
+
+      if (attemptsLeft <= 0) {
+        if (playlistProbeIndex < 3) {
+          playlistProbeIndex += 1;
+          cuePlaylistAtIndex(playlistProbeIndex);
+        } else {
+          setReady(false);
+          setStatus('無法讀取這份 YouTube 播放清單，請確認清單為公開或不公開。', true);
+        }
+        return;
+      }
+
+      window.setTimeout(() => waitForPlaylist(token, attemptsLeft - 1), 250);
+    };
+
+    const cuePlaylistAtIndex = (index: number) => {
+      const token = ++playlistProbeToken;
+      root.classList.remove('has-error');
+      setStatus(index === 0 ? '正在讀取播放清單…' : `第 ${index + 1} 首無法內嵌，正在嘗試下一首…`);
+      player.cuePlaylist({ listType: 'playlist', list: playlistId, index });
+      waitForPlaylist(token);
+    };
+
+    const pickRandomVideo = () => {
+      const playable = playlistIds.filter((id) => id !== currentVideoId && !failedVideoIds.has(id));
+      const fallback = playlistIds.filter((id) => !failedVideoIds.has(id));
+      const candidates = playable.length > 0 ? playable : fallback;
+      if (candidates.length === 0) return undefined;
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    };
+
+    const playRandomVideo = (isRetry = false) => {
+      if (!isRetry) retryCount = 0;
+      const nextVideoId = pickRandomVideo();
+
+      if (!nextVideoId) {
+        setVisualState('idle');
+        setStatus('找不到可播放的曲目，請確認播放清單權限。', true);
+        return;
+      }
+
+      playbackBlocked = false;
+      currentVideoId = nextVideoId;
+      trackMetadataReady = false;
+      trackTitle.textContent = '正在抽選曲目…';
+      setTonearmProgress(0);
+      setVisualState('loading');
+      setStatus(isRetry ? '這首無法嵌入，正在重新抽選…' : '正在抽選並放下唱針…');
+      player.loadVideoById(nextVideoId);
+    };
+
+    player = new YT.Player(playerHost, {
+      host: 'https://www.youtube.com',
+      width: '100%',
+      height: '100%',
+      playerVars: {
+        controls: 1,
+        list: playlistId,
+        listType: 'playlist',
+        playsinline: 1,
+        rel: 0,
+        origin: window.location.origin,
+      },
+      events: {
+        onReady: (event) => {
+          player = event.target;
+          const iframe = player.getIframe();
+          iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+          iframe.title = `${iframe.parentElement?.getAttribute('aria-label') ?? 'YouTube'} 播放器`;
+          cuePlaylistAtIndex(playlistProbeIndex);
+        },
+        onStateChange: (event) => {
+          player = event.target;
+
+          if (event.data === 5 && playlistIds.length === 0) refreshPlaylistIds();
+          if (event.data === 1) {
+            playbackBlocked = false;
+            retryCount = 0;
+            trackMetadataReady = player.getDuration() > 0;
+            updateTrackTitle();
+            startProgressTracker();
+            setVisualState('playing');
+            setStatus('唱針已落下 · 拖曳唱針可選時間');
+          } else if (event.data === 2 && currentVideoId) {
+            stopProgressTracker();
+            trackMetadataReady = player.getDuration() > 0;
+            updateTrackTitle();
+            if (root.classList.contains('is-scrubbing')) return;
+            updateTonearmProgress();
+            setVisualState('paused');
+            setStatus('播放已暫停 · 拖曳唱針可選時間');
+          } else if (event.data === 3 && currentVideoId) {
+            stopProgressTracker();
+            trackMetadataReady = player.getDuration() > 0;
+            updateTrackTitle();
+            updateTonearmProgress();
+            setVisualState('loading');
+            setStatus('正在緩衝音樂…');
+          } else if (event.data === 0 && currentVideoId) {
+            stopProgressTracker();
+            setVisualState('idle');
+            setStatus('這一面播放完畢，再抽一首吧。');
+          }
+        },
+        onError: (event) => {
+          player = event.target;
+          stopProgressTracker();
+          trackMetadataReady = false;
+
+          if (playlistIds.length === 0) {
+            if (playlistProbeIndex < 3) {
+              playlistProbeIndex += 1;
+              cuePlaylistAtIndex(playlistProbeIndex);
+            } else {
+              playlistProbeToken += 1;
+              setReady(false);
+              setStatus(`無法初始化 YouTube 播放清單（錯誤 ${event.data}）。`, true);
+            }
+            return;
+          }
+
+          if (currentVideoId) failedVideoIds.add(currentVideoId);
+
+          if (playlistIds.length > 0 && retryCount < 3) {
+            retryCount += 1;
+            playRandomVideo(true);
+          } else {
+            setVisualState('idle');
+            setStatus(`YouTube 無法播放這份內容（錯誤 ${event.data}）。`, true);
+          }
+        },
+        onAutoplayBlocked: (event) => {
+          player = event.target;
+          playbackBlocked = true;
+          stopProgressTracker();
+          trackMetadataReady = player.getDuration() > 0;
+          updateTrackTitle();
+          updateTonearmProgress();
+          setVisualState('paused');
+          setStatus('瀏覽器阻擋播放，請再按一次播放或使用影片控制列。', true);
+        },
+      },
+    });
+
+    toggleButton.addEventListener('click', () => {
+      const state = player.getPlayerState();
+      if (state === 1) player.pauseVideo();
+      else if (playbackBlocked || (state === 2 && currentVideoId)) player.playVideo();
+      else playRandomVideo();
+    });
+
+    nextButton.addEventListener('click', () => playRandomVideo());
+    scrubber.addEventListener('pointerdown', beginScrub);
+    scrubber.addEventListener('pointermove', moveScrub);
+    scrubber.addEventListener('pointerup', finishScrub);
+    scrubber.addEventListener('pointercancel', cancelScrub);
+    scrubber.addEventListener('keydown', seekWithKeyboard);
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-turntable-player]').forEach((root) => {
+    loadYouTubeApi()
+      .then((YT) => initializeTurntable(root, YT))
+      .catch(() => {
+        const status = root.querySelector<HTMLElement>('[data-turntable-status]');
+        if (status) status.textContent = 'YouTube 播放器載入失敗，請稍後重新整理。';
+        root.classList.add('has-error');
+      });
+  });
+</script>

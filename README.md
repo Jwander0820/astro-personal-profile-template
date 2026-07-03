@@ -128,7 +128,28 @@ tags: []
 
 Notion 頁面必須先透過 `Share → Publish → Embed this page` 公開並取得嵌入網址。`height` 可設為 320–1200；修改 Notion 內容後不需要重新建置網站。
 
-`layout` 可選 `card` 或 `plain`。同一位置內使用 `order` 排序。新增文字、圖片、標籤與調整位置只需修改 Markdown；若要新增全新的視覺種類或互動行為，則需要擴充 Astro component 與 CSS。
+### 黑膠唱盤隨機播放器
+
+`turntable` 版型會讀取公開或不公開的 YouTube 播放清單。設定檔只需保存分享網址中的 `list` ID，不需要 API Key：
+
+```yaml
+---
+title: On rotation
+placement: after-sections
+order: 5
+visible: true
+layout: turntable
+provider: youtube
+playlistId: PLlaN88a7y2_oK0nKMjZSwdU_njxUYWykm
+tags: [Shuffle, YouTube]
+---
+
+按下唱針，從短期輪播清單隨機抽一首。
+```
+
+播放器會隨機選取單支影片、顯示目前 YouTube 曲名，唱臂會依播放進度從外圈往唱片中心移動；暫停、結束或播放失敗時會回到唱臂架。使用滑鼠或觸控拖曳唱臂可跳轉播放時間，鍵盤方向鍵每次調整 5 秒、搭配 Shift 調整 15 秒，Home／End 可跳至開頭／結尾。「換一首」會避開目前曲目重新抽選。私人清單、禁止嵌入或受地區限制的影片可能無法播放。YouTube 播放器必須保持可見、至少 `200 × 200px`，且不得以自訂介面遮擋。
+
+`layout` 可選 `card`、`plain`、`embed` 或 `turntable`。同一位置內使用 `order` 排序。新增文字、圖片、標籤與調整位置只需修改 Markdown；若要新增全新的視覺種類或互動行為，則需要擴充 Astro component 與 CSS。
 
 
 ## GitHub Pages 部署

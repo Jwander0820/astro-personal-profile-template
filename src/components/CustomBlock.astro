@@ -1,12 +1,14 @@
 ---
 import { render, type CollectionEntry } from 'astro:content';
 import { withBase } from '../lib/paths';
+import TurntablePlayer from './TurntablePlayer.astro';
 
 interface Props { block: CollectionEntry<'blocks'>; }
 const { block } = Astro.props;
 const { Content } = await render(block);
 const imageUrl = withBase(block.data.image);
 const isEmbed = block.data.layout === 'embed';
+const isTurntable = block.data.layout === 'turntable';
 const embedUrl = block.data.url;
 ---
 <section class:list={['content-section', 'custom-block', `custom-block--${block.data.layout}`]} aria-labelledby={`block-${block.id}`}>
@@ -14,6 +16,9 @@ const embedUrl = block.data.url;
   <div class="custom-block__body">
     {imageUrl && <img src={imageUrl} alt="" loading="lazy" />}
     <div class="custom-block__content"><Content /></div>
+    {isTurntable && block.data.playlistId && (
+      <TurntablePlayer playlistId={block.data.playlistId} title={block.data.title} />
+    )}
     {isEmbed && embedUrl && (
       <>
         <div class="custom-block__embed">

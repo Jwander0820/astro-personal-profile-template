@@ -53,9 +53,10 @@ const blocks = defineCollection({
     placement: z.enum(['before-links', 'between-links-sections', 'after-sections']),
     order: z.number().default(100),
     visible: z.boolean().default(true),
-    layout: z.enum(['card', 'plain', 'embed']).default('card'),
-    provider: z.enum(['notion']).optional(),
+    layout: z.enum(['card', 'plain', 'embed', 'turntable']).default('card'),
+    provider: z.enum(['notion', 'youtube']).optional(),
     url: z.string().url().optional(),
+    playlistId: z.string().regex(/^[A-Za-z0-9_-]{10,}$/, 'Invalid YouTube playlist ID.').optional(),
     height: z.number().int().min(320).max(1200).default(600),
     image: z.string().optional(),
     tags: z.array(z.string()).default([]),
@@ -65,6 +66,20 @@ const blocks = defineCollection({
         code: z.ZodIssueCode.custom,
         path: ['url'],
         message: 'Embed blocks require a public URL.',
+      });
+    }
+    if (data.layout === 'turntable' && data.provider !== 'youtube') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['provider'],
+        message: 'Turntable blocks require provider: youtube.',
+      });
+    }
+    if (data.layout === 'turntable' && !data.playlistId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['playlistId'],
+        message: 'Turntable blocks require a YouTube playlist ID.',
       });
     }
   }),
