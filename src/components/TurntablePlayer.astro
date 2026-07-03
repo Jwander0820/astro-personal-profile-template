@@ -228,18 +228,30 @@ const { playlistId, title } = Astro.props;
       return Number.isFinite(duration) && duration > 0;
     };
 
+    let scrubIsResting = false;
+
     const updateScrubPreview = (clientX: number, clientY: number) => {
       const pivotRect = scrubberPivot.getBoundingClientRect();
       const pivotX = pivotRect.left + pivotRect.width / 2;
       const pivotY = pivotRect.top + pivotRect.height / 2;
       const pointerAngle = Math.atan2(pivotX - clientX, clientY - pivotY) * (180 / Math.PI);
-      const clampedAngle = Math.min(tonearmEndAngle, Math.max(tonearmStartAngle, pointerAngle));
-      const progress = (clampedAngle - tonearmStartAngle) / (tonearmEndAngle - tonearmStartAngle);
-      const duration = player.getDuration();
+      const restThreshold = 18;
 
-      scrubPreviewTime = progress * duration;
-      setTonearmProgress(progress);
-      setStatus(`預覽位置 · ${formatTime(scrubPreviewTime)} / ${formatTime(duration)}`);
+      if (pointerAngle <= restThreshold) {
+        scrubIsResting = true;
+        const clampedAngle = Math.min(tonearmEndAngle, Math.max(0, pointerAngle));
+        root.style.setProperty('--tonearm-angle', `${clampedAngle}deg`);
+        setStatus('放回唱針架 · 放開將暫停播放');
+      } else {
+        scrubIsResting = false;
+        const clampedAngle = Math.min(tonearmEndAngle, Math.max(tonearmStartAngle, pointerAngle));
+        const progress = (clampedAngle - tonearmStartAngle) / (tonearmEndAngle - tonearmStartAngle);
+        const duration = player.getDuration();
+
+        scrubPreviewTime = progress * duration;
+        setTonearmProgress(progress);
+        setStatus(`預覽位置 · ${formatTime(scrubPreviewTime)} / ${formatTime(duration)}`);
+      }
     };
 
     const beginScrub = (event: PointerEvent) => {
@@ -251,6 +263,7 @@ const { playlistId, title } = Astro.props;
       event.preventDefault();
       scrubWasPlaying = player.getPlayerState() === 1;
       scrubPreviewTime = player.getCurrentTime();
+      scrubIsResting = false;
       stopProgressTracker();
       setVisualState('paused');
       root.classList.add('is-scrubbing');
@@ -269,21 +282,27 @@ const { playlistId, title } = Astro.props;
       if (!root.classList.contains('is-scrubbing')) return;
       event.preventDefault();
 
-      if (scrubWasPlaying) setVisualState('loading');
-      else setVisualState('paused');
       root.classList.remove('is-scrubbing');
-
       if (scrubber.hasPointerCapture(event.pointerId)) scrubber.releasePointerCapture(event.pointerId);
-      player.seekTo(scrubPreviewTime, true);
 
-      if (scrubWasPlaying) {
-        setStatus(`已移至 ${formatTime(scrubPreviewTime)} · 正在繼續播放`);
-        player.playVideo();
+      if (scrubIsResting) {
+        player.pauseVideo();
+        setVisualState('paused');
+        setStatus('唱針已放回唱針架 · 播放已暫停');
       } else {
-        setStatus(`已移至 ${formatTime(scrubPreviewTime)} · 播放維持暫停`);
+        player.seekTo(scrubPreviewTime, true);
+        if (scrubWasPlaying) {
+          setVisualState('loading');
+          setStatus(`已移至 ${formatTime(scrubPreviewTime)} · 正在繼續播放`);
+          player.playVideo();
+        } else {
+          setVisualState('paused');
+          setStatus(`已移至 ${formatTime(scrubPreviewTime)} · 播放維持暫停`);
+        }
       }
 
       scrubWasPlaying = false;
+      scrubIsResting = false;
     };
 
     const cancelScrub = (event: PointerEvent) => {
@@ -414,7 +433,7 @@ const { playlistId, title } = Astro.props;
             updateTrackTitle();
             startProgressTracker();
             setVisualState('playing');
-            setStatus('唱針已落下 · 拖曳唱針可選時間');
+            setStatus('唱針已落下 · 拖曳唱針調整進度');
           } else if (event.data === 2 && currentVideoId) {
             stopProgressTracker();
             trackMetadataReady = player.getDuration() > 0;
@@ -422,7 +441,7 @@ const { playlistId, title } = Astro.props;
             if (root.classList.contains('is-scrubbing')) return;
             updateTonearmProgress();
             setVisualState('paused');
-            setStatus('播放已暫停 · 拖曳唱針可選時間');
+            setStatus('播放已暫停 · 拖曳唱針調整進度');
           } else if (event.data === 3 && currentVideoId) {
             stopProgressTracker();
             trackMetadataReady = player.getDuration() > 0;

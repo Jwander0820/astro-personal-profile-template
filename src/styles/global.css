@@ -117,7 +117,7 @@ h1 { margin: 0; font-size: 1.72rem; line-height: 1.3; letter-spacing: .02em; }
 .turntable-player__controls { align-self: center; min-width: 0; }
 .turntable-player__eyebrow { margin: 0 0 6px; color: #887e91; font-size: .55rem; font-weight: 850; letter-spacing: .13em; text-transform: uppercase; }
 .turntable-player__track-title { display: -webkit-box; min-height: 2.6em; margin: 0 0 8px; overflow: hidden; color: #433b4a; font-size: .84rem; font-weight: 800; line-height: 1.3; letter-spacing: -.01em; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.turntable-player__status { min-height: 3em; margin: 0; color: #655d6c; font-size: .66rem; font-weight: 650; line-height: 1.5; }
+.turntable-player__status { min-height: 3em; margin: 0; color: #655d6c; font-size: .66rem; font-weight: 650; line-height: 1.5; word-break: keep-all; overflow-wrap: break-word; }
 .turntable-player.has-error .turntable-player__status { color: #915e70; }
 .turntable-player__actions { display: grid; gap: 7px; margin-top: 13px; }
 .turntable-player__button { min-height: 38px; padding: 8px 10px; color: #62596b; border: 1px solid #cfc7d7; border-radius: 11px; background: rgba(255,255,255,.7); font: inherit; font-size: .7rem; font-weight: 750; cursor: pointer; transition: transform .16s ease, border-color .16s ease, background .16s ease; }
