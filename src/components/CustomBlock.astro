@@ -17,7 +17,11 @@ const embedUrl = block.data.url;
     {imageUrl && <img src={imageUrl} alt="" loading="lazy" />}
     <div class="custom-block__content"><Content /></div>
     {isTurntable && block.data.playlistId && (
-      <TurntablePlayer playlistId={block.data.playlistId} title={block.data.title} />
+      <TurntablePlayer
+        playlistId={block.data.playlistId}
+        title={block.data.title}
+        continuousPlayback={block.data.continuousPlayback}
+      />
     )}
     {isEmbed && embedUrl && (
       <>

@@ -6,6 +6,7 @@ visible: true
 layout: turntable
 provider: youtube
 playlistId: PLlaN88a7y2_oK0nKMjZSwdU_njxUYWykm
+continuousPlayback: true
 tags: [Shuffle, YouTube]
 ---
 
