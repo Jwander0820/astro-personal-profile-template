@@ -291,14 +291,9 @@ const { playlistId, title } = Astro.props;
         setStatus('唱針已放回唱針架 · 播放已暫停');
       } else {
         player.seekTo(scrubPreviewTime, true);
-        if (scrubWasPlaying) {
-          setVisualState('loading');
-          setStatus(`已移至 ${formatTime(scrubPreviewTime)} · 正在繼續播放`);
-          player.playVideo();
-        } else {
-          setVisualState('paused');
-          setStatus(`已移至 ${formatTime(scrubPreviewTime)} · 播放維持暫停`);
-        }
+        setVisualState('loading');
+        setStatus(`已移至 ${formatTime(scrubPreviewTime)} · 正在播放`);
+        player.playVideo();
       }
 
       scrubWasPlaying = false;
