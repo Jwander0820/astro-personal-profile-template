@@ -24,6 +24,8 @@ export const icons: Record<string, string> = {
   music: '<path d="M9 17.5V6l10-2v11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>',
   code: '<path d="m8.7 17.3-5.3-5.3 5.3-5.3 1.4 1.4-3.9 3.9 3.9 3.9-1.4 1.4Zm6.6 0-1.4-1.4 3.9-3.9-3.9-3.9 1.4-1.4 5.3 5.3-5.3 5.3Z"/>',
   live: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(45 10 10)" stroke-width="1.5"><path d="M6.4 7.4V5.2a3.6 3.6 0 0 1 7.2 0v2.2H6.4Z"/><path d="M6.8 4h6.4M6.4 5.7h7.2M7.2 7.4l1 2.5h3.6l1-2.5M8.2 9.9l.9 7h1.8l.9-7M10 16.9v.1"/></g><path d="M5.05 14.95c-2.1 1.7-1.8 4.4.4 5.2 2.2.8 3.8-1.5 6.2-.6 1.9.7 1.9 2.4 4.4 2.4 1.8 0 3.1-.8 3.9-2.1" stroke-width="1.8"/></g>',
+  game12345: '<g stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><g transform="rotate(-32 12 19)"><rect x="8" y="4.2" width="8" height="14.8" rx="1.25" fill="#fff"/><text x="9.65" y="7.85" fill="currentColor" stroke="none" font-family="ui-monospace, monospace" font-size="3.6" font-weight="800" text-anchor="middle">1</text></g><g transform="rotate(-16 12 19)"><rect x="8" y="4.2" width="8" height="14.8" rx="1.25" fill="#fff"/><text x="9.65" y="7.85" fill="currentColor" stroke="none" font-family="ui-monospace, monospace" font-size="3.6" font-weight="800" text-anchor="middle">2</text></g><g><rect x="8" y="4.2" width="8" height="14.8" rx="1.25" fill="#fff"/><text x="9.65" y="7.85" fill="currentColor" stroke="none" font-family="ui-monospace, monospace" font-size="3.6" font-weight="800" text-anchor="middle">3</text></g><g transform="rotate(16 12 19)"><rect x="8" y="4.2" width="8" height="14.8" rx="1.25" fill="#fff"/><text x="9.65" y="7.85" fill="currentColor" stroke="none" font-family="ui-monospace, monospace" font-size="3.6" font-weight="800" text-anchor="middle">4</text></g><g transform="rotate(32 12 19)"><rect x="8" y="4.2" width="8" height="14.8" rx="1.25" fill="#fff"/><text x="9.65" y="7.85" fill="currentColor" stroke="none" font-family="ui-monospace, monospace" font-size="3.6" font-weight="800" text-anchor="middle">5</text></g></g>',
+  game: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M7.2 8.1h9.6c2.12 0 3.87 1.53 4.25 3.62l.93 5.08c.34 1.86-1.93 3.02-3.23 1.65l-2.08-2.2H7.33l-2.08 2.2c-1.3 1.37-3.57.21-3.23-1.65l.93-5.08A4.32 4.32 0 0 1 7.2 8.1Z" stroke-width="1.8"/><path d="M7.1 11.05v3.8m-1.9-1.9H9" stroke-width="1.75"/><circle cx="16.1" cy="11.65" r=".85" fill="currentColor" stroke="none"/><circle cx="18.25" cy="13.8" r=".85" fill="currentColor" stroke="none"/><path d="M9.2 8.1 10.1 6h3.8l.9 2.1" stroke-width="1.5"/></g>',
   arrow: '<path d="M5 11h10.17l-3.59-3.59L13 6l6 6-6 6-1.42-1.41L15.17 13H5v-2Z"/>',
 };
 
@@ -39,5 +41,9 @@ export const iconGroups = [
   {
     label: '其他',
     names: ['notion', 'mail', 'code', 'live', 'arrow'],
+  },
+  {
+    label: '遊戲',
+    names: ['game12345', 'game'],
   },
 ] as const;
