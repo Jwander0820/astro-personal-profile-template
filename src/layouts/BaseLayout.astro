@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { withBase } from '../lib/paths';
+import ThemeToggle from '../components/ThemeToggle.astro';
 interface Props {
   title: string;
   description: string;
@@ -29,6 +30,16 @@ const favicon = withBase('/favicon.svg');
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
+    <script is:inline>
+      (function() {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
@@ -41,5 +52,8 @@ const favicon = withBase('/favicon.svg');
     <meta name="twitter:card" content={socialImage ? 'summary_large_image' : 'summary'} />
     <title>{title}</title>
   </head>
-  <body class={pageClass}><main><slot /></main></body>
+  <body class={pageClass}>
+    <ThemeToggle />
+    <main><slot /></main>
+  </body>
 </html>
