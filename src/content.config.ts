@@ -56,6 +56,7 @@ const blocks = defineCollection({
     layout: z.enum(['card', 'plain', 'embed', 'turntable']).default('card'),
     provider: z.enum(['notion', 'youtube']).optional(),
     url: z.string().url().optional(),
+    embedMode: z.enum(['preview', 'inline']).default('preview'),
     playlistId: z.string().regex(/^[A-Za-z0-9_-]{10,}$/, 'Invalid YouTube playlist ID.').optional(),
     continuousPlayback: z.boolean().default(true),
     height: z.number().int().min(320).max(1200).default(600),

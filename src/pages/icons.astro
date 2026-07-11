@@ -62,24 +62,24 @@ const homeUrl = withBase('/') ?? '/';
 
 <style>
   .preview-header { margin-bottom: 37px; padding: 29px 31px 31px; border: 1px solid rgba(255,255,255,.82); border-radius: 28px; background: rgba(255,255,255,.86); box-shadow: 0 16px 44px rgba(70,56,90,.09); }
-  .back-link { display: inline-block; margin-bottom: 28px; color: #6f5c97; font-size: .76rem; font-weight: 700; text-decoration: none; }
+  .back-link { min-height: 44px; display: inline-flex; align-items: center; margin-bottom: 20px; color: #6f5c97; font-size: .875rem; font-weight: 700; text-decoration: none; }
   .back-link:hover { text-decoration: underline; text-underline-offset: 3px; }
-  .eyebrow { margin: 0 0 8px; color: #8d79bc; font-size: .65rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+  .eyebrow { margin: 0 0 8px; color: #8d79bc; font-size: .75rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
   .preview-header h1 { font-size: clamp(1.8rem, 5vw, 2.7rem); }
   .intro { max-width: 570px; margin: 11px 0 0; color: #777382; font-size: .86rem; line-height: 1.75; }
   .intro code { padding: 2px 6px; color: #655581; border-radius: 6px; background: #eee9f8; font-size: .8em; }
   .preview-group { margin-top: 31px; }
   .group-heading { display: flex; align-items: center; gap: 9px; margin: 0 5px 12px; }
   .group-heading h2 { margin: 0; color: #6e6875; font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; }
-  .group-heading span { display: grid; place-items: center; min-width: 22px; height: 22px; padding-inline: 6px; color: #655581; border-radius: 999px; background: #eee9f8; font-size: .62rem; font-weight: 800; }
+  .group-heading span { display: grid; place-items: center; min-width: 26px; height: 26px; padding-inline: 6px; color: #655581; border-radius: 999px; background: #eee9f8; font-size: .75rem; font-weight: 800; }
   .icon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .icon-swatch { min-width: 0; display: grid; grid-template-columns: 49px minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 12px; border: 1px solid #ebe7ef; border-radius: 18px; background: rgba(255,255,255,.9); box-shadow: 0 7px 19px rgba(70,56,90,.05); }
   .icon-tile { display: grid; place-items: center; width: 49px; height: 49px; color: #655581; border-radius: 14px; background: #eee9f8; }
   .icon-meta { min-width: 0; }
   .icon-meta strong, .icon-meta code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .icon-meta strong { font-size: .78rem; }
-  .icon-meta code { margin-top: 4px; color: #8a8490; font-size: .58rem; }
-  .copy-button { padding: 5px 7px; color: #6f5c97; border: 0; border-radius: 7px; background: #f4f1f8; font: inherit; font-size: .6rem; font-weight: 700; cursor: pointer; }
+  .icon-meta code { margin-top: 4px; color: #77717e; font-size: .75rem; }
+  .copy-button { min-width: 44px; min-height: 44px; padding: 8px 10px; color: #6f5c97; border: 0; border-radius: 9px; background: #f4f1f8; font: inherit; font-size: .75rem; font-weight: 700; cursor: pointer; }
   .copy-button:hover { background: #e9e2f4; }
   .copy-button:focus-visible { outline: 3px solid #967bc2; outline-offset: 2px; }
   .preview-note { margin: 31px 5px 0; color: #88818f; font-size: .7rem; line-height: 1.7; }

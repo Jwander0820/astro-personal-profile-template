@@ -20,6 +20,8 @@ npm run build
 npm run preview
 ```
 
+`npm run build` 會一併執行 `npm run check:ui`，檢查首頁排序、桌面／手機斷點、44px 操作尺寸，以及唱片與唱臂共用的幾何定位，避免只通過編譯但視覺互動已經回歸。
+
 ## 修改內容
 
 - 個人資料：`src/content/profile/main.md`
@@ -108,6 +110,8 @@ tags: [Learning, Building]
 - `between-links-sections`：Links 與 About me 之間
 - `after-sections`：About me 後
 
+首頁會依照上述位置輸出：個人資料與社群 icon → `before-links` → Links → `between-links-sections` → About me → `after-sections`。因此預設的唱盤會在 Links 與 About me 後方；若想把唱盤移到 Links 上方，只需將它的 `placement` 改成 `before-links`。
+
 ### 內嵌 Notion 頁面
 
 複製 `src/content/blocks/notion-embed.md`，再將 Notion 官方嵌入程式碼中的 `src` 網址貼到 `url`：
@@ -121,12 +125,13 @@ visible: true
 layout: embed
 provider: notion
 url: https://your-workspace.notion.site/your-page
+embedMode: preview
 height: 600
 tags: []
 ---
 ```
 
-Notion 頁面必須先透過 `Share → Publish → Embed this page` 公開並取得嵌入網址。`height` 可設為 320–1200；修改 Notion 內容後不需要重新建置網站。
+`embedMode: preview` 會顯示精簡的外部檔案卡片，避免長篇嵌入內容壓過首頁；改成 `embedMode: inline` 才會直接載入 iframe。Notion 頁面必須先透過 `Share → Publish → Embed this page` 公開並取得嵌入網址。inline 模式的 `height` 可設為 320–1200；修改 Notion 內容後不需要重新建置網站。
 
 ### 黑膠唱盤隨機播放器
 

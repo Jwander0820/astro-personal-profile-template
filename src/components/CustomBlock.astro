@@ -10,6 +10,7 @@ const imageUrl = withBase(block.data.image);
 const isEmbed = block.data.layout === 'embed';
 const isTurntable = block.data.layout === 'turntable';
 const embedUrl = block.data.url;
+const embedLabel = block.data.provider === 'notion' ? '在 Notion 開啟' : '開啟完整內容';
 ---
 <section class:list={['content-section', 'custom-block', `custom-block--${block.data.layout}`]} aria-labelledby={`block-${block.id}`}>
   <h2 id={`block-${block.id}`}>{block.data.title}</h2>
@@ -23,7 +24,7 @@ const embedUrl = block.data.url;
         continuousPlayback={block.data.continuousPlayback}
       />
     )}
-    {isEmbed && embedUrl && (
+    {isEmbed && embedUrl && block.data.embedMode === 'inline' && (
       <>
         <div class="custom-block__embed">
           <iframe
@@ -36,8 +37,21 @@ const embedUrl = block.data.url;
             allowfullscreen
           ></iframe>
         </div>
-        <a class="custom-block__embed-link" href={embedUrl} target="_blank" rel="noopener noreferrer">在 Notion 開啟 ↗</a>
+        <a class="custom-block__embed-link" href={embedUrl} target="_blank" rel="noopener noreferrer">{embedLabel} ↗</a>
       </>
+    )}
+    {isEmbed && embedUrl && block.data.embedMode === 'preview' && (
+      <a
+        class="custom-block__embed-preview"
+        href={embedUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`${embedLabel}：${block.data.title}`}
+      >
+        <span class="custom-block__embed-kicker">Personal archive</span>
+        <strong>查看完整的 {block.data.title}</strong>
+        <span class="custom-block__embed-cta">{embedLabel} <span aria-hidden="true">↗</span></span>
+      </a>
     )}
     {block.data.tags.length > 0 && <ul>{block.data.tags.map((tag) => <li>{tag}</li>)}</ul>}
   </div>

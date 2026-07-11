@@ -29,7 +29,7 @@ const favicon = withBase('/favicon.svg');
 >
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script is:inline>
       (function() {
         const savedTheme = localStorage.getItem('theme');
@@ -53,7 +53,8 @@ const favicon = withBase('/favicon.svg');
     <title>{title}</title>
   </head>
   <body class={pageClass}>
+    <a class="skip-link" href="#main-content">跳到主要內容</a>
     <ThemeToggle />
-    <main><slot /></main>
+    <main id="main-content" tabindex="-1"><slot /></main>
   </body>
 </html>

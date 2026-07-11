@@ -161,6 +161,8 @@ const { playlistId, title, continuousPlayback } = Astro.props;
     let isPlayerMostlyVisible = false;
     let startPlaybackWhenReady = startOnReady;
     const failedVideoIds = new Set<string>();
+    const tonearmRestAngle = 0;
+    const tonearmRestThreshold = 18;
     const tonearmStartAngle = 23;
     const tonearmEndAngle = 43;
 
@@ -256,11 +258,9 @@ const { playlistId, title, continuousPlayback } = Astro.props;
       const pivotX = pivotRect.left + pivotRect.width / 2;
       const pivotY = pivotRect.top + pivotRect.height / 2;
       const pointerAngle = Math.atan2(pivotX - clientX, clientY - pivotY) * (180 / Math.PI);
-      const restThreshold = 18;
-
-      if (pointerAngle <= restThreshold) {
+      if (pointerAngle <= tonearmRestThreshold) {
         scrubIsResting = true;
-        const clampedAngle = Math.min(tonearmEndAngle, Math.max(0, pointerAngle));
+        const clampedAngle = Math.min(tonearmRestThreshold, Math.max(tonearmRestAngle, pointerAngle));
         root.style.setProperty('--tonearm-angle', `${clampedAngle}deg`);
         setStatus('放回唱針架 · 放開將暫停播放');
       } else {

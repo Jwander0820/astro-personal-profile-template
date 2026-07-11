@@ -1,7 +1,7 @@
 ---
 ---
-<button id="theme-toggle" class="theme-toggle-btn" aria-label="切換亮暗主題" title="切換亮暗主題">
-  <svg class="sun" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<button id="theme-toggle" class="theme-toggle-btn" aria-label="切換為暗色主題" aria-pressed="false" title="切換為暗色主題">
+  <svg class="sun" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="4"></circle>
     <path d="M12 2v2"></path>
     <path d="M12 20v2"></path>
@@ -12,7 +12,7 @@
     <path d="m6.34 17.66-1.41 1.41"></path>
     <path d="m19.07 4.93-1.41 1.41"></path>
   </svg>
-  <svg class="moon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <svg class="moon" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
   </svg>
 </button>
@@ -20,6 +20,16 @@
 <script>
   const themeToggle = document.getElementById('theme-toggle');
   if (themeToggle) {
+    const syncToggleState = () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const label = isDark ? '切換為亮色主題' : '切換為暗色主題';
+      themeToggle.setAttribute('aria-pressed', String(isDark));
+      themeToggle.setAttribute('aria-label', label);
+      themeToggle.setAttribute('title', label);
+    };
+
+    syncToggleState();
+
     themeToggle.addEventListener('click', () => {
       const currentTheme = document.documentElement.getAttribute('data-theme');
       let nextTheme = 'light';
@@ -36,6 +46,7 @@
 
       document.documentElement.setAttribute('data-theme', nextTheme);
       localStorage.setItem('theme', nextTheme);
+      syncToggleState();
     });
   }
 </script>
@@ -45,7 +56,7 @@
     position: fixed;
     top: 1.25rem;
     right: 1.25rem;
-    z-index: 99;
+    z-index: var(--z-floating);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -116,8 +127,6 @@
     .theme-toggle-btn {
       top: 1rem;
       right: 1rem;
-      width: 40px;
-      height: 40px;
     }
   }
 </style>

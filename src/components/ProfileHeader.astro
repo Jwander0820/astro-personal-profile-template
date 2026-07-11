@@ -12,6 +12,7 @@ const taglineItems = Array.isArray(tagline)
   : tagline.split(',').map((item) => item.trim()).filter(Boolean);
 ---
 <header class="profile" style={backgroundUrl ? `--cover-image: url('${backgroundUrl}')` : undefined}>
+  <span class="profile-archive-label" aria-hidden="true">PERSONAL ARCHIVE / SIDE A</span>
   <div class="cover" aria-hidden="true"></div>
   <div class="profile-body">
     {avatarUrl ? <img class="avatar" src={avatarUrl} alt={`${displayName} 的頭像`} width="112" height="112" /> : <span class="avatar avatar-fallback">{displayName.slice(0, 2)}</span>}

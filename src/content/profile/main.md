@@ -5,6 +5,7 @@ title: Python Engineer / ML Projects
 avatar: /images/avatar.svg
 background: /images/background.svg
 location: Taiwan
+sectionsLayout: grid
 tagline:
   - Code
   - Music
