@@ -1,0 +1,127 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  fortunes: CollectionEntry<'fortunes'>[];
+}
+
+const { fortunes } = Astro.props;
+const fortuneJson = JSON.stringify(
+  fortunes.map(({ id, data }) => ({ id, ...data })),
+).replaceAll('<', '\\u003c');
+---
+
+<div class="fortune-draw" data-fortune-draw>
+  <div class="fortune-draw__scene">
+    <div class="fortune-draw__urn-area" aria-hidden="true">
+      <div class="fortune-draw__sticks">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="fortune-draw__urn">
+        <span class="fortune-draw__urn-rim fortune-draw__urn-rim--top"></span>
+        <span class="fortune-draw__wood-grain"></span>
+        <span class="fortune-draw__urn-label">今日運勢</span>
+        <span class="fortune-draw__urn-rim fortune-draw__urn-rim--bottom"></span>
+      </div>
+      <span class="fortune-draw__shadow"></span>
+    </div>
+
+    <div class="fortune-draw__paper-wrap">
+      <article class="fortune-draw__paper" data-fortune-result aria-live="polite" aria-atomic="true">
+        <span class="fortune-draw__paper-kicker" data-fortune-kicker>今日御籤</span>
+        <strong class="fortune-draw__grade" data-fortune-grade>等待開籤</strong>
+        <p class="fortune-draw__message" data-fortune-message>搖一搖籤筒，看看今天的手氣。</p>
+        <p class="fortune-draw__note" data-fortune-note hidden></p>
+        <span class="fortune-draw__stamp" data-fortune-stamp aria-hidden="true">吉</span>
+      </article>
+    </div>
+  </div>
+
+  <div class="fortune-draw__actions">
+    <button type="button" class="fortune-draw__button" data-fortune-button aria-describedby="fortune-draw-hint">
+      <span data-fortune-button-label>抽一支</span>
+    </button>
+    <p id="fortune-draw-hint" class="fortune-draw__hint" data-fortune-status>每次都能重新抽，不會留下紀錄。</p>
+  </div>
+
+  <noscript><p class="fortune-draw__fallback">需要啟用 JavaScript 才能抽籤。</p></noscript>
+  <script is:inline type="application/json" data-fortune-data set:html={fortuneJson}></script>
+</div>
+
+<script>
+  type Fortune = {
+    id: string;
+    grade: '大吉' | '中吉' | '小吉';
+    category: 'blessing' | 'joke';
+    message: string;
+    note?: string;
+  };
+
+  document.querySelectorAll<HTMLElement>('[data-fortune-draw]').forEach((root) => {
+    const source = root.querySelector<HTMLScriptElement>('[data-fortune-data]');
+    const button = root.querySelector<HTMLButtonElement>('[data-fortune-button]');
+    const buttonLabel = root.querySelector<HTMLElement>('[data-fortune-button-label]');
+    const grade = root.querySelector<HTMLElement>('[data-fortune-grade]');
+    const message = root.querySelector<HTMLElement>('[data-fortune-message]');
+    const note = root.querySelector<HTMLElement>('[data-fortune-note]');
+    const status = root.querySelector<HTMLElement>('[data-fortune-status]');
+    const stamp = root.querySelector<HTMLElement>('[data-fortune-stamp]');
+
+    if (!source || !button || !buttonLabel || !grade || !message || !note || !status || !stamp) return;
+
+    let fortunes: Fortune[] = [];
+    let currentId: string | undefined;
+    let drawing = false;
+
+    try {
+      fortunes = JSON.parse(source.textContent ?? '[]') as Fortune[];
+    } catch {
+      fortunes = [];
+    }
+
+    if (fortunes.length === 0) {
+      button.disabled = true;
+      buttonLabel.textContent = '目前沒有籤紙';
+      status.textContent = '請先在 fortunes.json 加入至少一張啟用中的籤。';
+      return;
+    }
+
+    const pickFortune = () => {
+      const freshFortunes = fortunes.filter((fortune) => fortune.id !== currentId);
+      const pool = freshFortunes.length > 0 ? freshFortunes : fortunes;
+      return pool[Math.floor(Math.random() * pool.length)];
+    };
+
+    button.addEventListener('click', () => {
+      if (drawing) return;
+      const nextFortune = pickFortune();
+      if (!nextFortune) return;
+
+      drawing = true;
+      button.disabled = true;
+      root.setAttribute('aria-busy', 'true');
+      root.classList.remove('is-revealed', 'is-joke');
+      root.classList.add('is-drawing');
+      buttonLabel.textContent = '正在抽籤…';
+      status.textContent = '籤筒搖動中，請稍候。';
+
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.setTimeout(() => {
+        currentId = nextFortune.id;
+        grade.textContent = nextFortune.grade;
+        message.textContent = nextFortune.message;
+        note.textContent = nextFortune.note ?? '';
+        note.hidden = !nextFortune.note;
+        stamp.textContent = nextFortune.category === 'joke' ? '彩蛋' : '吉';
+        root.classList.toggle('is-joke', nextFortune.category === 'joke');
+        root.classList.remove('is-drawing');
+        root.classList.add('is-revealed');
+        root.removeAttribute('aria-busy');
+        status.textContent = `${nextFortune.grade} · ${nextFortune.message}`;
+        buttonLabel.textContent = '再抽一次';
+        button.disabled = false;
+        drawing = false;
+      }, reduceMotion ? 0 : 820);
+    });
+  });
+</script>

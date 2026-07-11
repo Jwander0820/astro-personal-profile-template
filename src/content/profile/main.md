@@ -6,7 +6,7 @@ avatar: /images/avatar.svg
 background: /images/background.svg
 location: Taiwan
 archiveLabel: PERSONAL ARCHIVE / SIDE A
-homeOrder: [about, turntable, links, notion]
+homeOrder: [about, turntable, links, fortune, notion]
 sectionsLayout: grid
 tagline:
   - Code

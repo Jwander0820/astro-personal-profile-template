@@ -1,4 +1,5 @@
 import { defineCollection, z } from 'astro:content';
+import { file } from 'astro/loaders';
 import { glob } from 'astro/loaders';
 
 const profile = defineCollection({
@@ -11,10 +12,10 @@ const profile = defineCollection({
     background: z.string().optional(),
     location: z.string().optional(),
     archiveLabel: z.string().optional(),
-    homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'notion']))
-      .length(4)
+    homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))
+      .length(5)
       .refine((items) => new Set(items).size === items.length, 'homeOrder cannot contain duplicates.')
-      .default(['about', 'turntable', 'links', 'notion']),
+      .default(['about', 'turntable', 'links', 'fortune', 'notion']),
     sectionsLayout: z.enum(['list', 'grid']).default('list'),
     fontScale: z.number().min(0.9).max(1.2).default(1),
     smallTextScale: z.number().min(0.9).max(1.35).default(1),
@@ -58,7 +59,7 @@ const blocks = defineCollection({
     placement: z.enum(['before-links', 'between-links-sections', 'after-sections']),
     order: z.number().default(100),
     visible: z.boolean().default(true),
-    layout: z.enum(['card', 'plain', 'embed', 'turntable']).default('card'),
+    layout: z.enum(['card', 'plain', 'embed', 'turntable', 'fortune']).default('card'),
     provider: z.enum(['notion', 'youtube']).optional(),
     url: z.string().url().optional(),
     embedMode: z.enum(['preview', 'inline']).default('preview'),
@@ -92,4 +93,15 @@ const blocks = defineCollection({
   }),
 });
 
-export const collections = { profile, links, sections, blocks };
+const fortunes = defineCollection({
+  loader: file('src/content/fortunes.json'),
+  schema: z.object({
+    grade: z.enum(['大吉', '中吉', '小吉']),
+    category: z.enum(['blessing', 'joke']),
+    message: z.string().trim().min(1, 'Fortune messages cannot be empty.'),
+    note: z.string().trim().min(1).optional(),
+    visible: z.boolean().default(true),
+  }),
+});
+
+export const collections = { profile, links, sections, blocks, fortunes };

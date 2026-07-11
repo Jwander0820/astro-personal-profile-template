@@ -1,0 +1,234 @@
+[
+  {
+    "id": "smooth-start",
+    "grade": "大吉",
+    "category": "blessing",
+    "message": "今天會比想像中更順利。",
+    "note": "放心往前走，好事正在靠近。",
+    "visible": true
+  },
+  {
+    "id": "perfect-timing",
+    "grade": "大吉",
+    "category": "blessing",
+    "message": "今天的時機剛剛好。",
+    "note": "想做的事，現在就是好時候。",
+    "visible": true
+  },
+  {
+    "id": "kindness-returned",
+    "grade": "大吉",
+    "category": "blessing",
+    "message": "你給出去的溫柔，會繞一圈回來。",
+    "note": "今天也會有人好好接住你。",
+    "visible": true
+  },
+  {
+    "id": "happy-surprise",
+    "grade": "大吉",
+    "category": "blessing",
+    "message": "一件沒預期的小事，會讓你開心很久。",
+    "note": "請留意今天突然出現的驚喜。",
+    "visible": true
+  },
+  {
+    "id": "effort-seen",
+    "grade": "大吉",
+    "category": "blessing",
+    "message": "你的努力有人看見，也正在累積成果。",
+    "note": "再一下下，就會抵達想去的地方。",
+    "visible": true
+  },
+  {
+    "id": "clear-mind",
+    "grade": "中吉",
+    "category": "blessing",
+    "message": "卡住的事情，今天會找到新的解法。",
+    "note": "先整理心情，答案就會慢慢浮出來。",
+    "visible": true
+  },
+  {
+    "id": "good-conversation",
+    "grade": "中吉",
+    "category": "blessing",
+    "message": "今天適合好好說話，也適合好好被理解。",
+    "note": "真心會替你打開一扇門。",
+    "visible": true
+  },
+  {
+    "id": "small-progress",
+    "grade": "中吉",
+    "category": "blessing",
+    "message": "不用一次做到完美，今天前進一點就很好。",
+    "note": "小小的進度也是貨真價實的進度。",
+    "visible": true
+  },
+  {
+    "id": "favorite-song",
+    "grade": "中吉",
+    "category": "blessing",
+    "message": "今天會遇見一首正好懂你的歌。",
+    "note": "把音量調到剛好能讓心情發亮。",
+    "visible": true
+  },
+  {
+    "id": "well-deserved-rest",
+    "grade": "中吉",
+    "category": "blessing",
+    "message": "休息不是偷懶，是今天的重要行程。",
+    "note": "充飽電之後，你會走得更遠。",
+    "visible": true
+  },
+  {
+    "id": "nice-meal",
+    "grade": "小吉",
+    "category": "blessing",
+    "message": "今天的一餐會特別好吃。",
+    "note": "好好吃飯，就是很實在的幸福。",
+    "visible": true
+  },
+  {
+    "id": "green-light",
+    "grade": "小吉",
+    "category": "blessing",
+    "message": "今天的路上，會多遇到幾次綠燈。",
+    "note": "世界偷偷替你省下一點時間。",
+    "visible": true
+  },
+  {
+    "id": "message-arrives",
+    "grade": "小吉",
+    "category": "blessing",
+    "message": "一則剛剛好的訊息，會在剛剛好的時候抵達。",
+    "note": "別忘了也回覆一點溫柔。",
+    "visible": true
+  },
+  {
+    "id": "sleep-well",
+    "grade": "小吉",
+    "category": "blessing",
+    "message": "今天辛苦了，今晚會睡得比昨天更好。",
+    "note": "沒完成的事，明天再處理也來得及。",
+    "visible": true
+  },
+  {
+    "id": "free-iphone",
+    "grade": "大吉",
+    "category": "blessing",
+    "message": "恭喜你抽到免費 iPhone 了！",
+    "note": "（並沒有）",
+    "visible": true
+  },
+  {
+    "id": "five-more-minutes",
+    "grade": "中吉",
+    "category": "blessing",
+    "message": "今天的「再睡五分鐘」不會讓你遲到。",
+    "note": "以上內容僅供參考，鬧鐘還是要設。",
+    "visible": true
+  },
+  {
+    "id": "calorie-holiday",
+    "grade": "中吉",
+    "category": "blessing",
+    "message": "今天吃下去的甜點會自動轉換成快樂。",
+    "note": "熱量本人尚未回覆。",
+    "visible": true
+  },
+  {
+    "id": "wifi-blessing",
+    "grade": "小吉",
+    "category": "blessing",
+    "message": "今天的 Wi-Fi 會比你的意志力更穩定。",
+    "note": "至少有一個很可靠。",
+    "visible": true
+  },
+  {
+    "id": "no-update-restart",
+    "grade": "小吉",
+    "category": "blessing",
+    "message": "今天電腦不會在最忙的時候突然更新。",
+    "note": "看到這張籤之後請不要立刻挑戰它。",
+    "visible": true
+  },
+  {
+    "id": "wallet-safe",
+    "grade": "小吉",
+    "category": "blessing",
+    "message": "今天的限定商品會剛好沒有打中你。",
+    "note": "錢包平安，功德圓滿。",
+    "visible": true
+  },
+  {
+    "id": "code-without-bugs",
+    "grade": "大吉",
+    "category": "blessing",
+    "message": "今天寫的 Code 居然沒有 Bug，直接一次跑過！",
+    "note": "醒醒吧，那只是因為你忘記按編譯或執行了。",
+    "visible": true
+  },
+  {
+    "id": "gacha-luck",
+    "grade": "大吉",
+    "category": "blessing",
+    "message": "今天的手氣好到適合去單抽抽卡！",
+    "note": "不過抽出來的可能也只是三星的保底心痛。",
+    "visible": true
+  },
+  {
+    "id": "cat-blessing",
+    "grade": "大吉",
+    "category": "blessing",
+    "message": "今天走在路上，會被路邊的貓咪多看三秒鐘。",
+    "note": "牠心裡大概是在想：「這個愚蠢的人類今天也在看我。」",
+    "visible": true
+  },
+  {
+    "id": "ai-hallucination",
+    "grade": "中吉",
+    "category": "blessing",
+    "message": "今天 AI 給你的回答將會完全正確、毫無胡言亂語。",
+    "note": "如果你發現它真的對了，請檢查是不是斷網了。",
+    "visible": true
+  },
+  {
+    "id": "usb-first-try",
+    "grade": "小吉",
+    "category": "blessing",
+    "message": "今天插入 USB 隨身碟時，第一次就插對了方向！",
+    "note": "請立即去買一張樂透，因為這違背了宇宙基本法。",
+    "visible": true
+  },
+  {
+    "id": "social-battery",
+    "grade": "中吉",
+    "category": "blessing",
+    "message": "今天的社交能量（Social Battery）可維持到下班。",
+    "note": "前提是今天沒有任何人跟你說話。",
+    "visible": true
+  },
+  {
+    "id": "code-blessing",
+    "grade": "中吉",
+    "category": "blessing",
+    "message": "今天寫的 Code 好像會動，而且沒人敢動它。",
+    "note": "這大概就是傳說中的「防禦性程式設計」吧。",
+    "visible": true
+  },
+  {
+    "id": "idea-arrives",
+    "grade": "大吉",
+    "category": "blessing",
+    "message": "今天你的腦袋會突然靈光一閃，想到超級棒的 Side Project 點子！",
+    "note": "前提是你要真的動手開始寫它。",
+    "visible": true
+  },
+  {
+    "id": "meeting-canceled",
+    "grade": "中吉",
+    "category": "blessing",
+    "message": "今天下午的冗長會議將會被臨時取消，改成發信說明。",
+    "note": "獲得了自由摸魚的黃金兩小時。",
+    "visible": true
+  }
+]

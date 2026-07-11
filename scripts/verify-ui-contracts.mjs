@@ -1,13 +1,20 @@
 import { readFile } from 'node:fs/promises';
 
-const [css, indexPage, linkCard, themeToggle, turntablePlayer, profileContent] = await Promise.all([
+const [css, indexPage, linkCard, themeToggle, turntablePlayer, fortuneDraw, contentConfig, profileContent, fortuneContent] = await Promise.all([
   readFile(new URL('../src/styles/global.css', import.meta.url), 'utf8'),
   readFile(new URL('../src/pages/index.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/LinkCard.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/ThemeToggle.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/TurntablePlayer.astro', import.meta.url), 'utf8'),
+  readFile(new URL('../src/components/FortuneDraw.astro', import.meta.url), 'utf8'),
+  readFile(new URL('../src/content.config.ts', import.meta.url), 'utf8'),
   readFile(new URL('../src/content/profile/main.md', import.meta.url), 'utf8'),
+  readFile(new URL('../src/content/fortunes.json', import.meta.url), 'utf8'),
 ]);
+
+const fortunes = JSON.parse(fortuneContent);
+const fortuneIds = fortunes.map((fortune) => fortune.id);
+
 
 const ruleBody = (selector) => {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -39,7 +46,14 @@ const contracts = [
   ['tonearm touch target remains 44px wide', /width:\s*44px/.test(tonearmRule)],
   ['turntable buttons remain at least 44px tall', /min-height:\s*44px/.test(buttonRule)],
   ['obsolete undefined page background token is absent', !css.includes('var(--page-bg)')],
-  ['home section order is controlled by the profile content', indexPage.includes('profile.data.homeOrder.map') && /homeOrder:\s*\[about,\s*turntable,\s*links,\s*notion\]/.test(profileContent)],
+  ['home section order is controlled by the profile content', indexPage.includes('profile.data.homeOrder.map') && /homeOrder:\s*\[about,\s*turntable,\s*links,\s*fortune,\s*notion\]/.test(profileContent)],
+  ['fortune block participates in ordered rendering without falling through', indexPage.includes("section === 'fortune'") && indexPage.includes('...fortuneBlocks') && indexPage.includes('fortunes={fortunes}')],
+  ['fortune data uses the validated single-file collection', contentConfig.includes("file('src/content/fortunes.json')") && contentConfig.includes("z.enum(['大吉', '中吉', '小吉'])")],
+  ['fortune ids are unique and messages are non-empty', new Set(fortuneIds).size === fortuneIds.length && fortunes.every((fortune) => typeof fortune.message === 'string' && fortune.message.trim().length > 0)],
+  ['fortune grades never fall below small luck', fortunes.every((fortune) => ['大吉', '中吉', '小吉'].includes(fortune.grade))],
+  ['fortune draw exposes a native button and polite live result', fortuneDraw.includes('<button type="button"') && fortuneDraw.includes('aria-live="polite"') && fortuneDraw.includes('aria-atomic="true"')],
+  ['fortune draw prevents immediate repeats without persistence', fortuneDraw.includes('fortune.id !== currentId') && !fortuneDraw.includes('localStorage') && !fortuneDraw.includes('sessionStorage')],
+  ['fortune button remains at least 44px tall and motion can be reduced', /\.fortune-draw__button\s*\{[^}]*min-height:\s*48px/.test(css) && css.includes('.fortune-draw.is-drawing .fortune-draw__urn-area') && css.includes('@media (prefers-reduced-motion: reduce)')],
   ['link cards remain unnumbered', !linkCard.includes('link-track') && !linkCard.includes('position?:') && !indexPage.includes('position={index + 1}')],
   ['expanded YouTube player is not clipped to the old 380px limit', css.includes('max-height: 700px') && !css.includes('max-height: 380px')],
   ['track and status rows reserve stable two-line space', titleRule.includes('block-size: 2.7em') && statusRule.includes('block-size: 3em')],

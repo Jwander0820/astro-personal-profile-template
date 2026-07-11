@@ -1,14 +1,19 @@
 ---
 import { render, type CollectionEntry } from 'astro:content';
 import { withBase } from '../lib/paths';
+import FortuneDraw from './FortuneDraw.astro';
 import TurntablePlayer from './TurntablePlayer.astro';
 
-interface Props { block: CollectionEntry<'blocks'>; }
-const { block } = Astro.props;
+interface Props {
+  block: CollectionEntry<'blocks'>;
+  fortunes?: CollectionEntry<'fortunes'>[];
+}
+const { block, fortunes = [] } = Astro.props;
 const { Content } = await render(block);
 const imageUrl = withBase(block.data.image);
 const isEmbed = block.data.layout === 'embed';
 const isTurntable = block.data.layout === 'turntable';
+const isFortune = block.data.layout === 'fortune';
 const embedUrl = block.data.url;
 const embedLabel = block.data.provider === 'notion' ? '在 Notion 開啟' : '開啟完整內容';
 ---
@@ -24,6 +29,7 @@ const embedLabel = block.data.provider === 'notion' ? '在 Notion 開啟' : '開
         continuousPlayback={block.data.continuousPlayback}
       />
     )}
+    {isFortune && <FortuneDraw fortunes={fortunes} />}
     {isEmbed && embedUrl && block.data.embedMode === 'inline' && (
       <>
         <div class="custom-block__embed">

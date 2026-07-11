@@ -24,3 +24,7 @@ export async function getBlocks() {
     .filter((entry) => entry.data.visible)
     .sort((a, b) => a.data.order - b.data.order);
 }
+
+export async function getFortunes() {
+  return (await getCollection('fortunes')).filter((entry) => entry.data.visible);
+}
