@@ -14,12 +14,14 @@ const sections = await getSections();
 const blocks = await getBlocks();
 const iconLinks = links.filter((link) => link.data.group !== 'footer' && link.data.layout === 'icon');
 const featuredLinks = links.filter((link) => ['main', 'featured'].includes(link.data.group) && link.data.layout === 'card');
+const turntableBlocks = blocks.filter((block) => block.data.layout === 'turntable');
+const notionBlocks = blocks.filter((block) => block.data.layout === 'embed' && block.data.provider === 'notion');
+const orderedBlockIds = new Set([...turntableBlocks, ...notionBlocks].map((block) => block.id));
+const remainingBlocks = blocks.filter((block) => !orderedBlockIds.has(block.id));
 const taglineText = Array.isArray(profile.data.tagline)
   ? profile.data.tagline.join(', ')
   : profile.data.tagline;
 const description = `${profile.data.displayName} — ${profile.data.title}。${taglineText}`;
-const blocksAt = (placement: 'before-links' | 'between-links-sections' | 'after-sections') =>
-  blocks.filter((block) => block.data.placement === placement);
 ---
 <BaseLayout
   title={`${profile.data.displayName} · ${profile.data.title}`}
@@ -30,20 +32,27 @@ const blocksAt = (placement: 'before-links' | 'between-links-sections' | 'after-
 >
   <ProfileHeader profile={profile} />
   <SocialIcons links={iconLinks} />
-  {blocksAt('before-links').map((block) => <CustomBlock block={block} />)}
-  {featuredLinks.length > 0 && (
-    <section class="content-section" aria-labelledby="links-heading">
-      <h2 id="links-heading">Links</h2>
-      <div class="link-list">{featuredLinks.map((link) => <LinkCard link={link} />)}</div>
-    </section>
-  )}
-  {blocksAt('between-links-sections').map((block) => <CustomBlock block={block} />)}
-  <section class="content-section" aria-labelledby="about-heading">
-    <h2 id="about-heading">About me</h2>
-    <div class:list={['section-list', `section-list--${profile.data.sectionsLayout}`]}>
-      {sections.map((section) => <SectionCard section={section} />)}
-    </div>
-  </section>
-  {blocksAt('after-sections').map((block) => <CustomBlock block={block} />)}
+  {profile.data.homeOrder.map((section) => (
+    section === 'about' ? sections.length > 0 && (
+      <section class="content-section" aria-labelledby="about-heading">
+        <h2 id="about-heading">About me</h2>
+        <div class:list={['section-list', `section-list--${profile.data.sectionsLayout}`]}>
+          {sections.map((item) => <SectionCard section={item} />)}
+        </div>
+      </section>
+    ) : section === 'turntable' ? (
+      turntableBlocks.map((block) => <CustomBlock block={block} />)
+    ) : section === 'links' ? (
+      featuredLinks.length > 0 && (
+        <section class="content-section" aria-labelledby="links-heading">
+          <h2 id="links-heading">Links</h2>
+          <div class="link-list">{featuredLinks.map((link) => <LinkCard link={link} />)}</div>
+        </section>
+      )
+    ) : (
+      notionBlocks.map((block) => <CustomBlock block={block} />)
+    )
+  ))}
+  {remainingBlocks.map((block) => <CustomBlock block={block} />)}
   <Footer name={profile.data.displayName} />
 </BaseLayout>

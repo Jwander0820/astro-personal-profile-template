@@ -1,11 +1,12 @@
 import { readFile } from 'node:fs/promises';
 
-const [css, indexPage, linkCard, themeToggle, turntablePlayer] = await Promise.all([
+const [css, indexPage, linkCard, themeToggle, turntablePlayer, profileContent] = await Promise.all([
   readFile(new URL('../src/styles/global.css', import.meta.url), 'utf8'),
   readFile(new URL('../src/pages/index.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/LinkCard.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/ThemeToggle.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/TurntablePlayer.astro', import.meta.url), 'utf8'),
+  readFile(new URL('../src/content/profile/main.md', import.meta.url), 'utf8'),
 ]);
 
 const ruleBody = (selector) => {
@@ -23,9 +24,6 @@ const nameRule = ruleBody('h1');
 const sectionHeadingRule = ruleBody('.content-section h2');
 const sectionCardTitleRule = ruleBody('.section-copy h3');
 const embedCardTitleRule = ruleBody('.custom-block__embed-preview strong');
-const linksIndex = indexPage.indexOf('id="links-heading"');
-const aboutIndex = indexPage.indexOf('id="about-heading"');
-const afterSectionsIndex = indexPage.indexOf("blocksAt('after-sections')");
 
 const contracts = [
   ['desktop content width remains 880px', /main\s*\{[^}]*880px/.test(css)],
@@ -41,12 +39,12 @@ const contracts = [
   ['tonearm touch target remains 44px wide', /width:\s*44px/.test(tonearmRule)],
   ['turntable buttons remain at least 44px tall', /min-height:\s*44px/.test(buttonRule)],
   ['obsolete undefined page background token is absent', !css.includes('var(--page-bg)')],
-  ['Links render before About and after-sections blocks', linksIndex >= 0 && aboutIndex > linksIndex && afterSectionsIndex > aboutIndex],
+  ['home section order is controlled by the profile content', indexPage.includes('profile.data.homeOrder.map') && /homeOrder:\s*\[about,\s*turntable,\s*links,\s*notion\]/.test(profileContent)],
   ['link cards remain unnumbered', !linkCard.includes('link-track') && !linkCard.includes('position?:') && !indexPage.includes('position={index + 1}')],
   ['expanded YouTube player is not clipped to the old 380px limit', css.includes('max-height: 700px') && !css.includes('max-height: 380px')],
   ['track and status rows reserve stable two-line space', titleRule.includes('block-size: 2.7em') && statusRule.includes('block-size: 3em')],
   ['YouTube frame joins the black player surface without a pale border', videoRule.includes('width: 100%') && videoRule.includes('border: 0') && videoRule.includes('background: #000')],
-  ['name keeps the serif display face', nameRule.includes('font-family: var(--font-display)')],
+  ['name uses the unified sans-serif body face', nameRule.includes('font-family: var(--font-body)')],
   ['section and card titles use the readable sans face', sectionHeadingRule.includes('font-family: var(--font-body)') && sectionCardTitleRule.includes('font-family: var(--font-body)') && embedCardTitleRule.includes('font-family: var(--font-body)')],
   ['theme toggle exposes and synchronizes pressed state', themeToggle.includes('aria-pressed="false"') && themeToggle.includes('syncToggleState')],
 ];

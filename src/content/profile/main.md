@@ -5,6 +5,8 @@ title: Python Engineer / ML Projects
 avatar: /images/avatar.svg
 background: /images/background.svg
 location: Taiwan
+archiveLabel: PERSONAL ARCHIVE / SIDE A
+homeOrder: [about, turntable, links, notion]
 sectionsLayout: grid
 tagline:
   - Code

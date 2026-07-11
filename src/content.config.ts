@@ -10,6 +10,11 @@ const profile = defineCollection({
     avatar: z.string().optional(),
     background: z.string().optional(),
     location: z.string().optional(),
+    archiveLabel: z.string().optional(),
+    homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'notion']))
+      .length(4)
+      .refine((items) => new Set(items).size === items.length, 'homeOrder cannot contain duplicates.')
+      .default(['about', 'turntable', 'links', 'notion']),
     sectionsLayout: z.enum(['list', 'grid']).default('list'),
     fontScale: z.number().min(0.9).max(1.2).default(1),
     smallTextScale: z.number().min(0.9).max(1.35).default(1),
