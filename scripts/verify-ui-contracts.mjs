@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 
-const [css, indexPage, linkCard, themeToggle, turntablePlayer, fortuneDraw, contentConfig, profileContent, fortuneContent] = await Promise.all([
+const [css, indexPage, linkCard, themeToggle, turntablePlayer, fortuneDraw, contentConfig, fortuneContent] = await Promise.all([
   readFile(new URL('../src/styles/global.css', import.meta.url), 'utf8'),
   readFile(new URL('../src/pages/index.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/LinkCard.astro', import.meta.url), 'utf8'),
@@ -8,7 +8,6 @@ const [css, indexPage, linkCard, themeToggle, turntablePlayer, fortuneDraw, cont
   readFile(new URL('../src/components/TurntablePlayer.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/FortuneDraw.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/content.config.ts', import.meta.url), 'utf8'),
-  readFile(new URL('../src/content/profile/main.md', import.meta.url), 'utf8'),
   readFile(new URL('../src/content/fortunes.json', import.meta.url), 'utf8'),
 ]);
 
@@ -46,7 +45,7 @@ const contracts = [
   ['tonearm touch target remains 44px wide', /width:\s*44px/.test(tonearmRule)],
   ['turntable buttons remain at least 44px tall', /min-height:\s*44px/.test(buttonRule)],
   ['obsolete undefined page background token is absent', !css.includes('var(--page-bg)')],
-  ['home section order is controlled by the profile content', indexPage.includes('profile.data.homeOrder.map') && /homeOrder:\s*\[about,\s*turntable,\s*links,\s*fortune,\s*notion\]/.test(profileContent)],
+  ['home section order is controlled by validated profile content', indexPage.includes('profile.data.homeOrder.map') && contentConfig.includes("homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))") && contentConfig.includes("new Set(items).size === items.length")],
   ['fortune block participates in ordered rendering without falling through', indexPage.includes("section === 'fortune'") && indexPage.includes('...fortuneBlocks') && indexPage.includes('fortunes={fortunes}')],
   ['fortune data uses the validated single-file collection', contentConfig.includes("file('src/content/fortunes.json')") && contentConfig.includes("z.enum(['大吉', '中吉', '小吉'])")],
   ['fortune ids are unique and messages are non-empty', new Set(fortuneIds).size === fortuneIds.length && fortunes.every((fortune) => typeof fortune.message === 'string' && fortune.message.trim().length > 0)],
