@@ -5,7 +5,6 @@ import { glob } from 'astro/loaders';
 const profile = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/profile' }),
   schema: z.object({
-    name: z.string(),
     displayName: z.string(),
     title: z.string(),
     avatar: z.string().optional(),
@@ -16,6 +15,12 @@ const profile = defineCollection({
       .length(5)
       .refine((items) => new Set(items).size === items.length, 'homeOrder cannot contain duplicates.')
       .default(['about', 'turntable', 'links', 'fortune', 'notion']),
+    homeVisibility: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))
+      .max(5)
+      .refine((items) => new Set(items).size === items.length, 'homeVisibility cannot contain duplicates.')
+      .default(['about', 'turntable', 'links', 'fortune', 'notion']),
+    aboutHeading: z.string().default('About me'),
+    linksHeading: z.string().default('Links'),
     sectionsLayout: z.enum(['list', 'grid']).default('list'),
     fontScale: z.number().min(0.9).max(1.2).default(1),
     smallTextScale: z.number().min(0.9).max(1.35).default(1),

@@ -45,7 +45,7 @@ const contracts = [
   ['tonearm touch target remains 44px wide', /width:\s*44px/.test(tonearmRule)],
   ['turntable buttons remain at least 44px tall', /min-height:\s*44px/.test(buttonRule)],
   ['obsolete undefined page background token is absent', !css.includes('var(--page-bg)')],
-  ['home section order is controlled by validated profile content', indexPage.includes('profile.data.homeOrder.map') && contentConfig.includes("homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))") && contentConfig.includes("new Set(items).size === items.length")],
+  ['home section order and visibility are controlled by validated profile content', /profile\.data\.homeOrder\.filter\(\(section\) => profile\.data\.homeVisibility\.includes\(section\)\)\.map/.test(indexPage) && contentConfig.includes("homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))") && contentConfig.includes("homeVisibility: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))") && contentConfig.includes("new Set(items).size === items.length")],
   ['fortune block participates in ordered rendering without falling through', indexPage.includes("section === 'fortune'") && indexPage.includes('...fortuneBlocks') && indexPage.includes('fortunes={fortunes}')],
   ['fortune data uses the validated single-file collection', contentConfig.includes("file('src/content/fortunes.json')") && contentConfig.includes("z.enum(['大吉', '中吉', '小吉'])")],
   ['fortune ids are unique and messages are non-empty', new Set(fortuneIds).size === fortuneIds.length && fortunes.every((fortune) => typeof fortune.message === 'string' && fortune.message.trim().length > 0)],

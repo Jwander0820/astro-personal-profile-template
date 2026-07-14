@@ -1,14 +1,18 @@
 {
-  "name": "jwander0820-github-io",
+  "name": "astro-personal-profile-template",
   "type": "module",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "packageManager": "pnpm@11.7.0",
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro check && astro build && npm run check:ui",
+    "studio": "node scripts/studio-server.mjs",
+    "profile:apply": "node scripts/apply-profile.mjs",
+    "build": "astro check && astro build && npm run check:ui && npm run check:profile-tools",
     "check:ui": "node scripts/verify-ui-contracts.mjs",
+    "check:profile-tools": "node scripts/verify-profile-tools.mjs",
     "preview": "astro preview"
   },
   "dependencies": {

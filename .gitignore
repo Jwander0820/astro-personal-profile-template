@@ -25,6 +25,9 @@ yarn-error.log*
 .vscode/
 .idea/
 
+# Local profile interview answers (may contain personal information)
+profile.answers.json
+
 # Operating-system files
 .DS_Store
 Thumbs.db

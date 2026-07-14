@@ -34,10 +34,10 @@ const description = `${profile.data.displayName} — ${profile.data.title}。${t
 >
   <ProfileHeader profile={profile} />
   <SocialIcons links={iconLinks} />
-  {profile.data.homeOrder.map((section) => (
+  {profile.data.homeOrder.filter((section) => profile.data.homeVisibility.includes(section)).map((section) => (
     section === 'about' ? sections.length > 0 && (
       <section class="content-section" aria-labelledby="about-heading">
-        <h2 id="about-heading">About me</h2>
+        <h2 id="about-heading">{profile.data.aboutHeading}</h2>
         <div class:list={['section-list', `section-list--${profile.data.sectionsLayout}`]}>
           {sections.map((item) => <SectionCard section={item} />)}
         </div>
@@ -47,7 +47,7 @@ const description = `${profile.data.displayName} — ${profile.data.title}。${t
     ) : section === 'links' ? (
       featuredLinks.length > 0 && (
         <section class="content-section" aria-labelledby="links-heading">
-          <h2 id="links-heading">Links</h2>
+          <h2 id="links-heading">{profile.data.linksHeading}</h2>
           <div class="link-list">{featuredLinks.map((link) => <LinkCard link={link} />)}</div>
         </section>
       )

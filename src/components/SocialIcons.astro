@@ -6,5 +6,7 @@ interface Props { links: CollectionEntry<'links'>[]; }
 const { links } = Astro.props;
 ---
 {links.length > 0 && <nav class="socials" aria-label="快速連結">
-  {links.map((link) => <a href={withBase(link.data.url)} aria-label={`前往 ${link.data.title}`} title={link.data.title} target={link.data.url.startsWith('http') ? '_blank' : undefined} rel={link.data.url.startsWith('http') ? 'noopener noreferrer' : undefined}><Icon name={link.data.icon} /></a>)}
+  {links.map((link) => <a href={withBase(link.data.url)} aria-label={`前往 ${link.data.title}`} title={link.data.title} target={link.data.url.startsWith('http') ? '_blank' : undefined} rel={link.data.url.startsWith('http') ? 'noopener noreferrer' : undefined}>
+    {link.data.image ? <img src={withBase(link.data.image)} alt="" width="22" height="22" /> : <Icon name={link.data.icon} />}
+  </a>)}
 </nav>}

@@ -1,0 +1,45 @@
+{
+  "$schema": "./docs/profile-answers.schema.json",
+  "version": 1,
+  "identity": {
+    "displayName": "你的名字",
+    "title": "Developer / Music Explorer",
+    "location": "Taiwan",
+    "tagline": ["Code", "Music", "Learning"],
+    "bio": "喜歡把想法做成小工具，也用音樂記錄生活。"
+  },
+  "socials": [
+    { "service": "github", "url": "https://github.com/yourname" },
+    { "service": "email", "url": "mailto:hello@example.com" }
+  ],
+  "links": [
+    {
+      "id": "projects",
+      "title": "Projects",
+      "url": "https://github.com/yourname?tab=repositories",
+      "description": "最近完成的工具、練習與實驗。",
+      "icon": "code",
+      "tags": ["Open source", "Side projects"]
+    }
+  ],
+  "sections": [
+    {
+      "id": "about",
+      "title": "About",
+      "description": "目前專注在軟體開發，也持續整理學習筆記。",
+      "tags": ["Developer", "Learning"]
+    },
+    {
+      "id": "music",
+      "title": "Music",
+      "description": "分享最近反覆播放的歌與現場演出紀錄。",
+      "tags": ["Playlist", "Live"]
+    }
+  ],
+  "playlist": null,
+  "features": { "fortune": true },
+  "appearance": {
+    "sectionsLayout": "grid",
+    "homeOrder": ["about", "links", "turntable", "fortune", "notion"]
+  }
+}

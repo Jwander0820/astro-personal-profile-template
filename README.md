@@ -11,6 +11,37 @@ npm run dev
 
 開發伺服器預設位於 `http://localhost:4321`。
 
+### 使用視覺化 Profile Studio
+
+不想直接修改 Markdown 時，可以啟動只在本機運作的內容編輯台：
+
+Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，或在 PowerShell／CMD 執行：
+
+```powershell
+.\start-studio.cmd
+```
+
+也可以使用 `npm.cmd run studio`。如果本機的 pnpm 不會在執行前自動重建 `node_modules`，`pnpm studio` 仍可使用。
+
+前往 `http://localhost:4322`，即可編輯基本資料與圖片、拖曳首頁板塊、調整社群連結，並在右側即時檢查桌面／手機畫面。按下各區域的「儲存」後，Studio 會更新 `src/content`，Astro 偵測變更後會自動刷新右側預覽；不需要手動重新啟動。Studio 不會被打包進 GitHub Pages。完整欄位與安全邊界請見 [`docs/PROFILE_CONTENT_MODEL.md`](docs/PROFILE_CONTENT_MODEL.md)。
+
+請優先使用 `localhost` 開啟 Studio 與網站預覽。YouTube 嵌入播放器可能無法把 `127.0.0.1` 視為有效的本機來源，導致公開播放清單在正式網站可以播放、在本機預覽卻顯示無法讀取。
+
+「連結管理」會列出所有支援的社群服務，即使尚未建立或目前關閉也看得到；展開後可選擇專案內建 Icon，或匯入 PNG、JPG、WebP、GIF、SVG。首頁的 Links 卡片也可在同一面板新增、修改與隱藏。Profile Studio 以電腦雙欄工作區為主要使用情境，小尺寸視窗會保留桌面寬度並允許水平捲動。
+
+### 讓 AI 引導建立自介
+
+若不熟悉程式，可以把 fork／clone 後的專案交給 Codex 或其他 coding agent，輸入：
+
+> 請依照 AGENTS.md 的個人自介流程訪談我，產生 profile.answers.json、套用內容並執行 build。沒有得到答案的選填資料請留空，不要自行杜撰。
+
+AI 問答流程、資料格式與 GitHub Pages 手動步驟請見 [`docs/AI_PROFILE_SETUP.md`](docs/AI_PROFILE_SETUP.md)。也可以複製 `profile.answers.example.json`，自行填寫後執行：
+
+```bash
+pnpm profile:apply profile.answers.json
+pnpm build
+```
+
 專案也包含 `pnpm-lock.yaml`，CI 會使用 pnpm 進行可重現安裝；本機使用上述 npm 指令同樣可正常開發。
 
 ## Build 與預覽

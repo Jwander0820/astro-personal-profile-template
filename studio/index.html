@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>Profile Studio</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23241f2c'/%3E%3Cpath d='M9 22V15h3v7H9Zm6 0V9h3v13h-3Zm6 0V12h3v10h-3Z' fill='%23c9a9eb'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#editor">跳到編輯區</a>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span><strong>Profile Studio</strong><small>本機內容編輯台</small></span>
+      </div>
+      <div class="connection"><span class="connection-dot" aria-hidden="true"></span>只寫入這個專案</div>
+    </header>
+
+    <main class="workspace">
+      <section class="editor" id="editor" aria-labelledby="editor-title">
+        <div class="editor-heading">
+          <div><p class="eyebrow">CONTENT WORKBENCH</p><h1 id="editor-title">把自介調到剛剛好</h1></div>
+          <p>修改後儲存，右側預覽會同步更新；所有內容仍是可追蹤的 Markdown。</p>
+        </div>
+
+        <nav class="tabs" aria-label="編輯項目">
+          <button class="tab is-active" type="button" data-panel="profile" aria-selected="true">基本資料</button>
+          <button class="tab" type="button" data-panel="order" aria-selected="false">首頁板塊</button>
+          <button class="tab" type="button" data-panel="links" aria-selected="false">連結管理</button>
+          <button class="tab" type="button" data-panel="ai" aria-selected="false">AI 匯入</button>
+        </nav>
+
+        <div class="loading" id="loading">正在讀取 src/content…</div>
+
+        <form class="panel is-active" id="profile-panel" data-panel-name="profile" hidden>
+          <div class="form-grid">
+            <label><span>顯示名稱 <em>必填</em></span><input name="displayName" required maxlength="80" /></label>
+            <label><span>一句話身分 <em>必填</em></span><input name="title" required maxlength="120" placeholder="Python Engineer / Music Explorer" /></label>
+            <label><span>國家／地區 <i>選填</i></span><input name="location" maxlength="100" placeholder="Taiwan" /></label>
+            <label><span>封面小標 <i>選填</i></span><input name="archiveLabel" maxlength="100" placeholder="PERSONAL ARCHIVE / SIDE A" /></label>
+            <label class="field-wide"><span>關鍵字 <em>必填</em></span><input name="tagline" required placeholder="Code, Music, Travel" /><small>用逗號分隔，最多 6 個</small></label>
+            <label class="field-wide"><span>自我介紹 <em>必填</em></span><textarea name="bio" rows="6" required maxlength="5000"></textarea><small>支援 Markdown，例如 **粗體** 或 [連結](https://…)</small></label>
+          </div>
+
+          <fieldset class="media-fields">
+            <legend>個人圖片</legend>
+            <div class="media-row">
+              <label><span>頭像路徑</span><input name="avatar" placeholder="/images/avatar.svg" /></label>
+              <label class="file-button">選擇頭像<input id="avatar-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" /></label>
+            </div>
+            <div class="media-row">
+              <label><span>背景路徑</span><input name="background" placeholder="/images/background.svg" /></label>
+              <label class="file-button">選擇背景<input id="background-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" /></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>閱讀與排版</legend>
+            <div class="form-grid form-grid--settings">
+              <label><span>About me 排版</span><select name="sectionsLayout"><option value="grid">兩欄卡片</option><option value="list">單欄列表</option></select></label>
+              <label><span>整體字級 <output id="font-output">1</output></span><input name="fontScale" type="range" min="0.9" max="1.2" step="0.05" /></label>
+              <label><span>小字比例 <output id="small-font-output">1</output></span><input name="smallTextScale" type="range" min="0.9" max="1.35" step="0.05" /></label>
+            </div>
+          </fieldset>
+          <div class="actions"><button class="primary-action" type="submit">儲存基本資料</button><span class="save-note">會更新 profile/main.md</span></div>
+        </form>
+
+        <section class="panel" id="order-panel" data-panel-name="order" hidden>
+          <div class="panel-intro"><h2>首頁板塊</h2><p>調整順序、開關顯示，並展開修改各板塊內容。個人封面與社群小圖示固定在最上方。</p></div>
+          <ol class="order-board" id="order-list"></ol>
+          <div class="actions"><button class="primary-action" id="save-order" type="button">儲存板塊設定</button><span class="save-note">關閉只會隱藏，不會刪除 Markdown</span></div>
+        </section>
+
+        <section class="panel" id="links-panel" data-panel-name="links" hidden>
+          <div class="panel-intro"><h2>連結管理</h2><p>社群 Icon 顯示在個人資料下方；Links 卡片顯示在首頁 Links 板塊。關閉項目只會隱藏，不會刪除 Markdown。</p></div>
+
+          <section class="link-manager-section" aria-labelledby="social-links-heading">
+            <div class="link-manager-heading">
+              <div><h3 id="social-links-heading">社群 Icons</h3><p>所有支援服務都列在這裡；展開項目即可設定網址與 Icon。</p></div>
+              <span class="count-badge" id="social-count">0 / 0 顯示</span>
+            </div>
+            <div class="link-editor-list link-editor-list--social" id="social-link-list"></div>
+          </section>
+
+          <section class="link-manager-section" aria-labelledby="featured-links-heading">
+            <div class="link-manager-heading">
+              <div><h3 id="featured-links-heading">Links 卡片</h3><p>可修改現有卡片，或新增專案、作品集、文章與歌單。</p></div>
+              <button class="secondary-action" id="add-featured-link" type="button">＋ 新增 Link</button>
+            </div>
+            <div id="new-featured-link"></div>
+            <div class="link-editor-list" id="featured-link-list"></div>
+          </section>
+        </section>
+
+        <section class="panel" id="ai-panel" data-panel-name="ai" hidden>
+          <div class="panel-intro"><h2>套用 AI 回答檔</h2><p>請 AI 依 <code>docs/AI_PROFILE_SETUP.md</code> 訪談並產生 JSON，再貼到下方。套用前請先用 Git 保留目前版本。</p></div>
+          <label class="drop-zone" for="answers-file"><strong>選擇 profile.answers.json</strong><span>或直接貼上 JSON</span><input id="answers-file" type="file" accept="application/json,.json" /></label>
+          <label class="json-field"><span>回答內容</span><textarea id="answers-json" rows="16" spellcheck="false" placeholder='{ "version": 1, "identity": { … } }'></textarea></label>
+          <div class="warning-card"><strong>套用範圍</strong><p>個人資料、AI 產生的社群／精選連結、自介卡片、播放清單與抽籤開關。原有自訂 Markdown 不會被刪除。</p></div>
+          <div class="actions"><button class="primary-action" id="apply-answers" type="button">驗證並套用</button><span class="save-note">格式範例：profile.answers.example.json</span></div>
+        </section>
+      </section>
+
+      <aside class="preview-shell" aria-label="網站即時預覽">
+        <div class="preview-toolbar">
+          <span><i aria-hidden="true"></i>Live preview</span>
+          <div class="viewport-switch" aria-label="預覽尺寸">
+            <button type="button" class="is-active" data-width="desktop" aria-label="桌面預覽">寬</button>
+            <button type="button" data-width="mobile" aria-label="手機預覽">窄</button>
+          </div>
+          <button type="button" id="reload-preview">重新整理</button>
+        </div>
+        <div class="preview-stage"><iframe id="preview" title="個人網站預覽"></iframe></div>
+      </aside>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
