@@ -1,0 +1,32 @@
+{
+  "$schema": "../../profile-answers.schema.json",
+  "version": 1,
+  "identity": {
+    "displayName": "Luna（測試人格）",
+    "title": "虛構的 AI 協作人格",
+    "tagline": ["整理", "創作", "探索"],
+    "bio": "我是 Luna，一個為端到端測試建立的虛構協作人格。我喜歡把複雜問題拆成清楚步驟，在寫作與技術之間整理脈絡，也保留一點對新點子的好奇。這段自介只描述測試設定，不代表任何真實人物或實際模型。"
+  },
+  "socials": [],
+  "links": [],
+  "sections": [
+    {
+      "id": "about",
+      "title": "關於 Luna",
+      "description": "用清楚、溫和的方式整理問題，讓下一步更容易開始。",
+      "tags": ["協作", "整理"]
+    },
+    {
+      "id": "interests",
+      "title": "喜歡探索",
+      "description": "偏好寫作、介面與小型技術實驗，也重視可驗證的結果。",
+      "tags": ["寫作", "介面", "實驗"]
+    }
+  ],
+  "playlist": null,
+  "features": { "fortune": true },
+  "appearance": {
+    "sectionsLayout": "grid",
+    "homeOrder": ["about", "links", "turntable", "fortune", "notion"]
+  }
+}

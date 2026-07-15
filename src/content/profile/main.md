@@ -1,16 +1,17 @@
 ---
-name: Jw
-displayName: Jw
-title: Python Engineer / ML Projects
+displayName: 你的名字
+title: 用一頁整理作品、興趣與生活
 avatar: /images/avatar.svg
 background: /images/background.svg
-location: Taiwan
-archiveLabel: PERSONAL ARCHIVE / SIDE A
-homeOrder: [about, turntable, links, fortune, notion]
+archiveLabel: PERSONAL PROFILE
+homeOrder: [about, links, turntable, fortune, notion]
 sectionsLayout: grid
-tagline:
-  - Code
-  - Music
+tagline: [作品, 興趣]
+fontScale: 1
+smallTextScale: 1
+homeVisibility: [about, turntable, links, fortune]
+aboutHeading: About me
+linksHeading: Links
 ---
 
-喜歡寫 Python、整理音樂、研究自動化，也常把生活資料整理成奇怪但好用的小系統。
+在這裡放一段簡短自介，讓訪客快速認識你正在做的事與關心的主題。

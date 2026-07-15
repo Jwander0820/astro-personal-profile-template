@@ -532,6 +532,32 @@ export function validateProfileAnswers(input) {
   };
 }
 
+export function previewProfileAnswers(rawInput) {
+  const answers = validateProfileAnswers(rawInput);
+  const warnings = [];
+  if (answers.identity.location) warnings.push('location 會公開顯示在網站上，請確認只填入願意公開的國家或地區。');
+  if (answers.socials.some((social) => social.url.startsWith('mailto:'))) warnings.push('回答包含公開 email 連結，套用前請確認地址可公開。');
+  return {
+    answers,
+    summary: {
+      displayName: answers.identity.displayName,
+      title: answers.identity.title,
+      hasLocation: Boolean(answers.identity.location),
+      taglineCount: answers.identity.tagline.length,
+      socialCount: answers.socials.length,
+      socialServices: answers.socials.map((social) => social.title),
+      linkCount: answers.links.length,
+      linkTitles: answers.links.map((link) => link.title),
+      sectionCount: answers.sections.length,
+      sectionTitles: answers.sections.map((section) => section.title),
+      playlistEnabled: Boolean(answers.playlist),
+      fortuneEnabled: answers.features.fortune,
+      homeOrder: answers.appearance.homeOrder,
+    },
+    warnings,
+  };
+}
+
 export async function applyProfileAnswers(projectRoot, rawInput) {
   const input = validateProfileAnswers(rawInput);
   const current = await loadStudioContent(projectRoot);

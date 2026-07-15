@@ -1,6 +1,7 @@
-import { defineCollection, z } from 'astro:content';
+import { defineCollection } from 'astro:content';
 import { file } from 'astro/loaders';
 import { glob } from 'astro/loaders';
+import { z } from 'astro/zod';
 
 const profile = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/profile' }),
@@ -66,7 +67,7 @@ const blocks = defineCollection({
     visible: z.boolean().default(true),
     layout: z.enum(['card', 'plain', 'embed', 'turntable', 'fortune']).default('card'),
     provider: z.enum(['notion', 'youtube']).optional(),
-    url: z.string().url().optional(),
+    url: z.url().optional(),
     embedMode: z.enum(['preview', 'inline']).default('preview'),
     playlistId: z.string().regex(/^[A-Za-z0-9_-]{10,}$/, 'Invalid YouTube playlist ID.').optional(),
     continuousPlayback: z.boolean().default(true),
@@ -76,21 +77,21 @@ const blocks = defineCollection({
   }).superRefine((data, context) => {
     if (data.layout === 'embed' && !data.url) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['url'],
         message: 'Embed blocks require a public URL.',
       });
     }
     if (data.layout === 'turntable' && data.provider !== 'youtube') {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['provider'],
         message: 'Turntable blocks require provider: youtube.',
       });
     }
     if (data.layout === 'turntable' && !data.playlistId) {
       context.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['playlistId'],
         message: 'Turntable blocks require a YouTube playlist ID.',
       });

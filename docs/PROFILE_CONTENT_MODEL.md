@@ -19,7 +19,7 @@ Windows 建議直接雙擊 `start-studio.cmd`，或執行：
 
 Studio 的寫入 API 不會部署到 `dist`，GitHub Pages 上也不存在。圖片上傳僅接受 PNG、JPG、WebP、GIF、SVG，單檔上限 5 MB，並寫入 `public/images/`。
 
-預覽同步採用明確儲存：使用者按下「儲存基本資料」、「儲存板塊設定」或單一內容項目的「儲存」後，Markdown 先通過驗證並寫入，Astro 再透過檔案監看刷新右側 iframe。輸入到一半的無效內容不會寫入檔案。
+預覽同步預設採用明確儲存；也可切換成 5 秒 debounce 的自動更新。每個表單都有獨立 revision，同一表單同時只會送出一個寫入，舊回應不會清除較新的修改。Markdown 通過驗證並寫入後，Studio 才以內容 revision 重新載入右側 iframe，並分開顯示寫入失敗與預覽載入失敗。輸入到一半的無效內容不會排入背景寫入。
 
 連結管理分為個人資料下方的社群 Icons，以及首頁 Links 卡片。社群服務目錄會顯示尚未建立的項目；首次儲存時才建立對應 Markdown。兩種連結都能選擇 `src/lib/icons.ts` 的內建 Icon，或將自訂圖檔上傳到 `public/images/` 並寫入 `image` 欄位。
 
@@ -32,6 +32,9 @@ Studio 的寫入 API 不會部署到 `dist`，GitHub Pages 上也不存在。圖
 | 社群連結 | `links/*.md` | URL protocol、content schema |
 | 自介卡片 | `sections/*.md` | `order`、`visible`、layout |
 | 播放清單／抽籤／Notion | `blocks/*.md` | 各 block 的條件驗證 |
+| 籤桶內容 | `fortunes.json` | 共用籤桶模組的 ID、等級、分類、訊息、啟用數與 revision 驗證 |
+
+籤桶管理採整份檔案儲存：搜尋與畫面排序不改變來源順序，只有上移／下移操作會改變草稿順序。儲存時若偵測到 `fortunes.json` 已被外部修改，Studio 會拒絕覆寫並要求重新載入。
 
 Studio 的唱盤欄位接受 YouTube 播放清單完整網址或 playlist ID，儲存時只保留 `list` ID。Notion 欄位接受已發布到網路的完整頁面網址；`preview` 產生簡化連結卡片，`inline` 則嘗試 iframe 內嵌，實際是否允許內嵌仍取決於 Notion 回應標頭。
 

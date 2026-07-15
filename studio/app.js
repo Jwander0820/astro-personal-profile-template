@@ -1,4 +1,18 @@
-const state = { content: null, order: [], homeVisibility: [], toastTimer: null };
+import { createSaveCoordinator } from './save-coordinator.js';
+
+const state = {
+  content: null,
+  order: [],
+  homeVisibility: [],
+  fortuneBucket: null,
+  fortuneDraft: [],
+  fortuneDirty: false,
+  validatedAnswers: null,
+  toastTimer: null,
+  previewRequest: 0,
+  previewPending: null,
+};
+const saveTasks = new Map();
 
 const homeLabels = {
   about: ['About me', '自介卡片與經歷'],
@@ -60,11 +74,140 @@ async function api(url, options = {}) {
   return result;
 }
 
-function refreshPreview(delay = 350) {
-  setTimeout(() => {
-    const frame = $('#preview');
-    frame.src = frame.src || state.content.previewUrl;
-  }, delay);
+const saveStatusLabels = {
+  clean: '已儲存',
+  dirty: '尚未儲存',
+  scheduled: '等待自動更新',
+  saving: '儲存中',
+  refreshing: '更新預覽中',
+  error: '更新失敗',
+};
+
+function setSaveStatus(status, detail = '') {
+  const element = $('#save-status');
+  element.dataset.status = status;
+  $('#save-status-text').textContent = detail || saveStatusLabels[status];
+}
+
+function refreshPreview(revision = state.content?.contentRevision ?? 0, timeoutMs = 8000) {
+  if (state.previewPending) state.previewPending({ superseded: true });
+  const frame = $('#preview');
+  const requestId = ++state.previewRequest;
+  const url = new URL(state.content.previewUrl);
+  url.searchParams.set('studioRevision', String(revision));
+  return new Promise((resolve, reject) => {
+    let timer;
+    let retryTimer;
+    let attempt = 0;
+    const maximumAttempts = 3;
+    const cleanup = () => {
+      clearTimeout(timer);
+      clearTimeout(retryTimer);
+      frame.removeEventListener('load', handleLoad);
+      frame.removeEventListener('error', handleError);
+      if (state.previewPending === settle) state.previewPending = null;
+    };
+    const settle = (result, error) => {
+      cleanup();
+      if (error) reject(error); else resolve(result);
+    };
+    const navigate = () => {
+      attempt += 1;
+      url.searchParams.set('studioRequest', `${requestId}-${attempt}`);
+      frame.src = url.href;
+    };
+    const handleLoad = () => {
+      if (attempt < maximumAttempts) {
+        retryTimer = setTimeout(navigate, attempt * 250);
+        return;
+      }
+      settle({ loaded: true, revision, attempts: attempt });
+    };
+    const handleError = () => settle(null, new Error('預覽頁載入失敗。'));
+    state.previewPending = settle;
+    frame.addEventListener('load', handleLoad);
+    frame.addEventListener('error', handleError, { once: true });
+    timer = setTimeout(() => settle(null, new Error('內容已儲存，但預覽更新逾時。')), timeoutMs);
+    navigate();
+  });
+}
+
+async function finishSave(result, message) {
+  state.content.contentRevision = result.contentRevision;
+  setSaveStatus('refreshing');
+  try {
+    const preview = await refreshPreview(result.contentRevision);
+    if (!preview.superseded) setSaveStatus('clean');
+    toast(message);
+  } catch (error) {
+    setSaveStatus('error', '內容已儲存・預覽失敗');
+    toast(error.message, true);
+  }
+}
+
+async function refreshSavedContent(result, message) {
+  state.content.contentRevision = result.contentRevision;
+  const preview = await refreshPreview(result.contentRevision);
+  if (!preview.superseded) toast(message);
+}
+
+const saveCoordinator = createSaveCoordinator({
+  delayMs: 5000,
+  canSave: ({ key }) => saveTasks.get(key)?.validate(false) !== false,
+  save: async ({ key, revision }) => {
+    const task = saveTasks.get(key);
+    if (!task) throw new Error(`找不到儲存工作：${key}`);
+    if (!task.validate(true)) throw new Error('請先修正欄位內容再儲存。');
+    return task.run({ revision });
+  },
+  refresh: async ({ result }) => refreshSavedContent(result.result, result.message),
+  onStatus: ({ status, hasNewerChanges, contentSaved, error }) => {
+    if (status === 'saving' && hasNewerChanges) setSaveStatus('saving', '儲存中・有新修改');
+    else if (status === 'error' && contentSaved) setSaveStatus('error', '內容已儲存・預覽失敗');
+    else setSaveStatus(status);
+    if (status === 'error' && error) toast(error.message, true);
+  },
+});
+
+function registerSaveTask(key, task) {
+  saveTasks.set(key, { validate: () => true, ...task });
+}
+
+function bindSaveUnit(form, key, { ignore = () => false } = {}) {
+  const markDirty = (event) => {
+    if (event.target.matches('input[type="file"]') || ignore(event)) return;
+    saveCoordinator.markDirty(key);
+  };
+  form.addEventListener('input', markDirty);
+  form.addEventListener('change', markDirty);
+}
+
+async function submitSaveUnit(key, button) {
+  const task = saveTasks.get(key);
+  if (!task?.validate(true)) {
+    setSaveStatus('dirty');
+    return;
+  }
+  if (button) button.disabled = true;
+  try { await saveCoordinator.submit(key); }
+  catch { /* onStatus 已顯示可操作的錯誤。 */ }
+  finally { if (button) button.disabled = false; }
+}
+
+async function runExplicitSave(run, button) {
+  if (button) button.disabled = true;
+  setSaveStatus('saving');
+  try {
+    const output = await run();
+    await finishSave(output.result, output.message);
+    return output.result;
+  } catch (error) {
+    setSaveStatus('error');
+    toast(error.message, true);
+    return null;
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 function assetUrl(imagePath) {
@@ -173,7 +316,10 @@ function renderOrder() {
       if (!event.target.closest('.drag-handle')) { event.preventDefault(); return; }
       item.classList.add('is-dragging');
     });
-    item.addEventListener('dragend', () => item.classList.remove('is-dragging'));
+    item.addEventListener('dragend', () => {
+      item.classList.remove('is-dragging');
+      saveCoordinator.markDirty('home');
+    });
     item.addEventListener('dragover', (event) => {
       event.preventDefault();
       const dragging = $('.order-item.is-dragging');
@@ -191,6 +337,7 @@ function renderOrder() {
         if (moveButton.dataset.move === 'up') sibling.before(item); else sibling.after(item);
         state.order = $$('.order-item', list).map((element) => element.dataset.id);
         updateOrderNumbers();
+        saveCoordinator.markDirty('home');
         return;
       }
       const expandButton = event.target.closest('button[data-expand]');
@@ -207,6 +354,7 @@ function renderOrder() {
       const visible = new Set(state.homeVisibility);
       if (visibility.checked) visible.add(id); else visible.delete(id);
       state.homeVisibility = HOME_ORDER(visible);
+      saveCoordinator.markDirty('home');
     });
     list.append(item);
   });
@@ -223,31 +371,35 @@ function updateOrderNumbers() {
 
 function bindSectionEditor(editor) {
   const form = $('form', editor);
+  const isNew = editor.dataset.new === 'true';
+  const key = `section:${editor.dataset.sectionId}`;
+  const persist = async () => {
+    const values = Object.fromEntries(new FormData(form));
+    values.visible = form.elements.visible.checked;
+    values.order = Number(values.order);
+    values.tags = values.tags.split(/[,，]/).map((item) => item.trim()).filter(Boolean);
+    const endpoint = isNew ? '/api/sections' : `/api/sections/${editor.dataset.sectionId}`;
+    const result = await api(endpoint, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(values) });
+    const index = state.content.sections.findIndex((item) => item.id === result.section.id);
+    if (index >= 0) state.content.sections[index] = result.section;
+    else state.content.sections.push(result.section);
+    if (isNew) renderOrder();
+    else {
+      $('summary strong', editor).textContent = result.section.data.title;
+      $('summary small', editor).textContent = result.section.file;
+    }
+    return { result, message: `已儲存 About 卡片「${result.section.data.title}」。` };
+  };
+  if (!isNew) {
+    registerSaveTask(key, { validate: (report) => report ? form.reportValidity() : form.checkValidity(), run: persist });
+    bindSaveUnit(form, key);
+  }
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!form.reportValidity()) return;
     const button = $('button[type="submit"]', form);
-    button.disabled = true;
-    try {
-      const values = Object.fromEntries(new FormData(form));
-      values.visible = form.elements.visible.checked;
-      values.order = Number(values.order);
-      values.tags = values.tags.split(/[,，]/).map((item) => item.trim()).filter(Boolean);
-      const isNew = editor.dataset.new === 'true';
-      const endpoint = isNew ? '/api/sections' : `/api/sections/${editor.dataset.sectionId}`;
-      const result = await api(endpoint, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(values) });
-      const index = state.content.sections.findIndex((item) => item.id === result.section.id);
-      if (index >= 0) state.content.sections[index] = result.section;
-      else state.content.sections.push(result.section);
-      toast(`已儲存 About 卡片「${result.section.data.title}」。`);
-      if (isNew) renderOrder();
-      else {
-        $('summary strong', editor).textContent = result.section.data.title;
-        $('summary small', editor).textContent = result.section.file;
-      }
-      refreshPreview();
-    } catch (error) { toast(error.message, true); }
-    finally { button.disabled = false; }
+    if (isNew) await runExplicitSave(persist, button);
+    else await submitSaveUnit(key, button);
   });
 }
 
@@ -265,23 +417,28 @@ function bindHomeEditors() {
   $$('[data-open-links]', $('#order-list')).forEach((button) => button.addEventListener('click', () => {
     $('.tab[data-panel="links"]').click();
   }));
-  $$('.home-block-form', $('#order-list')).forEach((form) => form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!form.reportValidity()) return;
-    const button = $('button[type="submit"]', form);
-    button.disabled = true;
-    try {
+  ['#about-heading-input', '#links-heading-input'].forEach((selector) => {
+    const input = $(selector);
+    if (input) input.addEventListener('input', () => saveCoordinator.markDirty('home'));
+  });
+  $$('.home-block-form', $('#order-list')).forEach((form) => {
+    const key = `block:${form.dataset.blockId}`;
+    const persist = async () => {
       const values = Object.fromEntries(new FormData(form));
       if (form.elements.continuousPlayback) values.continuousPlayback = form.elements.continuousPlayback.checked;
       if (form.elements.height) values.height = Number(values.height);
       const result = await api(`/api/blocks/${form.dataset.blockId}`, { method: 'PUT', body: JSON.stringify(values) });
       const index = state.content.blocks.findIndex((item) => item.id === result.block.id);
       if (index >= 0) state.content.blocks[index] = result.block;
-      toast(`已儲存「${result.block.data.title}」。`);
-      refreshPreview();
-    } catch (error) { toast(error.message, true); }
-    finally { button.disabled = false; }
-  }));
+      return { result, message: `已儲存「${result.block.data.title}」。` };
+    };
+    registerSaveTask(key, { validate: (report) => report ? form.reportValidity() : form.checkValidity(), run: persist });
+    bindSaveUnit(form, key);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      await submitSaveUnit(key, $('button[type="submit"]', form));
+    });
+  });
 }
 
 function socialEntries() {
@@ -363,27 +520,35 @@ function featuredEditorMarkup(link, isNew = false) {
 
 function bindLinkEditor(editor) {
   const form = $('form', editor);
+  const exists = editor.dataset.exists === 'true';
+  const key = `link:${editor.dataset.linkId}`;
   const visibility = $('input[name="visible"]', editor);
   const switchControl = $('.switch-control', editor);
   switchControl.addEventListener('click', (event) => event.stopPropagation());
   switchControl.addEventListener('keydown', (event) => event.stopPropagation());
   visibility.addEventListener('change', async () => {
-    if (editor.dataset.exists !== 'true') {
+    if (!exists) {
       editor.open = true;
       if (visibility.checked) toast('先填寫網址，再儲存即可開啟這個項目。');
       return;
     }
-    try {
-      await persistLinkEditor(editor, true);
-    } catch (error) {
+    const result = await runExplicitSave(() => persistLinkEditor(editor, true), null);
+    if (!result) {
       visibility.checked = !visibility.checked;
-      toast(error.message, true);
     }
   });
+  if (exists) {
+    registerSaveTask(key, {
+      validate: (report) => report ? form.reportValidity() : form.checkValidity(),
+      run: () => persistLinkEditor(editor, false),
+    });
+    bindSaveUnit(form, key, { ignore: (event) => event.target === visibility });
+  }
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    try { await persistLinkEditor(editor, false); }
-    catch (error) { toast(error.message, true); }
+    const button = $('button[type="submit"]', form);
+    if (exists) await submitSaveUnit(key, button);
+    else await runExplicitSave(() => persistLinkEditor(editor, false), button);
   });
   form.elements.icon.addEventListener('change', () => updateEditorIcon(editor));
   form.elements.iconUpload.addEventListener('change', async (event) => {
@@ -392,12 +557,14 @@ function bindLinkEditor(editor) {
     try {
       form.elements.image.value = await uploadAsset(file);
       updateEditorIcon(editor);
+      if (exists) saveCoordinator.markDirty(key);
       toast('自訂 Icon 已匯入；按下儲存後套用。');
     } catch (error) { toast(error.message, true); }
   });
   $('.clear-custom-icon', editor).addEventListener('click', () => {
     form.elements.image.value = '';
     updateEditorIcon(editor);
+    if (exists) saveCoordinator.markDirty(key);
   });
 }
 
@@ -431,34 +598,27 @@ function linkPayload(editor) {
 
 async function persistLinkEditor(editor, toggleOnly) {
   const form = $('form', editor);
-  const button = $('button[type="submit"]', form);
   if (!toggleOnly && !form.reportValidity()) throw new Error('請先填完名稱與網址。');
-  if (button) button.disabled = true;
-  try {
-    const isNewFeatured = editor.dataset.kind === 'featured' && editor.dataset.exists !== 'true';
-    const endpoint = isNewFeatured ? '/api/links' : `/api/links/${editor.dataset.linkId}`;
-    const current = state.content.links.find((item) => item.id === editor.dataset.linkId);
-    const payload = toggleOnly
-      ? { ...current.data, body: current.body, visible: $('input[name="visible"]', editor).checked }
-      : linkPayload(editor);
-    const result = await api(endpoint, { method: isNewFeatured ? 'POST' : 'PUT', body: JSON.stringify(payload) });
-    const index = state.content.links.findIndex((item) => item.id === result.link.id);
-    if (index >= 0) state.content.links[index] = result.link;
-    else state.content.links.push(result.link);
-    if (toggleOnly) {
-      $('.link-editor__meta small', editor).textContent = editorStatus(result.link);
-      updateSocialCount();
-    } else {
-      const scrollTop = $('.editor').scrollTop;
-      $('#new-featured-link').innerHTML = '';
-      renderLinkManager();
-      requestAnimationFrame(() => { $('.editor').scrollTop = scrollTop; });
-    }
-    toast(toggleOnly ? '顯示設定已更新。' : `已儲存 ${result.link.data.title}。`);
-    refreshPreview();
-  } finally {
-    if (button) button.disabled = false;
+  const isNewFeatured = editor.dataset.kind === 'featured' && editor.dataset.exists !== 'true';
+  const endpoint = isNewFeatured ? '/api/links' : `/api/links/${editor.dataset.linkId}`;
+  const current = state.content.links.find((item) => item.id === editor.dataset.linkId);
+  const payload = toggleOnly
+    ? { ...current.data, body: current.body, visible: $('input[name="visible"]', editor).checked }
+    : linkPayload(editor);
+  const result = await api(endpoint, { method: isNewFeatured ? 'POST' : 'PUT', body: JSON.stringify(payload) });
+  const index = state.content.links.findIndex((item) => item.id === result.link.id);
+  if (index >= 0) state.content.links[index] = result.link;
+  else state.content.links.push(result.link);
+  if (toggleOnly) {
+    $('.link-editor__meta small', editor).textContent = editorStatus(result.link);
+    updateSocialCount();
+  } else {
+    const scrollTop = $('.editor').scrollTop;
+    $('#new-featured-link').innerHTML = '';
+    renderLinkManager();
+    requestAnimationFrame(() => { $('.editor').scrollTop = scrollTop; });
   }
+  return { result, message: toggleOnly ? '顯示設定已更新。' : `已儲存 ${result.link.data.title}。` };
 }
 
 function updateSocialCount() {
@@ -488,6 +648,151 @@ function showNewFeaturedEditor() {
   $('input[name="title"]', container).focus();
 }
 
+function fortuneSummary(fortunes) {
+  const visible = fortunes.filter((fortune) => fortune.visible);
+  const count = (key, value) => fortunes.filter((fortune) => fortune[key] === value).length;
+  const jokeRatio = visible.length ? visible.filter((fortune) => fortune.category === 'joke').length / visible.length : 0;
+  return {
+    total: fortunes.length,
+    visible: visible.length,
+    grades: { 大吉: count('grade', '大吉'), 中吉: count('grade', '中吉'), 小吉: count('grade', '小吉') },
+    categories: { blessing: count('category', 'blessing'), joke: count('category', 'joke') },
+    warnings: jokeRatio < 0.2 || jokeRatio > 0.4 ? ['目前啟用籤的玩梗比例偏離建議的約 3 成；這是風格提示，不會阻擋儲存。'] : [],
+  };
+}
+
+function renderFortuneSummary() {
+  const summary = fortuneSummary(state.fortuneDraft);
+  $('#fortune-summary').innerHTML = [
+    `共 ${summary.total} 張`,
+    `啟用 ${summary.visible} 張`,
+    `大吉 ${summary.grades.大吉}`,
+    `中吉 ${summary.grades.中吉}`,
+    `小吉 ${summary.grades.小吉}`,
+    `祝福 ${summary.categories.blessing}`,
+    `玩梗 ${summary.categories.joke}`,
+  ].map((label) => `<span>${escapeHtml(label)}</span>`).join('');
+  const warning = $('#fortune-warning');
+  warning.hidden = summary.warnings.length === 0;
+  warning.textContent = summary.warnings.join(' ');
+}
+
+function fortuneEditorMarkup(fortune, sourceIndex) {
+  return `<details class="fortune-editor" data-index="${sourceIndex}">
+    <summary>
+      <span class="fortune-preview-grade">${escapeHtml(fortune.grade)}</span>
+      <span class="fortune-preview-copy"><strong>${escapeHtml(fortune.message)}</strong><small>${escapeHtml(fortune.id)}・${fortune.visible ? '啟用中' : '已停用'}</small></span>
+      <span class="disclosure" aria-hidden="true">⌄</span>
+    </summary>
+    <form class="fortune-editor__body">
+      <div class="fortune-fields">
+        <label><span>ID</span><input name="id" value="${escapeHtml(fortune.id)}" pattern="[a-z0-9][a-z0-9-]*" maxlength="80" required /></label>
+        <label><span>等級</span><select name="grade"><option value="大吉" ${fortune.grade === '大吉' ? 'selected' : ''}>大吉</option><option value="中吉" ${fortune.grade === '中吉' ? 'selected' : ''}>中吉</option><option value="小吉" ${fortune.grade === '小吉' ? 'selected' : ''}>小吉</option></select></label>
+        <label><span>分類</span><select name="category"><option value="blessing" ${fortune.category === 'blessing' ? 'selected' : ''}>祝福</option><option value="joke" ${fortune.category === 'joke' ? 'selected' : ''}>玩梗</option></select></label>
+        <label class="switch-control fortune-visible"><span>啟用</span><input name="visible" type="checkbox" ${fortune.visible ? 'checked' : ''} /><span class="switch-track" aria-hidden="true"></span></label>
+        <label class="field-wide"><span>籤文</span><textarea name="message" rows="3" maxlength="200" required>${escapeHtml(fortune.message)}</textarea></label>
+        <label class="field-wide"><span>備註 <i>選填</i></span><textarea name="note" rows="2" maxlength="300">${escapeHtml(fortune.note ?? '')}</textarea></label>
+      </div>
+      <div class="fortune-editor__footer">
+        <span><button class="text-action" type="button" data-fortune-move="up">上移</button><button class="text-action" type="button" data-fortune-move="down">下移</button></span>
+        <button class="danger-action" type="button" data-delete-fortune>刪除</button>
+      </div>
+    </form>
+  </details>`;
+}
+
+function markFortuneDirty() {
+  state.fortuneDirty = true;
+  setSaveStatus('dirty');
+}
+
+function renderFortuneList() {
+  const query = $('#fortune-search').value.trim().toLowerCase();
+  const sort = $('#fortune-sort').value;
+  const gradeOrder = { 大吉: 0, 中吉: 1, 小吉: 2 };
+  const entries = state.fortuneDraft
+    .map((fortune, sourceIndex) => ({ fortune, sourceIndex }))
+    .filter(({ fortune }) => !query || [fortune.id, fortune.message, fortune.note].some((value) => String(value ?? '').toLowerCase().includes(query)));
+  if (sort === 'grade') entries.sort((a, b) => gradeOrder[a.fortune.grade] - gradeOrder[b.fortune.grade]);
+  if (sort === 'category') entries.sort((a, b) => a.fortune.category.localeCompare(b.fortune.category));
+  if (sort === 'visible') entries.sort((a, b) => Number(b.fortune.visible) - Number(a.fortune.visible));
+  $('#fortune-list').innerHTML = entries.length
+    ? entries.map(({ fortune, sourceIndex }) => fortuneEditorMarkup(fortune, sourceIndex)).join('')
+    : '<p class="inline-help">找不到符合條件的籤詩。</p>';
+  $$('.fortune-editor', $('#fortune-list')).forEach((editor) => {
+    const sourceIndex = Number(editor.dataset.index);
+    const form = $('form', editor);
+    const updateDraft = () => {
+      const values = Object.fromEntries(new FormData(form));
+      state.fortuneDraft[sourceIndex] = { ...values, visible: form.elements.visible.checked };
+      $('.fortune-preview-grade', editor).textContent = values.grade;
+      $('.fortune-preview-copy strong', editor).textContent = values.message || '尚未填寫籤文';
+      $('.fortune-preview-copy small', editor).textContent = `${values.id || '尚未設定 ID'}・${form.elements.visible.checked ? '啟用中' : '已停用'}`;
+      markFortuneDirty();
+      renderFortuneSummary();
+    };
+    form.addEventListener('input', updateDraft);
+    form.addEventListener('change', updateDraft);
+    $$('[data-fortune-move]', form).forEach((button) => button.addEventListener('click', () => {
+      const target = button.dataset.fortuneMove === 'up' ? sourceIndex - 1 : sourceIndex + 1;
+      if (target < 0 || target >= state.fortuneDraft.length) return;
+      [state.fortuneDraft[sourceIndex], state.fortuneDraft[target]] = [state.fortuneDraft[target], state.fortuneDraft[sourceIndex]];
+      markFortuneDirty();
+      renderFortuneManager();
+    }));
+    $('[data-delete-fortune]', form).addEventListener('click', () => {
+      const fortune = state.fortuneDraft[sourceIndex];
+      if (!window.confirm(`確定要從草稿刪除「${fortune.message}」？按下儲存籤桶後才會寫入檔案。`)) return;
+      state.fortuneDraft.splice(sourceIndex, 1);
+      markFortuneDirty();
+      renderFortuneManager();
+    });
+  });
+}
+
+function renderFortuneManager() {
+  renderFortuneSummary();
+  renderFortuneList();
+}
+
+function addFortune() {
+  const ids = new Set(state.fortuneDraft.map((fortune) => fortune.id));
+  let id = 'new-fortune';
+  let suffix = 2;
+  while (ids.has(id)) id = `new-fortune-${suffix++}`;
+  state.fortuneDraft.push({ id, grade: '小吉', category: 'blessing', message: '請填寫新的籤文。', note: '', visible: true });
+  $('#fortune-search').value = '';
+  $('#fortune-sort').value = 'source';
+  markFortuneDirty();
+  renderFortuneManager();
+  const last = $$('.fortune-editor', $('#fortune-list')).at(-1);
+  if (last) { last.open = true; $('textarea[name="message"]', last).select(); }
+}
+
+function resetAnswerValidation() {
+  state.validatedAnswers = null;
+  $('#answers-summary').hidden = true;
+  $('#answers-summary').innerHTML = '';
+  $('#apply-answers').hidden = true;
+}
+
+function renderAnswerSummary(preview) {
+  const summary = preview.summary;
+  const list = (values) => values.length ? values.join('、') : '無';
+  $('#answers-summary').innerHTML = `<h3>套用前摘要</h3><dl>
+    <dt>顯示名稱</dt><dd>${escapeHtml(summary.displayName)}</dd>
+    <dt>一句話身分</dt><dd>${escapeHtml(summary.title)}</dd>
+    <dt>公開地點</dt><dd>${summary.hasLocation ? '有' : '無'}</dd>
+    <dt>社群連結</dt><dd>${summary.socialCount} 個：${escapeHtml(list(summary.socialServices))}</dd>
+    <dt>精選連結</dt><dd>${summary.linkCount} 個：${escapeHtml(list(summary.linkTitles))}</dd>
+    <dt>自介卡片</dt><dd>${summary.sectionCount} 個：${escapeHtml(list(summary.sectionTitles))}</dd>
+    <dt>播放清單</dt><dd>${summary.playlistEnabled ? '啟用' : '停用'}</dd>
+    <dt>今日手氣</dt><dd>${summary.fortuneEnabled ? '啟用' : '停用'}</dd>
+  </dl>${preview.warnings.length ? `<ul>${preview.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>` : ''}`;
+  $('#answers-summary').hidden = false;
+  $('#apply-answers').hidden = false;
+}
+
 async function uploadAsset(file) {
   const reader = new FileReader();
   const dataUrl = await new Promise((resolve, reject) => {
@@ -503,39 +808,69 @@ async function uploadProfileImage(file, targetName) {
   if (!file) return;
   const imagePath = await uploadAsset(file);
   $('#profile-panel').elements[targetName].value = imagePath;
+  saveCoordinator.markDirty('profile');
   toast(`圖片已放入 ${imagePath}，請記得儲存基本資料。`);
 }
 
 function bindEvents() {
-  $$('.tab').forEach((tab) => tab.addEventListener('click', () => {
-    $$('.tab').forEach((item) => { item.classList.toggle('is-active', item === tab); item.setAttribute('aria-selected', item === tab ? 'true' : 'false'); });
+  const modeControl = $('#save-mode');
+  let initialMode = 'manual';
+  try { initialMode = localStorage.getItem('profile-studio-save-mode') === 'auto' ? 'auto' : 'manual'; } catch { /* 使用預設模式。 */ }
+  modeControl.value = initialMode;
+  saveCoordinator.setMode(initialMode);
+  modeControl.addEventListener('change', () => {
+    saveCoordinator.setMode(modeControl.value);
+    try { localStorage.setItem('profile-studio-save-mode', modeControl.value); } catch { /* 不阻擋本機編輯。 */ }
+    toast(modeControl.value === 'auto' ? '已開啟自動更新；停止修改 5 秒後儲存。' : '已切換為手動儲存。');
+  });
+  const tabs = $$('.tab');
+  const activateTab = (tab) => {
+    const current = $('.tab.is-active')?.dataset.panel;
+    if (current !== tab.dataset.panel && (state.fortuneDirty || saveCoordinator.hasPending())
+      && !window.confirm('目前還有尚未儲存的修改，確定要切換編輯頁籤嗎？')) return false;
+    tabs.forEach((item) => {
+      const active = item === tab;
+      item.classList.toggle('is-active', active);
+      item.setAttribute('aria-selected', active ? 'true' : 'false');
+      item.tabIndex = active ? 0 : -1;
+    });
     $$('.panel').forEach((panel) => { panel.hidden = panel.dataset.panelName !== tab.dataset.panel; });
-  }));
+    return true;
+  };
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => activateTab(tab));
+    tab.addEventListener('keydown', (event) => {
+      const moves = { ArrowLeft: -1, ArrowRight: 1, Home: -index, End: tabs.length - index - 1 };
+      if (!(event.key in moves)) return;
+      event.preventDefault();
+      const next = tabs[(index + moves[event.key] + tabs.length) % tabs.length];
+      if (activateTab(next)) next.focus();
+    });
+  });
   const form = $('#profile-panel');
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const button = $('.primary-action', form);
-    button.disabled = true;
-    try {
+  registerSaveTask('profile', {
+    validate: (report) => report ? form.reportValidity() : form.checkValidity(),
+    run: async () => {
       const values = Object.fromEntries(new FormData(form));
       values.tagline = values.tagline.split(/[,，]/).map((item) => item.trim()).filter(Boolean);
       values.fontScale = Number(values.fontScale);
       values.smallTextScale = Number(values.smallTextScale);
       const result = await api('/api/profile', { method: 'PUT', body: JSON.stringify(values) });
       state.content.profile = result.profile;
-      toast('基本資料已儲存。');
-      refreshPreview();
-    } catch (error) { toast(error.message, true); }
-    finally { button.disabled = false; }
+      return { result, message: '基本資料已儲存。' };
+    },
+  });
+  bindSaveUnit(form, 'profile');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await submitSaveUnit('profile', $('.primary-action', form));
   });
   form.elements.fontScale.addEventListener('input', () => { $('#font-output').value = form.elements.fontScale.value; });
   form.elements.smallTextScale.addEventListener('input', () => { $('#small-font-output').value = form.elements.smallTextScale.value; });
   $('#avatar-upload').addEventListener('change', (event) => uploadProfileImage(event.target.files[0], 'avatar').catch((error) => toast(error.message, true)));
   $('#background-upload').addEventListener('change', (event) => uploadProfileImage(event.target.files[0], 'background').catch((error) => toast(error.message, true)));
-  $('#save-order').addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    button.disabled = true;
-    try {
+  registerSaveTask('home', {
+    run: async () => {
       const result = await api('/api/home', {
         method: 'PUT',
         body: JSON.stringify({
@@ -552,45 +887,117 @@ function bindEvents() {
         const homeId = block.id === 'notion-embed' ? 'notion' : block.id;
         if (['turntable', 'fortune', 'notion'].includes(homeId)) block.data.visible = state.homeVisibility.includes(homeId);
       });
-      toast('首頁板塊順序與顯示設定已儲存。');
-      refreshPreview();
-    } catch (error) { toast(error.message, true); }
-    finally { button.disabled = false; }
+      return { result, message: '首頁板塊順序與顯示設定已儲存。' };
+    },
+  });
+  $('#save-order').addEventListener('click', async (event) => {
+    await submitSaveUnit('home', event.currentTarget);
   });
   $('#add-featured-link').addEventListener('click', showNewFeaturedEditor);
+  $('#fortune-search').addEventListener('input', renderFortuneList);
+  $('#fortune-sort').addEventListener('change', renderFortuneList);
+  $('#add-fortune').addEventListener('click', addFortune);
+  $('#save-fortunes').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    setSaveStatus('saving');
+    try {
+      const result = await api('/api/fortunes', {
+        method: 'PUT',
+        body: JSON.stringify({ fortunes: state.fortuneDraft, expectedRevision: state.fortuneBucket.revision }),
+      });
+      state.fortuneBucket = result;
+      state.fortuneDraft = result.fortunes.map((fortune) => ({ ...fortune }));
+      state.fortuneDirty = false;
+      renderFortuneManager();
+      await finishSave(result, '籤桶已儲存並建立上一次版本備份。');
+    } catch (error) { setSaveStatus('error'); toast(error.message, true); }
+    finally { button.disabled = false; }
+  });
+  $('#restore-fortunes').addEventListener('click', async (event) => {
+    if (!window.confirm('確定要用上一次備份取代目前籤桶嗎？目前版本也會保留下來供下一次復原。')) return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    setSaveStatus('saving');
+    try {
+      const result = await api('/api/fortunes/restore', {
+        method: 'POST',
+        body: JSON.stringify({ expectedRevision: state.fortuneBucket.revision }),
+      });
+      state.fortuneBucket = result;
+      state.fortuneDraft = result.fortunes.map((fortune) => ({ ...fortune }));
+      state.fortuneDirty = false;
+      renderFortuneManager();
+      await finishSave(result, '已復原上一次籤桶；復原前版本仍可再次復原。');
+    } catch (error) { setSaveStatus('error'); toast(error.message, true); }
+    finally { button.disabled = false; }
+  });
   $('#answers-file').addEventListener('change', async (event) => {
     const file = event.target.files[0];
-    if (file) $('#answers-json').value = await file.text();
+    if (file) { $('#answers-json').value = await file.text(); resetAnswerValidation(); }
   });
-  $('#apply-answers').addEventListener('click', async (event) => {
+  $('#answers-json').addEventListener('input', resetAnswerValidation);
+  $('#validate-answers').addEventListener('click', async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
     try {
       const payload = JSON.parse($('#answers-json').value);
-      state.content = { ...state.content, ...await api('/api/apply', { method: 'POST', body: JSON.stringify(payload) }) };
+      state.validatedAnswers = await api('/api/answers/validate', { method: 'POST', body: JSON.stringify(payload) });
+      renderAnswerSummary(state.validatedAnswers);
+      toast('回答格式有效；請確認套用摘要。');
+    } catch (error) {
+      resetAnswerValidation();
+      toast(error.message, true);
+    } finally { button.disabled = false; }
+  });
+  $('#apply-answers').addEventListener('click', async (event) => {
+    if (!state.validatedAnswers) { toast('請先驗證回答內容。', true); return; }
+    if (saveCoordinator.hasPending() || state.fortuneDirty) { toast('請先儲存或還原目前的 Studio 修改，再套用 AI 回答。', true); return; }
+    if (!window.confirm('確定依摘要套用 AI 回答嗎？這會更新個人資料、產生的連結與自介卡片，以及播放清單和抽籤開關。')) return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    setSaveStatus('saving');
+    try {
+      state.content = { ...state.content, ...await api('/api/answers/apply', { method: 'POST', body: JSON.stringify(state.validatedAnswers.answers) }) };
       state.order = [...state.content.profile.homeOrder];
       state.homeVisibility = [...state.content.profile.homeVisibility];
       populateProfile(); renderOrder(); renderLinkManager();
-      toast('AI 回答檔已套用並通過格式驗證。');
-      refreshPreview(650);
-    } catch (error) { toast(error.message, true); }
+      await finishSave(state.content, 'AI 回答檔已套用並通過格式驗證。');
+      resetAnswerValidation();
+    } catch (error) { setSaveStatus('error'); toast(error.message, true); }
     finally { button.disabled = false; }
   });
-  $('#reload-preview').addEventListener('click', () => refreshPreview(0));
+  $('#reload-preview').addEventListener('click', async () => {
+    setSaveStatus('refreshing');
+    try { await refreshPreview(); setSaveStatus('clean'); }
+    catch (error) { setSaveStatus('error', '預覽更新失敗'); toast(error.message, true); }
+  });
   $$('.viewport-switch button').forEach((button) => button.addEventListener('click', () => {
-    $$('.viewport-switch button').forEach((item) => item.classList.toggle('is-active', item === button));
+    $$('.viewport-switch button').forEach((item) => {
+      const active = item === button;
+      item.classList.toggle('is-active', active);
+      item.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
     $('#preview').classList.toggle('is-mobile', button.dataset.width === 'mobile');
   }));
+  window.addEventListener('beforeunload', (event) => {
+    if (!state.fortuneDirty && !saveCoordinator.hasPending()) return;
+    event.preventDefault();
+  });
 }
 
 async function initialize() {
   bindEvents();
   try {
-    state.content = await api('/api/content');
+    const [content, fortuneBucket] = await Promise.all([api('/api/content'), api('/api/fortunes')]);
+    state.content = content;
+    state.fortuneBucket = fortuneBucket;
+    state.fortuneDraft = fortuneBucket.fortunes.map((fortune) => ({ ...fortune }));
     state.order = [...state.content.profile.homeOrder];
     state.homeVisibility = [...state.content.profile.homeVisibility];
-    populateProfile(); renderOrder(); renderLinkManager();
+    populateProfile(); renderOrder(); renderLinkManager(); renderFortuneManager();
     $('#preview').src = state.content.previewUrl;
+    setSaveStatus('clean');
     $('#loading').hidden = true;
     $('#profile-panel').hidden = false;
   } catch (error) {

@@ -23,11 +23,11 @@ Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，或在 PowerShell
 
 也可以在 Windows 使用 `npm.cmd run studio`；其他環境使用 `npm run studio`。
 
-前往 `http://localhost:4322`，即可編輯基本資料與圖片、拖曳首頁板塊、調整社群連結，並在右側即時檢查桌面／手機畫面。按下各區域的「儲存」後，Studio 會更新 `src/content`，Astro 偵測變更後會自動刷新右側預覽；不需要手動重新啟動。Studio 不會被打包進 GitHub Pages。完整欄位與安全邊界請見 [`docs/PROFILE_CONTENT_MODEL.md`](docs/PROFILE_CONTENT_MODEL.md)。
+前往 `http://localhost:4322`，即可編輯基本資料與圖片、拖曳首頁板塊、調整社群連結，並在右側即時檢查桌面／手機畫面。預設採手動儲存，也可從頂端切換「自動更新（5 秒）」；停止修改五秒且欄位有效時才會寫入，不會每打一個字就改檔。寫入與預覽載入會顯示不同狀態，不需要手動重新啟動。Studio 不會被打包進 GitHub Pages。完整欄位與安全邊界請見 [`docs/PROFILE_CONTENT_MODEL.md`](docs/PROFILE_CONTENT_MODEL.md)。
 
 請優先使用 `localhost` 開啟 Studio 與網站預覽。YouTube 嵌入播放器可能無法把 `127.0.0.1` 視為有效的本機來源，導致公開播放清單在正式網站可以播放、在本機預覽卻顯示無法讀取。
 
-「連結管理」會列出所有支援的社群服務，即使尚未建立或目前關閉也看得到；展開後可選擇專案內建 Icon，或匯入 PNG、JPG、WebP、GIF、SVG。首頁的 Links 卡片也可在同一面板新增、修改與隱藏。Profile Studio 以電腦雙欄工作區為主要使用情境，小尺寸視窗會保留桌面寬度並允許水平捲動。
+「連結管理」會列出所有支援的社群服務，即使尚未建立或目前關閉也看得到；展開後可選擇專案內建 Icon，或匯入 PNG、JPG、WebP、GIF、SVG。首頁的 Links 卡片也可在同一面板新增、修改與隱藏。「籤桶管理」可搜尋、新增、編輯、停用、排序、刪除與復原籤詩。Profile Studio 以電腦雙欄工作區為主要使用情境，小尺寸視窗會保留桌面寬度並允許水平捲動。
 
 ### 讓 AI 引導建立自介
 
@@ -35,7 +35,9 @@ Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，或在 PowerShell
 
 > 請依照 AGENTS.md 的個人自介流程訪談我，產生 profile.answers.json、套用內容並執行 build。沒有得到答案的選填資料請留空，不要自行杜撰。
 
-AI 問答流程、資料格式與 GitHub Pages 手動步驟請見 [`docs/AI_PROFILE_SETUP.md`](docs/AI_PROFILE_SETUP.md)。也可以複製 `profile.answers.example.json`，自行填寫後執行：
+AI 問答流程、資料格式與 GitHub Pages 手動步驟請見 [`docs/AI_PROFILE_SETUP.md`](docs/AI_PROFILE_SETUP.md)。可直接使用 [provider-neutral 訪談提示詞](docs/ai/PROFILE_INTERVIEW_PROMPT.md)，Gemini 使用方式見 [`docs/ai/GEMINI.md`](docs/ai/GEMINI.md)。Studio 會先驗證回答並顯示影響摘要，只有再次確認後才會寫入；完全不使用 AI 也能透過 Studio 或 Markdown 完成全部設定。
+
+也可以複製 `profile.answers.example.json`，自行填寫後執行：
 
 ```bash
 npm run profile:apply -- profile.answers.json
@@ -196,6 +198,13 @@ tags: [Shuffle, YouTube]
 `.github/workflows/deploy.yml` 會在推送至 `main` 後建置並發布。請到 repository 的 **Settings → Pages → Build and deployment**，將 Source 設為 **GitHub Actions**。
 
 `astro.config.mjs` 會依 repository 擁有者與名稱自動設定 GitHub Pages 的 `site` 與 `base`。在 fork 中啟用 **Actions**，並於 **Settings → Pages → Build and deployment** 將 Source 設為 **GitHub Actions**，推送到 `main` 後即可部署。
+
+## Cloudflare Pages 部署
+
+Cloudflare Pages 使用 `npm run build`、輸出目錄 `dist`，並建議固定使用 Node.js 22。完整設定、`SITE_URL` 與錯誤排除請見 [`docs/CLOUDFLARE_PAGES.md`](docs/CLOUDFLARE_PAGES.md)。
+
+從 `0.1.0` 開發基線升級到 V1 的相容性與復原方式，請見 [`docs/V1_UPGRADE.md`](docs/V1_UPGRADE.md)。
+
 
 ## 下一階段
 

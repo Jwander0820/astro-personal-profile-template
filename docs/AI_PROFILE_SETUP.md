@@ -15,6 +15,8 @@ Agent 應分兩輪詢問：
 
 回答時可以很口語。Agent 的工作是整理語句、確認不確定的網址，最後產生符合 `docs/profile-answers.schema.json` 的 `profile.answers.json`。
 
+若使用一般 AI 對話介面，可直接使用 [`ai/PROFILE_INTERVIEW_PROMPT.md`](ai/PROFILE_INTERVIEW_PROMPT.md)。Gemini 操作與限制請見 [`ai/GEMINI.md`](ai/GEMINI.md)。
+
 ## 可直接交給 AI 的問答清單
 
 ### 基本資料
@@ -34,6 +36,8 @@ Agent 應分兩輪詢問：
 - 是否保留「今日手氣」抽籤？
 
 ## 套用與檢查
+
+Profile Studio 的「AI 協助產生自介」會先驗證 JSON 並顯示個人資料、連結、卡片與功能開關摘要，不會在第一次點擊時寫檔。確認摘要後再按「確認套用」；server 會重新驗證後才修改內容。若 Studio 仍有其他尚未儲存的修改，需先處理完再套用，避免互相覆蓋。
 
 Agent 或開發者可執行：
 

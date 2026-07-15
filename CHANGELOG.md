@@ -6,11 +6,25 @@
 
 ## [Unreleased]
 
+### 改善
+
+- 建立 V1.0.0 三條主要工作流的規格基線：自動儲存與即時預覽、籤桶維護及 AI 協助產生自介。
+- Profile Studio 的內容寫入改用 revision 驅動的預覽刷新，移除固定 350／650 ms 延遲，並區分寫入與預覽載入狀態。
+- 建立籤桶共用內容模組與本機讀寫介面，加入完整資料驗證、revision 衝突保護、原子替換及最近一次備份。
+- Profile Studio 新增籤桶管理，可搜尋、顯示排序、新增、編輯、啟用、停用、調整來源順序、刪除與復原上一次版本。
+- Profile Studio 新增可選的 5 秒自動更新、單表單寫入協調、未儲存提醒，以及手動／自動模式切換。
+- AI 回答檔改為先驗證並顯示套用摘要，再由使用者確認寫入；加入 provider-neutral 提示詞、測試 fixture 與 Gemini 指引。
+- 將公開模板的預設身份與播放清單改為通用 placeholder，避免把個人內容帶入新站。
+
 ### 建置與文件
 
+- 升級至 Astro 7.0.9 與安全版本的建置依賴，並明確要求 Node.js 22.12 以上；`npm audit` 回復為 0 vulnerabilities。
+- Studio 預覽改由套件宣告的 CLI bin 啟動，不再依賴 Astro 5 的內部 `astro.js` 路徑。
 - 統一以 npm 管理依賴，改用 `package-lock.json` 提供可重現安裝。
 - 更新 GitHub Pages workflow，以 `npm ci` 與 `npm run build` 完成部署建置。
 - 同步更新 README、AI 設定流程與 Profile Studio 指引中的操作命令。
+- 新增 Cloudflare Pages 部署、V1 升級、release notes 草稿與 RC 驗證清單。
+- 完整 build 新增模板安全檢查，阻擋私人回答檔、常見憑證格式與個人化預設內容。
 
 ## [0.1.0] - 2026-07-15
 

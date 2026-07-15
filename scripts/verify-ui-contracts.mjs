@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { validateFortuneBucket } from './fortune-content.mjs';
 
 const [css, indexPage, linkCard, themeToggle, turntablePlayer, fortuneDraw, contentConfig, fortuneContent] = await Promise.all([
   readFile(new URL('../src/styles/global.css', import.meta.url), 'utf8'),
@@ -13,6 +14,8 @@ const [css, indexPage, linkCard, themeToggle, turntablePlayer, fortuneDraw, cont
 
 const fortunes = JSON.parse(fortuneContent);
 const fortuneIds = fortunes.map((fortune) => fortune.id);
+let fortuneBucketIsValid = true;
+try { validateFortuneBucket(fortunes); } catch { fortuneBucketIsValid = false; }
 
 
 const ruleBody = (selector) => {
@@ -48,8 +51,8 @@ const contracts = [
   ['home section order and visibility are controlled by validated profile content', /profile\.data\.homeOrder\.filter\(\(section\) => profile\.data\.homeVisibility\.includes\(section\)\)\.map/.test(indexPage) && contentConfig.includes("homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))") && contentConfig.includes("homeVisibility: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))") && contentConfig.includes("new Set(items).size === items.length")],
   ['fortune block participates in ordered rendering without falling through', indexPage.includes("section === 'fortune'") && indexPage.includes('...fortuneBlocks') && indexPage.includes('fortunes={fortunes}')],
   ['fortune data uses the validated single-file collection', contentConfig.includes("file('src/content/fortunes.json')") && contentConfig.includes("z.enum(['大吉', '中吉', '小吉'])")],
-  ['fortune ids are unique and messages are non-empty', new Set(fortuneIds).size === fortuneIds.length && fortunes.every((fortune) => typeof fortune.message === 'string' && fortune.message.trim().length > 0)],
-  ['fortune grades never fall below small luck', fortunes.every((fortune) => ['大吉', '中吉', '小吉'].includes(fortune.grade))],
+  ['fortune ids are unique and messages are non-empty', fortuneBucketIsValid && new Set(fortuneIds).size === fortuneIds.length],
+  ['fortune grades never fall below small luck', fortuneBucketIsValid && fortunes.every((fortune) => ['大吉', '中吉', '小吉'].includes(fortune.grade))],
   ['fortune draw exposes a native button and polite live result', fortuneDraw.includes('<button type="button"') && fortuneDraw.includes('aria-live="polite"') && fortuneDraw.includes('aria-atomic="true"')],
   ['fortune draw prevents immediate repeats without persistence', fortuneDraw.includes('fortune.id !== currentId') && !fortuneDraw.includes('localStorage') && !fortuneDraw.includes('sessionStorage')],
   ['fortune button remains at least 44px tall and motion can be reduced', /\.fortune-draw__button\s*\{[^}]*min-height:\s*48px/.test(css) && css.includes('.fortune-draw.is-drawing .fortune-draw__urn-area') && css.includes('@media (prefers-reduced-motion: reduce)')],

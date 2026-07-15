@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "identity": {
+    "displayName": "林小樹",
+    "title": "喜歡把日常整理成小工具",
+    "tagline": ["生活整理", "小工具"],
+    "bio": "記錄正在學習的事，也分享讓生活變簡單的小作品。"
+  },
+  "socials": [],
+  "links": [],
+  "sections": [],
+  "playlist": null,
+  "features": { "fortune": true },
+  "appearance": {
+    "sectionsLayout": "grid",
+    "homeOrder": ["about", "turntable", "links", "fortune", "notion"]
+  }
+}
+

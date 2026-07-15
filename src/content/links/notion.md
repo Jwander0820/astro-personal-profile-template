@@ -1,10 +1,11 @@
 ---
 title: Notion
-url: https://www.notion.so/
+url: "https://www.notion.so/"
 icon: notion
 group: social
 order: 40
-visible: true
+visible: false
 layout: icon
 style: normal
+tags: []
 ---

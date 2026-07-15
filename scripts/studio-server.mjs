@@ -9,12 +9,15 @@ import {
   createStudioSection,
   createStudioLink,
   loadStudioContent,
+  previewProfileAnswers,
   saveHomeSettings,
   saveStudioBlock,
   saveStudioLink,
   saveStudioProfile,
   saveStudioSection,
 } from './profile-content.mjs';
+import { FortuneConflictError, loadFortuneBucket, restoreFortuneBucket, saveFortuneBucket } from './fortune-content.mjs';
+import { resolvePackageBin } from './package-bin.mjs';
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,6 +26,7 @@ const studioPort = Number(process.env.STUDIO_PORT || 4322);
 const previewPort = Number(process.env.PORT || 4321);
 const MAX_BODY_SIZE = 7 * 1024 * 1024;
 let iconCatalogPromise;
+let contentRevision = 0;
 
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -35,6 +39,12 @@ const contentTypes = {
 function sendJson(response, status, body) {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   response.end(JSON.stringify(body));
+}
+
+async function sendMutation(response, status, mutation) {
+  const body = await mutation;
+  contentRevision += 1;
+  sendJson(response, status, { ...body, contentRevision });
 }
 
 async function loadIconCatalog() {
@@ -111,7 +121,7 @@ const server = createServer(async (request, response) => {
     const url = new URL(request.url || '/', `http://${request.headers.host}`);
     if (request.method === 'GET' && url.pathname === '/api/content') {
       const [content, icons] = await Promise.all([loadStudioContent(projectRoot), loadIconCatalog()]);
-      sendJson(response, 200, { ...content, icons: Object.keys(icons), previewUrl: `http://localhost:${previewPort}/` });
+      sendJson(response, 200, { ...content, icons: Object.keys(icons), previewUrl: `http://localhost:${previewPort}/`, contentRevision });
       return;
     }
     const iconMatch = url.pathname.match(/^\/api\/icons\/([a-z0-9]+)\.svg$/);
@@ -124,43 +134,59 @@ const server = createServer(async (request, response) => {
       sendSvg(response, icon);
       return;
     }
+    if (request.method === 'GET' && url.pathname === '/api/fortunes') {
+      sendJson(response, 200, await loadFortuneBucket(projectRoot));
+      return;
+    }
+    if (request.method === 'PUT' && url.pathname === '/api/fortunes') {
+      await sendMutation(response, 200, saveFortuneBucket(projectRoot, await readJson(request)));
+      return;
+    }
+    if (request.method === 'POST' && url.pathname === '/api/fortunes/restore') {
+      await sendMutation(response, 200, restoreFortuneBucket(projectRoot, await readJson(request)));
+      return;
+    }
     if (request.method === 'PUT' && url.pathname === '/api/profile') {
-      sendJson(response, 200, { profile: await saveStudioProfile(projectRoot, await readJson(request)) });
+      await sendMutation(response, 200, saveStudioProfile(projectRoot, await readJson(request)).then((profile) => ({ profile })));
       return;
     }
     if (request.method === 'PUT' && url.pathname === '/api/home') {
-      sendJson(response, 200, { home: await saveHomeSettings(projectRoot, await readJson(request)) });
+      await sendMutation(response, 200, saveHomeSettings(projectRoot, await readJson(request)).then((home) => ({ home })));
       return;
     }
     const blockMatch = url.pathname.match(/^\/api\/blocks\/([a-z0-9-]+)$/);
     if (request.method === 'PUT' && blockMatch) {
-      sendJson(response, 200, { block: await saveStudioBlock(projectRoot, blockMatch[1], await readJson(request)) });
+      await sendMutation(response, 200, saveStudioBlock(projectRoot, blockMatch[1], await readJson(request)).then((block) => ({ block })));
       return;
     }
     const sectionMatch = url.pathname.match(/^\/api\/sections\/([a-z0-9-]+)$/);
     if (request.method === 'PUT' && sectionMatch) {
-      sendJson(response, 200, { section: await saveStudioSection(projectRoot, sectionMatch[1], await readJson(request)) });
+      await sendMutation(response, 200, saveStudioSection(projectRoot, sectionMatch[1], await readJson(request)).then((section) => ({ section })));
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/sections') {
-      sendJson(response, 201, { section: await createStudioSection(projectRoot, await readJson(request)) });
+      await sendMutation(response, 201, createStudioSection(projectRoot, await readJson(request)).then((section) => ({ section })));
       return;
     }
     const linkMatch = url.pathname.match(/^\/api\/links\/([a-z0-9-]+)$/);
     if (request.method === 'PUT' && linkMatch) {
-      sendJson(response, 200, { link: await saveStudioLink(projectRoot, linkMatch[1], await readJson(request)) });
+      await sendMutation(response, 200, saveStudioLink(projectRoot, linkMatch[1], await readJson(request)).then((link) => ({ link })));
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/links') {
-      sendJson(response, 201, { link: await createStudioLink(projectRoot, await readJson(request)) });
+      await sendMutation(response, 201, createStudioLink(projectRoot, await readJson(request)).then((link) => ({ link })));
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/images') {
       sendJson(response, 201, { path: await saveImage(await readJson(request)) });
       return;
     }
-    if (request.method === 'POST' && url.pathname === '/api/apply') {
-      sendJson(response, 200, await applyProfileAnswers(projectRoot, await readJson(request)));
+    if (request.method === 'POST' && url.pathname === '/api/answers/validate') {
+      sendJson(response, 200, previewProfileAnswers(await readJson(request)));
+      return;
+    }
+    if (request.method === 'POST' && (url.pathname === '/api/answers/apply' || url.pathname === '/api/apply')) {
+      await sendMutation(response, 200, applyProfileAnswers(projectRoot, await readJson(request)));
       return;
     }
     if (request.method !== 'GET') {
@@ -170,16 +196,18 @@ const server = createServer(async (request, response) => {
     await serveStatic(url.pathname, response);
   } catch (error) {
     if (!(error instanceof StudioRequestError)) console.error(error);
-    const status = error instanceof StudioRequestError ? error.status : 400;
+    const status = error instanceof StudioRequestError || error instanceof FortuneConflictError ? error.status : 400;
     sendJson(response, status, { error: error.message || '操作失敗。' });
   }
 });
 
-const astroCli = path.join(projectRoot, 'node_modules', 'astro', 'astro.js');
+const astroCli = await resolvePackageBin('astro');
 const astro = spawn(process.execPath, [astroCli, 'dev', '--host', '127.0.0.1', '--port', String(previewPort)], {
   cwd: projectRoot,
   stdio: 'inherit',
-  env: { ...process.env },
+  // Astro 7 auto-backgrounds dev servers in coding-agent environments. The
+  // Studio owns this child process, so suppress auto-detection and keep it attached.
+  env: { ...process.env, ASTRO_DEV_BACKGROUND: 'studio-managed' },
 });
 
 astro.on('exit', (code) => {

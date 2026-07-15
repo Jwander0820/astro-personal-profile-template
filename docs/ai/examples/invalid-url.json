@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "identity": {
+    "displayName": "測試使用者",
+    "title": "錯誤案例",
+    "tagline": ["Test"],
+    "bio": "這份 fixture 必須被拒絕。"
+  },
+  "socials": [
+    {
+      "service": "website",
+      "title": "不完整網址",
+      "url": "example dot com"
+    }
+  ]
+}
+

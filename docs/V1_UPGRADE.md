@@ -1,0 +1,46 @@
+# 從 0.1.0 升級到 V1.0.0
+
+這份文件說明公開模板從 `0.1.0` 開發基線升級到 V1.0.0 的內容相容性與建議步驟。V1 尚未正式建立 tag；目前內容是 release candidate 的 migration 草稿。
+
+## 相容性摘要
+
+- 建置基線升級為 Astro 7.0.9，需使用 Node.js 22.12 以上；部署平台也必須同步設定 Node 22。
+- `src/content/` 仍是唯一資料來源。
+- 五個 `homeOrder` 值維持 `about`、`turntable`、`links`、`fortune`、`notion`，每個值必須出現一次。
+- 既有 profile、link、section、block 與 fortune 檔案不需要批次改寫。
+- 自動儲存只是新的 Studio 寫入模式；預設仍可使用手動儲存。
+- 籤桶管理直接維護既有 `src/content/fortunes.json`，不建立第二份資料庫。
+- AI 回答新增 validate／摘要／確認流程；既有 `profile.answers.json` 仍沿用 version 1 schema。
+
+本次沒有強制內容 migration。若內容原本不符合 schema，新的集中驗證可能會更早拒絕寫入；請依錯誤訊息修正原始 Markdown 或 JSON，不要停用驗證。
+
+## 升級步驟
+
+1. 先 commit 或另外備份個人站的 `src/content/` 與 `public/images/`。
+2. 依 [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) 的「個人站如何選擇性更新」建立獨立更新分支，合併固定的 V1 tag，不要直接追蹤模板 `main`。
+3. 執行：
+
+   ```powershell
+   npm ci
+   npm run build
+   npm run studio
+   ```
+
+   如果 `node --version` 低於 `v22.12.0`，請先升級 Node，再執行安裝。Astro 7 的編譯器比 Astro 5 嚴格；若自訂 `.astro` 檔案有未關閉標籤或依賴舊的空白處理，請依 build diagnostics 修正。
+
+4. 在 Studio 確認基本資料、首頁順序、連結、卡片與區塊皆能載入。
+5. 先使用手動儲存確認內容正常，再視需要切換「自動更新（5 秒）」。
+6. 打開籤桶管理，確認總數、等級統計與警告正確；第一次修改前保留 Git 備份。
+7. 若使用 AI 回答檔，先按「驗證回答」、核對摘要，再確認套用。
+8. 重新執行 `npm run build` 並檢查 `git diff`，只提交預期的模板與個人內容變更。
+
+## 復原
+
+- 尚未 commit：使用 Git 或既有備份還原個人內容，不要刪除整個 working tree。
+- 籤桶誤改：Studio 會在 `.studio-backups/fortunes-latest.json` 保留最近一次版本，可從籤桶管理執行復原。
+- AI 套用不符合預期：套用前摘要不會修改檔案；已套用則用 Git diff 檢查並還原對應的 `src/content/` 檔案。
+- V1 build 失敗：停止部署，保留錯誤輸出，修正 schema 或內容後重新跑完整 build。
+
+## V1 後的相容性承諾
+
+V1.0.0 後，主要 frontmatter、回答檔 version 1 schema 與五個首頁板塊值應維持向下相容。若未來無法避免破壞性變更，必須提高 major version，並提供 migration、備份與復原步驟。

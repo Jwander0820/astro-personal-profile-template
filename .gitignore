@@ -6,9 +6,14 @@ yarn.lock
 pnpm-lock.yaml
 pnpm-workspace.yaml
 
-# Private/internal documentation
+# Private/internal documentation and QA records
 docs/PROJECT_HANDOFF.md
 docs/RELEASE_PROCESS.md
+docs/specs/
+docs/verification/
+docs/releases/
+docs/ai/TEST_MATRIX.md
+docs/ai/cases/
 
 # Astro and generated output
 dist/
@@ -35,6 +40,9 @@ yarn-error.log*
 
 # Local profile interview answers (may contain personal information)
 profile.answers.json
+
+# Local Profile Studio safety backups
+.studio-backups/
 
 # Operating-system files
 .DS_Store

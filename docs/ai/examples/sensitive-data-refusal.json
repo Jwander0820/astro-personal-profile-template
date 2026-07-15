@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "identity": {
+    "displayName": "陳小雨",
+    "title": "閱讀與音樂愛好者",
+    "tagline": ["閱讀", "音樂"],
+    "bio": "在這裡收藏最近讀到的句子與反覆播放的歌曲。"
+  },
+  "socials": [],
+  "links": [],
+  "sections": [
+    {
+      "id": "notes",
+      "title": "最近的筆記",
+      "description": "只分享願意公開的閱讀與音樂紀錄。",
+      "tags": ["Notes"]
+    }
+  ],
+  "playlist": null,
+  "features": { "fortune": false }
+}
+

@@ -1,0 +1,157 @@
+export function createSaveCoordinator({
+  delayMs = 5000,
+  mode: initialMode = 'manual',
+  canSave = () => true,
+  save,
+  refresh = async () => {},
+  onStatus = () => {},
+  setTimeoutFn = setTimeout,
+  clearTimeoutFn = clearTimeout,
+} = {}) {
+  if (typeof save !== 'function') throw new Error('save coordinator 需要 save 函式。');
+  if (!['manual', 'auto'].includes(initialMode)) throw new Error('儲存模式必須是 manual 或 auto。');
+
+  const entries = new Map();
+  let mode = initialMode;
+  let disposed = false;
+
+  function entryFor(key) {
+    if (!entries.has(key)) {
+      entries.set(key, {
+        revision: 0,
+        savedRevision: 0,
+        status: 'clean',
+        timer: null,
+        inFlight: null,
+        submitAfterFlight: false,
+        lastSaveResult: null,
+      });
+    }
+    return entries.get(key);
+  }
+
+  function emit(key, status, details = {}) {
+    const entry = entryFor(key);
+    entry.status = status;
+    onStatus({
+      key,
+      status,
+      mode,
+      revision: entry.revision,
+      savedRevision: entry.savedRevision,
+      pending: entry.revision > entry.savedRevision || Boolean(entry.timer) || Boolean(entry.inFlight),
+      ...details,
+    });
+  }
+
+  function clearScheduled(entry) {
+    if (entry.timer === null) return;
+    clearTimeoutFn(entry.timer);
+    entry.timer = null;
+  }
+
+  function schedule(key) {
+    const entry = entryFor(key);
+    clearScheduled(entry);
+    if (disposed || mode !== 'auto' || entry.inFlight || entry.revision <= entry.savedRevision || !canSave({ key })) {
+      if (entry.revision > entry.savedRevision && !entry.inFlight) emit(key, 'dirty');
+      return;
+    }
+    emit(key, 'scheduled');
+    entry.timer = setTimeoutFn(() => {
+      entry.timer = null;
+      submit(key).catch(() => {});
+    }, delayMs);
+  }
+
+  function markDirty(key) {
+    if (disposed) return 0;
+    const entry = entryFor(key);
+    entry.revision += 1;
+    if (entry.inFlight) emit(key, 'saving', { hasNewerChanges: true });
+    else if (mode === 'auto' && canSave({ key })) schedule(key);
+    else emit(key, 'dirty');
+    return entry.revision;
+  }
+
+  async function submit(key) {
+    if (disposed) return undefined;
+    const entry = entryFor(key);
+    clearScheduled(entry);
+    if (entry.inFlight) {
+      entry.submitAfterFlight = true;
+      return entry.inFlight.then(() => {
+        if (entry.submitAfterFlight) {
+          entry.submitAfterFlight = false;
+          return submit(key);
+        }
+        return entry.lastSaveResult;
+      });
+    }
+    if (entry.revision <= entry.savedRevision) {
+      emit(key, 'clean');
+      return entry.lastSaveResult;
+    }
+
+    const targetRevision = entry.revision;
+    emit(key, 'saving');
+    const operation = (async () => {
+      let result;
+      try {
+        result = await save({ key, revision: targetRevision });
+        entry.savedRevision = Math.max(entry.savedRevision, targetRevision);
+        entry.lastSaveResult = result;
+      } catch (error) {
+        emit(key, 'error', { phase: 'save', error });
+        throw error;
+      }
+
+      try {
+        emit(key, 'refreshing');
+        await refresh({ key, revision: targetRevision, result });
+      } catch (error) {
+        emit(key, 'error', { phase: 'refresh', error, contentSaved: true });
+        throw error;
+      }
+
+      if (entry.revision === targetRevision) emit(key, 'clean');
+      return result;
+    })();
+    entry.inFlight = operation;
+    try {
+      return await operation;
+    } finally {
+      entry.inFlight = null;
+      if (entry.revision > entry.savedRevision && mode === 'auto' && !entry.submitAfterFlight) schedule(key);
+    }
+  }
+
+  function setMode(nextMode) {
+    if (!['manual', 'auto'].includes(nextMode)) throw new Error('儲存模式必須是 manual 或 auto。');
+    mode = nextMode;
+    entries.forEach((entry, key) => {
+      if (mode === 'manual') {
+        clearScheduled(entry);
+        if (entry.revision > entry.savedRevision && !entry.inFlight) emit(key, 'dirty');
+      } else if (entry.revision > entry.savedRevision && !entry.inFlight) schedule(key);
+    });
+    return mode;
+  }
+
+  function hasPending() {
+    return [...entries.values()].some((entry) => entry.revision > entry.savedRevision || entry.timer !== null || entry.inFlight);
+  }
+
+  function getStatus(key) {
+    const entry = entryFor(key);
+    return { status: entry.status, revision: entry.revision, savedRevision: entry.savedRevision };
+  }
+
+  function dispose() {
+    disposed = true;
+    entries.forEach(clearScheduled);
+  }
+
+  return { markDirty, submit, setMode, hasPending, getStatus, dispose };
+}
+

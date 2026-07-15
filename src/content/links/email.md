@@ -1,10 +1,11 @@
 ---
 title: Email
-url: mailto:hello@example.com
+url: "mailto:hello@example.com"
 icon: mail
 group: social
 order: 50
-visible: true
+visible: false
 layout: icon
 style: normal
+tags: []
 ---

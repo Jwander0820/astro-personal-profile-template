@@ -15,7 +15,13 @@
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
         <span><strong>Profile Studio</strong><small>本機內容編輯台</small></span>
       </div>
-      <div class="connection"><span class="connection-dot" aria-hidden="true"></span>只寫入這個專案</div>
+      <div class="topbar-status">
+        <label class="save-mode"><span>儲存方式</span><select id="save-mode"><option value="manual">手動儲存</option><option value="auto">自動更新（5 秒）</option></select></label>
+        <div class="save-status" id="save-status" data-status="clean" role="status" aria-live="polite">
+          <span class="save-status__dot" aria-hidden="true"></span><span id="save-status-text">已儲存</span>
+        </div>
+        <div class="connection"><span class="connection-dot" aria-hidden="true"></span>只寫入這個專案</div>
+      </div>
     </header>
 
     <main class="workspace">
@@ -25,16 +31,17 @@
           <p>修改後儲存，右側預覽會同步更新；所有內容仍是可追蹤的 Markdown。</p>
         </div>
 
-        <nav class="tabs" aria-label="編輯項目">
-          <button class="tab is-active" type="button" data-panel="profile" aria-selected="true">基本資料</button>
-          <button class="tab" type="button" data-panel="order" aria-selected="false">首頁板塊</button>
-          <button class="tab" type="button" data-panel="links" aria-selected="false">連結管理</button>
-          <button class="tab" type="button" data-panel="ai" aria-selected="false">AI 匯入</button>
+        <nav class="tabs" aria-label="編輯項目" role="tablist">
+          <button class="tab is-active" id="profile-tab" type="button" role="tab" data-panel="profile" aria-controls="profile-panel" aria-selected="true" tabindex="0">基本資料</button>
+          <button class="tab" id="order-tab" type="button" role="tab" data-panel="order" aria-controls="order-panel" aria-selected="false" tabindex="-1">首頁板塊</button>
+          <button class="tab" id="links-tab" type="button" role="tab" data-panel="links" aria-controls="links-panel" aria-selected="false" tabindex="-1">連結管理</button>
+          <button class="tab" id="fortunes-tab" type="button" role="tab" data-panel="fortunes" aria-controls="fortunes-panel" aria-selected="false" tabindex="-1">籤桶管理</button>
+          <button class="tab" id="ai-tab" type="button" role="tab" data-panel="ai" aria-controls="ai-panel" aria-selected="false" tabindex="-1">AI 匯入</button>
         </nav>
 
         <div class="loading" id="loading">正在讀取 src/content…</div>
 
-        <form class="panel is-active" id="profile-panel" data-panel-name="profile" hidden>
+        <form class="panel is-active" id="profile-panel" data-panel-name="profile" role="tabpanel" aria-labelledby="profile-tab" hidden>
           <div class="form-grid">
             <label><span>顯示名稱 <em>必填</em></span><input name="displayName" required maxlength="80" /></label>
             <label><span>一句話身分 <em>必填</em></span><input name="title" required maxlength="120" placeholder="Python Engineer / Music Explorer" /></label>
@@ -67,13 +74,13 @@
           <div class="actions"><button class="primary-action" type="submit">儲存基本資料</button><span class="save-note">會更新 profile/main.md</span></div>
         </form>
 
-        <section class="panel" id="order-panel" data-panel-name="order" hidden>
+        <section class="panel" id="order-panel" data-panel-name="order" role="tabpanel" aria-labelledby="order-tab" hidden>
           <div class="panel-intro"><h2>首頁板塊</h2><p>調整順序、開關顯示，並展開修改各板塊內容。個人封面與社群小圖示固定在最上方。</p></div>
           <ol class="order-board" id="order-list"></ol>
           <div class="actions"><button class="primary-action" id="save-order" type="button">儲存板塊設定</button><span class="save-note">關閉只會隱藏，不會刪除 Markdown</span></div>
         </section>
 
-        <section class="panel" id="links-panel" data-panel-name="links" hidden>
+        <section class="panel" id="links-panel" data-panel-name="links" role="tabpanel" aria-labelledby="links-tab" hidden>
           <div class="panel-intro"><h2>連結管理</h2><p>社群 Icon 顯示在個人資料下方；Links 卡片顯示在首頁 Links 板塊。關閉項目只會隱藏，不會刪除 Markdown。</p></div>
 
           <section class="link-manager-section" aria-labelledby="social-links-heading">
@@ -94,12 +101,33 @@
           </section>
         </section>
 
-        <section class="panel" id="ai-panel" data-panel-name="ai" hidden>
-          <div class="panel-intro"><h2>套用 AI 回答檔</h2><p>請 AI 依 <code>docs/AI_PROFILE_SETUP.md</code> 訪談並產生 JSON，再貼到下方。套用前請先用 Git 保留目前版本。</p></div>
+        <section class="panel" id="fortunes-panel" data-panel-name="fortunes" role="tabpanel" aria-labelledby="fortunes-tab" hidden>
+          <div class="panel-intro"><h2>籤桶管理</h2><p>搜尋與顯示排序不會改變檔案順序；使用上移／下移才會調整籤桶順序。所有修改會在按下儲存後一次寫入。</p></div>
+          <div class="fortune-toolbar">
+            <label><span>搜尋籤詩</span><input id="fortune-search" type="search" placeholder="訊息、備註或 ID" /></label>
+            <label><span>顯示排序</span><select id="fortune-sort"><option value="source">籤桶順序</option><option value="grade">等級</option><option value="category">分類</option><option value="visible">啟用狀態</option></select></label>
+          </div>
+          <div class="fortune-summary" id="fortune-summary"></div>
+          <div class="fortune-warning" id="fortune-warning" hidden></div>
+          <div class="fortune-manager-actions">
+            <button class="secondary-action" id="add-fortune" type="button">＋ 新增籤詩</button>
+            <button class="text-action" id="restore-fortunes" type="button">復原上一次籤桶</button>
+          </div>
+          <div class="fortune-editor-list" id="fortune-list"></div>
+          <div class="actions"><button class="primary-action" id="save-fortunes" type="button">儲存籤桶</button><span class="save-note">會驗證整份 fortunes.json 並建立本機備份</span></div>
+        </section>
+
+        <section class="panel" id="ai-panel" data-panel-name="ai" role="tabpanel" aria-labelledby="ai-tab" hidden>
+          <div class="panel-intro"><h2>AI 協助產生自介</h2><p>請 AI 依 <code>docs/AI_PROFILE_SETUP.md</code> 訪談並產生 JSON。先驗證與查看影響摘要，確認後才會修改內容檔。</p></div>
+          <div class="warning-card"><strong>隱私提醒</strong><p>地點、社群、email、播放清單與互動功能都是選填。不要貼上密碼、token、API key 或不願公開的個人資料。</p></div>
           <label class="drop-zone" for="answers-file"><strong>選擇 profile.answers.json</strong><span>或直接貼上 JSON</span><input id="answers-file" type="file" accept="application/json,.json" /></label>
           <label class="json-field"><span>回答內容</span><textarea id="answers-json" rows="16" spellcheck="false" placeholder='{ "version": 1, "identity": { … } }'></textarea></label>
-          <div class="warning-card"><strong>套用範圍</strong><p>個人資料、AI 產生的社群／精選連結、自介卡片、播放清單與抽籤開關。原有自訂 Markdown 不會被刪除。</p></div>
-          <div class="actions"><button class="primary-action" id="apply-answers" type="button">驗證並套用</button><span class="save-note">格式範例：profile.answers.example.json</span></div>
+          <div class="ai-summary" id="answers-summary" hidden></div>
+          <div class="actions">
+            <button class="primary-action" id="validate-answers" type="button">驗證回答</button>
+            <button class="secondary-action" id="apply-answers" type="button" hidden>確認套用</button>
+            <span class="save-note">格式範例：profile.answers.example.json</span>
+          </div>
         </section>
       </section>
 
@@ -107,8 +135,8 @@
         <div class="preview-toolbar">
           <span><i aria-hidden="true"></i>Live preview</span>
           <div class="viewport-switch" aria-label="預覽尺寸">
-            <button type="button" class="is-active" data-width="desktop" aria-label="桌面預覽">寬</button>
-            <button type="button" data-width="mobile" aria-label="手機預覽">窄</button>
+            <button type="button" class="is-active" data-width="desktop" aria-label="桌面預覽" aria-pressed="true">寬</button>
+            <button type="button" data-width="mobile" aria-label="手機預覽" aria-pressed="false">窄</button>
           </div>
           <button type="button" id="reload-preview">重新整理</button>
         </div>
