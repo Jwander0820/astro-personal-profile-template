@@ -38,8 +38,8 @@ Agent 應分兩輪詢問：
 Agent 或開發者可執行：
 
 ```bash
-pnpm profile:apply profile.answers.json
-pnpm build
+npm run profile:apply -- profile.answers.json
+npm run build
 .\start-studio.cmd
 ```
 

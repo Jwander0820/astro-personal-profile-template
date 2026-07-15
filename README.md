@@ -21,7 +21,7 @@ Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，或在 PowerShell
 .\start-studio.cmd
 ```
 
-也可以使用 `npm.cmd run studio`。如果本機的 pnpm 不會在執行前自動重建 `node_modules`，`pnpm studio` 仍可使用。
+也可以在 Windows 使用 `npm.cmd run studio`；其他環境使用 `npm run studio`。
 
 前往 `http://localhost:4322`，即可編輯基本資料與圖片、拖曳首頁板塊、調整社群連結，並在右側即時檢查桌面／手機畫面。按下各區域的「儲存」後，Studio 會更新 `src/content`，Astro 偵測變更後會自動刷新右側預覽；不需要手動重新啟動。Studio 不會被打包進 GitHub Pages。完整欄位與安全邊界請見 [`docs/PROFILE_CONTENT_MODEL.md`](docs/PROFILE_CONTENT_MODEL.md)。
 
@@ -38,11 +38,11 @@ Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，或在 PowerShell
 AI 問答流程、資料格式與 GitHub Pages 手動步驟請見 [`docs/AI_PROFILE_SETUP.md`](docs/AI_PROFILE_SETUP.md)。也可以複製 `profile.answers.example.json`，自行填寫後執行：
 
 ```bash
-pnpm profile:apply profile.answers.json
-pnpm build
+npm run profile:apply -- profile.answers.json
+npm run build
 ```
 
-專案也包含 `pnpm-lock.yaml`，CI 會使用 pnpm 進行可重現安裝；本機使用上述 npm 指令同樣可正常開發。
+專案使用 `package-lock.json` 鎖定依賴，CI 會執行 `npm ci` 進行可重現安裝。
 
 ## Build 與預覽
 

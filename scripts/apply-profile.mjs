@@ -13,7 +13,7 @@ try {
   console.log(`個人資料：${result.profile.displayName}`);
   console.log(`社群連結：${result.links.filter((item) => item.data.group === 'social' && item.data.visible).length}`);
   console.log(`自介區塊：${result.sections.filter((item) => item.data.visible).length}`);
-  console.log('下一步：執行 pnpm build 驗證，再用 pnpm studio 預覽。');
+  console.log('下一步：執行 npm run build 驗證，再用 npm run studio 預覽。');
 } catch (error) {
   console.error(`無法套用回答檔：${error.message}`);
   process.exitCode = 1;

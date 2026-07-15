@@ -10,9 +10,9 @@ Use the guided setup flow in `docs/AI_PROFILE_SETUP.md`.
 2. Ask only for missing information. Start with identity, then offer optional social links, featured links, profile sections, playlist, and appearance choices.
 3. Explain that location, social links, playlist, and interactive features are optional. Never invent personal facts or URLs.
 4. Convert confirmed answers to `profile.answers.json`. This file is gitignored because it can contain personal information.
-5. Run `pnpm profile:apply profile.answers.json`.
-6. Run `pnpm build`. Fix content validation errors, but do not redesign components unless the user explicitly requests a new visual feature.
-7. Summarize the generated content and tell the user to run `pnpm studio` for visual review.
+5. Run `npm run profile:apply -- profile.answers.json`.
+6. Run `npm run build`. Fix content validation errors, but do not redesign components unless the user explicitly requests a new visual feature.
+7. Summarize the generated content and tell the user to run `npm run studio` for visual review.
 
 Do not commit, push, publish, enable GitHub Actions, or change repository settings unless the user explicitly asks. Never request or store GitHub passwords or personal access tokens in profile content.
 

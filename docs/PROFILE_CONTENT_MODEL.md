@@ -10,7 +10,7 @@ Windows 建議直接雙擊 `start-studio.cmd`，或執行：
 .\start-studio.cmd
 ```
 
-亦可使用 `npm.cmd run studio`；`pnpm studio` 保留為 pnpm 環境正常時的替代方式。
+在 Windows PowerShell 可使用 `npm.cmd run studio`；其他環境使用 `npm run studio`。
 
 此命令同時啟動：
 
