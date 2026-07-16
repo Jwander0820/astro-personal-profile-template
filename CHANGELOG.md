@@ -8,6 +8,8 @@
 
 ### 改善
 
+- Profile Studio 的社群 Icon 清單新增上移／下移排序控制，調整後會直接寫回各連結 Markdown 的 `order` 並刷新預覽。
+- 預設社群 Icon 改為 Facebook、Instagram、Threads、GitHub 依序開啟，其餘服務依常用程度排列。
 - 建立 V1.0.0 三條主要工作流的規格基線：自動儲存與即時預覽、籤桶維護及 AI 協助產生自介。
 - Profile Studio 的內容寫入改用 revision 驅動的預覽刷新，移除固定 350／650 ms 延遲，並區分寫入與預覽載入狀態。
 - 建立籤桶共用內容模組與本機讀寫介面，加入完整資料驗證、revision 衝突保護、原子替換及最近一次備份。

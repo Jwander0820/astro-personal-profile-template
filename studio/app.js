@@ -23,25 +23,25 @@ const homeLabels = {
 };
 
 const socialPresets = [
-  ['github', 'GitHub', 'github', 'https://github.com/'],
-  ['threads', 'Threads', 'threads', 'https://www.threads.net/@'],
   ['facebook', 'Facebook', 'facebook', 'https://www.facebook.com/'],
-  ['x', 'X', 'x', 'https://x.com/'],
-  ['pixiv', 'Pixiv', 'pixiv', 'https://www.pixiv.net/users/'],
   ['instagram', 'Instagram', 'instagram', 'https://www.instagram.com/'],
-  ['linkedin', 'LinkedIn', 'linkedin', 'https://www.linkedin.com/in/'],
+  ['threads', 'Threads', 'threads', 'https://www.threads.net/@'],
+  ['github', 'GitHub', 'github', 'https://github.com/'],
   ['youtube', 'YouTube', 'youtube', 'https://www.youtube.com/@'],
+  ['x', 'X', 'x', 'https://x.com/'],
   ['tiktok', 'TikTok', 'tiktok', 'https://www.tiktok.com/@'],
+  ['linkedin', 'LinkedIn', 'linkedin', 'https://www.linkedin.com/in/'],
   ['spotify', 'Spotify', 'spotify', 'https://open.spotify.com/'],
+  ['email', 'Email', 'mail', 'mailto:'],
+  ['website', '個人網站', 'arrow', 'https://'],
   ['youtubemusic', 'YouTube Music', 'youtubemusic', 'https://music.youtube.com/'],
   ['applemusic', 'Apple Music', 'applemusic', 'https://music.apple.com/'],
   ['podcasts', 'Podcasts', 'podcasts', 'https://'],
   ['applepodcasts', 'Apple Podcasts', 'applepodcasts', 'https://podcasts.apple.com/'],
   ['kkbox', 'KKBOX', 'kkbox', 'https://www.kkbox.com/'],
-  ['tidal', 'TIDAL', 'tidal', 'https://tidal.com/'],
   ['notion', 'Notion', 'notion', 'https://www.notion.so/'],
-  ['email', 'Email', 'mail', 'mailto:'],
-  ['website', '個人網站', 'arrow', 'https://'],
+  ['pixiv', 'Pixiv', 'pixiv', 'https://www.pixiv.net/users/'],
+  ['tidal', 'TIDAL', 'tidal', 'https://tidal.com/'],
 ].map(([id, label, icon, placeholder]) => ({ id, label, icon, placeholder }));
 
 const iconLabels = {
@@ -454,7 +454,13 @@ function socialEntries() {
   existing.filter((link) => !used.has(link.id)).forEach((link) => {
     entries.push({ preset: { id: link.id, label: link.data.title, icon: link.data.icon, placeholder: 'https://' }, link });
   });
-  return entries;
+  return entries.sort((a, b) => {
+    const aPresetOrder = socialPresets.findIndex((preset) => preset.id === a.preset.id);
+    const bPresetOrder = socialPresets.findIndex((preset) => preset.id === b.preset.id);
+    const aOrder = a.link?.data.order ?? (aPresetOrder >= 0 ? (aPresetOrder + 1) * 10 : 10000);
+    const bOrder = b.link?.data.order ?? (bPresetOrder >= 0 ? (bPresetOrder + 1) * 10 : 10000);
+    return aOrder - bOrder || a.preset.label.localeCompare(b.preset.label);
+  });
 }
 
 function editorStatus(link) {
@@ -462,14 +468,16 @@ function editorStatus(link) {
   return link.data.visible ? '顯示中' : '已設定・目前隱藏';
 }
 
-function socialEditorMarkup(preset, link) {
+function socialEditorMarkup(preset, link, position) {
   const data = link?.data ?? { title: preset.label, url: '', icon: preset.icon, visible: false, image: '', order: 100 };
   const id = link?.id ?? `studio-social-${preset.id}`;
-  return `<details class="link-editor" data-link-id="${escapeHtml(id)}" data-kind="social" data-exists="${Boolean(link)}">
+  return `<details class="link-editor" data-link-id="${escapeHtml(id)}" data-kind="social" data-exists="${Boolean(link)}" data-order="${escapeHtml(data.order)}">
     <summary class="link-editor__summary">
+      <span class="social-order-number" aria-label="目前順序第 ${position} 位">${String(position).padStart(2, '0')}</span>
       <span class="icon-preview"><img src="${escapeHtml(previewUrl(data.icon, data.image))}" alt="" /></span>
       <span class="link-editor__meta"><strong>${escapeHtml(preset.label)}</strong><small>${escapeHtml(editorStatus(link))}</small></span>
       ${switchMarkup(Boolean(data.visible), `${preset.label}顯示設定`)}
+      ${link ? '<span class="social-order-actions"><button type="button" data-social-move="up" aria-label="上移此社群 icon">↑</button><button type="button" data-social-move="down" aria-label="下移此社群 icon">↓</button></span>' : '<span class="social-order-placeholder" aria-hidden="true"></span>'}
       <span class="disclosure" aria-hidden="true">⌄</span>
     </summary>
     <form class="link-editor__body">
@@ -526,6 +534,13 @@ function bindLinkEditor(editor) {
   const switchControl = $('.switch-control', editor);
   switchControl.addEventListener('click', (event) => event.stopPropagation());
   switchControl.addEventListener('keydown', (event) => event.stopPropagation());
+  $$('[data-social-move]', editor).forEach((button) => {
+    button.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await moveSocialLink(editor, button.dataset.socialMove, button);
+    });
+  });
   visibility.addEventListener('change', async () => {
     if (!exists) {
       editor.open = true;
@@ -621,6 +636,55 @@ async function persistLinkEditor(editor, toggleOnly) {
   return { result, message: toggleOnly ? '顯示設定已更新。' : `已儲存 ${result.link.data.title}。` };
 }
 
+async function moveSocialLink(editor, direction, button) {
+  const configured = $$('.link-editor[data-kind="social"][data-exists="true"]', $('#social-link-list'));
+  const index = configured.indexOf(editor);
+  const target = configured[index + (direction === 'up' ? -1 : 1)];
+  if (!target) return;
+  const currentLink = state.content.links.find((item) => item.id === editor.dataset.linkId);
+  const targetLink = state.content.links.find((item) => item.id === target.dataset.linkId);
+  if (!currentLink || !targetLink) return;
+  const currentOrder = Number(currentLink.data.order ?? 100);
+  const targetOrder = Number(targetLink.data.order ?? 100);
+  const result = await runExplicitSave(async () => {
+    const saved = await api('/api/social-order', {
+      method: 'PUT',
+      body: JSON.stringify({
+        links: [
+          { id: currentLink.id, order: targetOrder },
+          { id: targetLink.id, order: currentOrder },
+        ],
+      }),
+    });
+    saved.links.forEach((link) => {
+      const stateIndex = state.content.links.findIndex((item) => item.id === link.id);
+      if (stateIndex >= 0) state.content.links[stateIndex] = link;
+    });
+    if (direction === 'up') target.before(editor); else target.after(editor);
+    updateSocialOrderControls();
+    return { result: saved, message: '社群 icon 順序已更新。' };
+  }, button);
+  if (!result) updateSocialOrderControls();
+}
+
+function updateSocialOrderControls() {
+  const editors = $$('.link-editor[data-kind="social"]', $('#social-link-list'));
+  editors.forEach((editor, index) => {
+    const number = $('.social-order-number', editor);
+    if (number) {
+      number.textContent = String(index + 1).padStart(2, '0');
+      number.setAttribute('aria-label', `目前順序第 ${index + 1} 位`);
+    }
+  });
+  const configured = editors.filter((editor) => editor.dataset.exists === 'true');
+  configured.forEach((editor, index) => {
+    const up = $('[data-social-move="up"]', editor);
+    const down = $('[data-social-move="down"]', editor);
+    if (up) up.disabled = index === 0;
+    if (down) down.disabled = index === configured.length - 1;
+  });
+}
+
 function updateSocialCount() {
   const entries = socialEntries();
   $('#social-count').textContent = `${entries.filter(({ link }) => link?.data.visible).length} / ${entries.length} 顯示`;
@@ -628,13 +692,14 @@ function updateSocialCount() {
 
 function renderLinkManager() {
   const entries = socialEntries();
-  $('#social-link-list').innerHTML = entries.map(({ preset, link }) => socialEditorMarkup(preset, link)).join('');
+  $('#social-link-list').innerHTML = entries.map(({ preset, link }, index) => socialEditorMarkup(preset, link, index + 1)).join('');
   const featured = state.content.links
     .filter((link) => ['main', 'featured'].includes(link.data.group))
     .sort((a, b) => (a.data.order ?? 100) - (b.data.order ?? 100));
   $('#featured-link-list').innerHTML = featured.map((link) => featuredEditorMarkup(link)).join('');
   updateSocialCount();
   $$('.link-editor', $('#links-panel')).forEach(bindLinkEditor);
+  updateSocialOrderControls();
 }
 
 function showNewFeaturedEditor() {

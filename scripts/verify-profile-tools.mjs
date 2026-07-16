@@ -10,6 +10,7 @@ import {
   saveHomeSettings,
   saveStudioBlock,
   saveStudioLink,
+  saveStudioSocialOrder,
   saveStudioSection,
   previewProfileAnswers,
 } from './profile-content.mjs';
@@ -50,6 +51,12 @@ try {
     style: 'normal',
     tags: [],
     body: '',
+  });
+  const reorderedSocials = await saveStudioSocialOrder(temporaryRoot, {
+    links: [
+      { id: 'generated-social-github', order: 20 },
+      { id: 'generated-social-email', order: 10 },
+    ],
   });
   const featured = await createStudioLink(temporaryRoot, {
     title: 'Portfolio',
@@ -128,6 +135,10 @@ try {
   assert.equal(result.blocks.find((item) => item.id === 'fortune')?.data.visible, true);
   assert.equal(social.data.visible, false);
   assert.equal(social.data.icon, 'instagram');
+  assert.deepEqual(reorderedSocials.map((item) => [item.id, item.data.order]), [
+    ['generated-social-github', 20],
+    ['generated-social-email', 10],
+  ]);
   assert.equal(featured.data.group, 'featured');
   assert.equal(featured.data.image, '/images/custom-icon.svg');
   assert.equal(featured.body, 'Selected work.');
@@ -253,7 +264,12 @@ try {
   assert.equal((studioHtml.match(/role="tabpanel"/g) ?? []).length, 5);
   assert.match(studioHtml, /data-width="desktop"[^>]*aria-pressed="true"/);
   assert.match(studioHtml, /data-width="mobile"[^>]*aria-pressed="false"/);
-  assert.ok(studioApp.includes("['instagram', 'Instagram', 'instagram'"));
+  assert.ok(studioApp.indexOf("['facebook', 'Facebook', 'facebook'") < studioApp.indexOf("['instagram', 'Instagram', 'instagram'"));
+  assert.ok(studioApp.indexOf("['instagram', 'Instagram', 'instagram'") < studioApp.indexOf("['threads', 'Threads', 'threads'"));
+  assert.ok(studioApp.indexOf("['threads', 'Threads', 'threads'") < studioApp.indexOf("['github', 'GitHub', 'github'"));
+  assert.ok(studioApp.includes("api('/api/social-order'"));
+  assert.ok(studioApp.includes('data-social-move="up"'));
+  assert.ok(studioCss.includes('.social-order-actions'));
   assert.ok(studioApp.includes("$('#add-featured-link').addEventListener"));
   assert.ok(studioApp.includes("if (toggleOnly) {"));
   assert.ok(studioApp.includes("$('.link-editor__meta small', editor).textContent"));

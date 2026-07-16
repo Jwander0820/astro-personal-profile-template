@@ -3,7 +3,7 @@ title: Notion
 url: "https://www.notion.so/"
 icon: notion
 group: social
-order: 40
+order: 170
 visible: false
 layout: icon
 style: normal

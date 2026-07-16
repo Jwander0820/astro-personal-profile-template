@@ -123,6 +123,13 @@ legend { padding: 0 8px; color: var(--ink); font-size: .75rem; font-weight: 850;
 .link-editor { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 3px 10px rgba(49,38,61,.03); }
 .link-editor[open] { border-color: #cab8dc; box-shadow: 0 8px 22px rgba(62,43,78,.07); }
 .link-editor__summary { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 18px; gap: 11px; align-items: center; min-height: 62px; padding: 10px 13px; cursor: pointer; list-style: none; }
+.link-editor[data-kind="social"] > .link-editor__summary { grid-template-columns: 26px 38px minmax(0, 1fr) auto 58px 18px; }
+.social-order-number { color: #978b9f; font: 800 .62rem/1 ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: .04em; text-align: center; }
+.social-order-actions { display: grid; grid-template-columns: repeat(2, 27px); gap: 4px; }
+.social-order-actions button { width: 27px; min-height: 30px; padding: 0; color: var(--accent); border: 1px solid #d7cae2; border-radius: 7px; background: #faf7fc; font-size: .76rem; font-weight: 850; }
+.social-order-actions button:hover:not(:disabled) { border-color: #bda7d0; background: #f1eaf7; }
+.social-order-actions button:disabled { color: #bbb2c0; border-color: #e8e2eb; background: #f7f5f8; cursor: not-allowed; }
+.social-order-placeholder { width: 58px; }
 .link-editor__summary::-webkit-details-marker { display: none; }
 .link-editor__summary:hover { background: #fcfafd; }
 .link-editor__summary .disclosure { color: #988da1; font-size: .85rem; transition: transform .16s ease; }

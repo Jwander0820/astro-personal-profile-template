@@ -532,6 +532,33 @@ export function validateProfileAnswers(input) {
   };
 }
 
+export async function saveStudioSocialOrder(projectRoot, input) {
+  if (!isObject(input) || !Array.isArray(input.links) || input.links.length < 2) {
+    throw new Error('社群排序至少需要兩個連結。');
+  }
+  const ids = input.links.map((item) => assertSlug(item?.id, '社群連結 ID'));
+  assertUnique(ids.map((id) => ({ id })), 'id', '社群連結');
+  const pending = await Promise.all(input.links.map(async (item, index) => {
+    const id = ids[index];
+    const linkPath = safeFile(projectRoot, 'src', 'content', 'links', `${id}.md`);
+    const current = await readMarkdownFile(linkPath);
+    if (current.data.group !== 'social') throw new Error(`${id} 不是社群連結。`);
+    const order = Number(item.order);
+    if (!Number.isFinite(order) || order < 0 || order > 10000) throw new Error('社群排序必須介於 0 到 10000。');
+    return { id, linkPath, current, order };
+  }));
+  await Promise.all(pending.map(({ linkPath, current, order }) => {
+    const data = { ...current.data, order };
+    return atomicWrite(linkPath, stringifyMarkdown(data, current.body));
+  }));
+  return pending.map(({ id, current, order }) => ({
+    id,
+    file: `links/${id}.md`,
+    data: { ...current.data, order },
+    body: current.body,
+  }));
+}
+
 export function previewProfileAnswers(rawInput) {
   const answers = validateProfileAnswers(rawInput);
   const warnings = [];

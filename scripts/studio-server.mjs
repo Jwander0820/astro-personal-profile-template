@@ -13,6 +13,7 @@ import {
   saveHomeSettings,
   saveStudioBlock,
   saveStudioLink,
+  saveStudioSocialOrder,
   saveStudioProfile,
   saveStudioSection,
 } from './profile-content.mjs';
@@ -171,6 +172,10 @@ const server = createServer(async (request, response) => {
     const linkMatch = url.pathname.match(/^\/api\/links\/([a-z0-9-]+)$/);
     if (request.method === 'PUT' && linkMatch) {
       await sendMutation(response, 200, saveStudioLink(projectRoot, linkMatch[1], await readJson(request)).then((link) => ({ link })));
+      return;
+    }
+    if (request.method === 'PUT' && url.pathname === '/api/social-order') {
+      await sendMutation(response, 200, saveStudioSocialOrder(projectRoot, await readJson(request)).then((links) => ({ links })));
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/links') {
