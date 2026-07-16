@@ -38,6 +38,8 @@ const profile = await readFile(path.join(projectRoot, 'src', 'content', 'profile
 assert.match(profile, /^displayName:\s*你的名字$/m, '預設顯示名稱必須是通用 placeholder。');
 assert.doesNotMatch(profile, /^name:/m, '公開模板不保留舊的個人名稱欄位。');
 assert.doesNotMatch(profile, /^location:/m, '公開模板預設不應公開地區。');
+assert.match(profile, /^bodyFont:\s*system$/m, '公開模板預設內文字型不得產生外部請求。');
+assert.match(profile, /^displayFont:\s*system$/m, '公開模板預設展示字型不得產生外部請求。');
 
 const turntable = await readFile(path.join(projectRoot, 'src', 'content', 'blocks', 'turntable.md'), 'utf8');
 const placeholderPlaylistId = 'PL1234567890abcdef';

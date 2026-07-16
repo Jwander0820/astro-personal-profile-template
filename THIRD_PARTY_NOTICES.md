@@ -24,3 +24,13 @@ The LinkedIn icon (`linkedin`) uses the legacy CC0 Simple Icons path that was av
 The monochrome KKBOX icon (`kkbox`) is a project-local 24 × 24 adaptation of the hexagonal K app-icon geometry described in the [official KKBOX brand guidelines](https://a-www.kfs.io/about/sg/en/logo). KKBOX permits use of its name, logo, and icon subject to those guidelines.
 
 The remaining utility icons are project-local SVG paths designed for this template.
+
+# Optional web font notices
+
+The template can optionally load the following fonts from Google Fonts. They are not bundled into the repository, and the default `system` preset makes no external font request.
+
+- Noto Sans TC — SIL Open Font License 1.1 ([license](https://github.com/notofonts/noto-cjk/blob/main/Sans/LICENSE))
+- Noto Serif TC — SIL Open Font License 1.1 ([license](https://github.com/notofonts/noto-cjk/blob/main/Serif/LICENSE))
+- LXGW WenKai TC — SIL Open Font License 1.1 ([license](https://github.com/lxgw/LxgwWenkaiTC/blob/main/OFL.txt))
+
+The font allowlist and loading metadata are stored in `src/data/font-presets.json`. Custom font URLs are intentionally unsupported.

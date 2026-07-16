@@ -6,12 +6,14 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
   applyProfileAnswers,
+  createStudioImageBlock,
   createStudioSection,
   createStudioLink,
   loadStudioContent,
   previewProfileAnswers,
   saveHomeSettings,
   saveStudioBlock,
+  saveStudioImageBlock,
   saveStudioLink,
   saveStudioSocialOrder,
   saveStudioProfile,
@@ -27,6 +29,7 @@ const studioPort = Number(process.env.STUDIO_PORT || 4322);
 const previewPort = Number(process.env.PORT || 4321);
 const MAX_BODY_SIZE = 7 * 1024 * 1024;
 let iconCatalogPromise;
+let fontOptionsPromise;
 let contentRevision = 0;
 
 const contentTypes = {
@@ -60,6 +63,14 @@ async function loadIconCatalog() {
     });
   }
   return iconCatalogPromise;
+}
+
+async function loadFontOptions() {
+  if (!fontOptionsPromise) {
+    fontOptionsPromise = readFile(path.join(projectRoot, 'src', 'data', 'font-presets.json'), 'utf8')
+      .then((source) => JSON.parse(source));
+  }
+  return fontOptionsPromise;
 }
 
 function sendSvg(response, body) {
@@ -121,8 +132,8 @@ const server = createServer(async (request, response) => {
     validateStudioRequest(request, studioPort);
     const url = new URL(request.url || '/', `http://${request.headers.host}`);
     if (request.method === 'GET' && url.pathname === '/api/content') {
-      const [content, icons] = await Promise.all([loadStudioContent(projectRoot), loadIconCatalog()]);
-      sendJson(response, 200, { ...content, icons: Object.keys(icons), previewUrl: `http://localhost:${previewPort}/`, contentRevision });
+      const [content, icons, fontOptions] = await Promise.all([loadStudioContent(projectRoot), loadIconCatalog(), loadFontOptions()]);
+      sendJson(response, 200, { ...content, icons: Object.keys(icons), fontOptions, previewUrl: `http://localhost:${previewPort}/`, contentRevision });
       return;
     }
     const iconMatch = url.pathname.match(/^\/api\/icons\/([a-z0-9]+)\.svg$/);
@@ -158,6 +169,15 @@ const server = createServer(async (request, response) => {
     const blockMatch = url.pathname.match(/^\/api\/blocks\/([a-z0-9-]+)$/);
     if (request.method === 'PUT' && blockMatch) {
       await sendMutation(response, 200, saveStudioBlock(projectRoot, blockMatch[1], await readJson(request)).then((block) => ({ block })));
+      return;
+    }
+    const imageBlockMatch = url.pathname.match(/^\/api\/image-blocks\/([a-z0-9-]+)$/);
+    if (request.method === 'PUT' && imageBlockMatch) {
+      await sendMutation(response, 200, saveStudioImageBlock(projectRoot, imageBlockMatch[1], await readJson(request)).then((block) => ({ block })));
+      return;
+    }
+    if (request.method === 'POST' && url.pathname === '/api/image-blocks') {
+      await sendMutation(response, 201, createStudioImageBlock(projectRoot, await readJson(request)).then((block) => ({ block })));
       return;
     }
     const sectionMatch = url.pathname.match(/^\/api\/sections\/([a-z0-9-]+)$/);

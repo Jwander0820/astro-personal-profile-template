@@ -20,6 +20,15 @@ const fortuneBlocks = blocks.filter((block) => block.data.layout === 'fortune');
 const notionBlocks = blocks.filter((block) => block.data.layout === 'embed' && block.data.provider === 'notion');
 const orderedBlockIds = new Set([...turntableBlocks, ...fortuneBlocks, ...notionBlocks].map((block) => block.id));
 const remainingBlocks = blocks.filter((block) => !orderedBlockIds.has(block.id));
+const blocksBeforeLinks = remainingBlocks.filter((block) => block.data.placement === 'before-links');
+const blocksAfterLinks = remainingBlocks.filter((block) => block.data.placement === 'between-links-sections');
+const blocksAfterAbout = remainingBlocks.filter((block) => block.data.placement === 'after-sections');
+const visibleHomeSections = profile.data.homeOrder.filter((section) => profile.data.homeVisibility.includes(section));
+const fallbackBlocks = remainingBlocks.filter((block) => (
+  (block.data.placement === 'before-links' || block.data.placement === 'between-links-sections')
+    ? !visibleHomeSections.includes('links')
+    : !visibleHomeSections.includes('about')
+));
 const taglineText = Array.isArray(profile.data.tagline)
   ? profile.data.tagline.join(', ')
   : profile.data.tagline;
@@ -31,32 +40,39 @@ const description = `${profile.data.displayName} — ${profile.data.title}。${t
   image={profile.data.background}
   fontScale={profile.data.fontScale}
   smallTextScale={profile.data.smallTextScale}
+  bodyFont={profile.data.bodyFont}
+  displayFont={profile.data.displayFont}
 >
   <ProfileHeader profile={profile} />
   <SocialIcons links={iconLinks} />
-  {profile.data.homeOrder.filter((section) => profile.data.homeVisibility.includes(section)).map((section) => (
-    section === 'about' ? sections.length > 0 && (
-      <section class="content-section" aria-labelledby="about-heading">
-        <h2 id="about-heading">{profile.data.aboutHeading}</h2>
-        <div class:list={['section-list', `section-list--${profile.data.sectionsLayout}`]}>
-          {sections.map((item) => <SectionCard section={item} />)}
-        </div>
-      </section>
-    ) : section === 'turntable' ? (
-      turntableBlocks.map((block) => <CustomBlock block={block} />)
-    ) : section === 'links' ? (
-      featuredLinks.length > 0 && (
-        <section class="content-section" aria-labelledby="links-heading">
-          <h2 id="links-heading">{profile.data.linksHeading}</h2>
-          <div class="link-list">{featuredLinks.map((link) => <LinkCard link={link} />)}</div>
+  {visibleHomeSections.map((section) => (
+    <>
+      {section === 'links' && blocksBeforeLinks.map((block) => <CustomBlock block={block} />)}
+      {section === 'about' ? sections.length > 0 && (
+        <section class="content-section" aria-labelledby="about-heading">
+          <h2 id="about-heading">{profile.data.aboutHeading}</h2>
+          <div class:list={['section-list', `section-list--${profile.data.sectionsLayout}`]}>
+            {sections.map((item) => <SectionCard section={item} />)}
+          </div>
         </section>
-      )
-    ) : section === 'fortune' ? (
-      fortuneBlocks.map((block) => <CustomBlock block={block} fortunes={fortunes} />)
-    ) : (
-      notionBlocks.map((block) => <CustomBlock block={block} />)
-    )
+      ) : section === 'turntable' ? (
+        turntableBlocks.map((block) => <CustomBlock block={block} />)
+      ) : section === 'links' ? (
+        featuredLinks.length > 0 && (
+          <section class="content-section" aria-labelledby="links-heading">
+            <h2 id="links-heading">{profile.data.linksHeading}</h2>
+            <div class="link-list">{featuredLinks.map((link) => <LinkCard link={link} />)}</div>
+          </section>
+        )
+      ) : section === 'fortune' ? (
+        fortuneBlocks.map((block) => <CustomBlock block={block} fortunes={fortunes} />)
+      ) : (
+        notionBlocks.map((block) => <CustomBlock block={block} />)
+      )}
+      {section === 'links' && blocksAfterLinks.map((block) => <CustomBlock block={block} />)}
+      {section === 'about' && blocksAfterAbout.map((block) => <CustomBlock block={block} />)}
+    </>
   ))}
-  {remainingBlocks.map((block) => <CustomBlock block={block} />)}
+  {fallbackBlocks.map((block) => <CustomBlock block={block} />)}
   <Footer name={profile.data.displayName} />
 </BaseLayout>

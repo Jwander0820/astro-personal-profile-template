@@ -36,10 +36,26 @@
       "tags": ["Playlist", "Live"]
     }
   ],
+  "imageBlocks": [
+    {
+      "id": "featured-story",
+      "title": "最近的一段故事",
+      "image": "/images/projects.svg",
+      "imageAlt": "作品與靈感的幾何示意圖",
+      "description": "可在圖片旁邊或下方補充一段文字。",
+      "placement": "between-links-sections",
+      "imageLayout": "split-left",
+      "imageAspect": "landscape",
+      "imagePosition": "center",
+      "tags": ["Story"]
+    }
+  ],
   "playlist": null,
   "features": { "fortune": true },
   "appearance": {
     "sectionsLayout": "grid",
+    "bodyFont": "noto-sans-tc",
+    "displayFont": "noto-serif-tc",
     "homeOrder": ["about", "links", "turntable", "fortune", "notion"]
   }
 }

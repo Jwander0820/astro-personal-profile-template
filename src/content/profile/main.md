@@ -6,6 +6,8 @@ background: /images/background.svg
 archiveLabel: PERSONAL PROFILE
 homeOrder: [about, links, turntable, fortune, notion]
 sectionsLayout: grid
+bodyFont: system
+displayFont: system
 tagline: [作品, 興趣]
 fontScale: 1
 smallTextScale: 1

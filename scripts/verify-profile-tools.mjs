@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
   applyProfileAnswers,
+  createStudioImageBlock,
   createStudioLink,
   extractYoutubePlaylistId,
   saveHomeSettings,
@@ -71,6 +72,20 @@ try {
     tags: ['Work'],
     body: 'Selected work.',
   });
+  const imageBlock = await createStudioImageBlock(temporaryRoot, {
+    id: 'studio-photo',
+    title: 'Studio photo',
+    placement: 'before-links',
+    order: 15,
+    visible: true,
+    image: '/images/projects.svg',
+    imageAlt: 'Project illustration.',
+    imageLayout: 'split-right',
+    imageAspect: 'square',
+    imagePosition: 'top-right',
+    tags: ['Photo'],
+    body: 'Image block copy.',
+  });
   const home = await saveHomeSettings(temporaryRoot, {
     homeOrder: ['links', 'about', 'turntable', 'fortune', 'notion'],
     homeVisibility: ['links', 'about', 'turntable'],
@@ -101,6 +116,7 @@ try {
   assert.equal(answersPreview.summary.displayName, '你的名字');
   assert.equal(answersPreview.summary.socialCount, 2);
   assert.equal(answersPreview.summary.sectionCount, 2);
+  assert.equal(answersPreview.summary.imageBlockCount, 1);
   assert.equal(answersPreview.answers.identity.location, 'Taiwan');
   assert.ok(answersPreview.warnings.some((warning) => warning.includes('location')));
   assert.equal(minimalPreview.summary.socialCount, 0);
@@ -112,6 +128,7 @@ try {
   assert.equal(lunaPreview.summary.socialCount, 0);
   assert.equal(lunaPreview.summary.linkCount, 0);
   assert.equal(lunaPreview.summary.sectionCount, 2);
+  assert.equal(lunaPreview.summary.imageBlockCount, 0);
   assert.equal(lunaPreview.summary.playlistEnabled, false);
   assert.equal(lunaPreview.summary.fortuneEnabled, true);
   assert.deepEqual(lunaPreview.warnings, []);
@@ -127,6 +144,8 @@ try {
   assert.equal('name' in result.profile, false);
   assert.ok(Number.isFinite(result.profile.fontScale) && result.profile.fontScale >= 0.9 && result.profile.fontScale <= 1.2);
   assert.ok(Number.isFinite(result.profile.smallTextScale) && result.profile.smallTextScale >= 0.9 && result.profile.smallTextScale <= 1.35);
+  assert.equal(result.profile.bodyFont, 'noto-sans-tc');
+  assert.equal(result.profile.displayFont, 'noto-serif-tc');
   assert.deepEqual(result.profile.homeOrder, ['about', 'links', 'turntable', 'fortune', 'notion']);
   assert.equal(visibleSocials.length, 2);
   assert.deepEqual(visibleFeatured.filter((item) => item.id.startsWith('generated-')).map((item) => item.id), ['generated-link-projects']);
@@ -142,6 +161,11 @@ try {
   assert.equal(featured.data.group, 'featured');
   assert.equal(featured.data.image, '/images/custom-icon.svg');
   assert.equal(featured.body, 'Selected work.');
+  assert.equal(imageBlock.data.layout, 'image');
+  assert.equal(imageBlock.data.placement, 'before-links');
+  assert.equal(imageBlock.data.imageLayout, 'split-right');
+  assert.equal(imageBlock.data.imagePosition, 'top-right');
+  assert.equal(imageBlock.body, 'Image block copy.');
   assert.deepEqual(home.homeVisibility, ['links', 'about', 'turntable']);
   assert.equal(home.aboutHeading, 'Profile');
   assert.equal(turntable.data.playlistId, 'PL1234567890abcdef');
@@ -279,11 +303,12 @@ try {
   assert.match(studioCss, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(studioHtml, /<a class="skip-link" href="#editor">/);
   assert.match(studioHtml, /role="tablist"/);
-  assert.equal((studioHtml.match(/role="tab"/g) ?? []).length, 5);
-  assert.equal((studioHtml.match(/role="tabpanel"/g) ?? []).length, 5);
+  assert.equal((studioHtml.match(/role="tab"/g) ?? []).length, 6);
+  assert.equal((studioHtml.match(/role="tabpanel"/g) ?? []).length, 6);
   assert.match(studioHtml, /data-width="desktop"[^>]*aria-pressed="true"/);
   assert.match(studioHtml, /data-width="mobile"[^>]*aria-pressed="false"/);
   assert.match(studioHtml, /id="save-all"[^>]*>儲存並更新<\/button>/);
+  assert.ok(studioHtml.indexOf('id="save-all"') < studioHtml.indexOf('id="save-mode"'));
   assert.ok(studioApp.indexOf("['facebook', 'Facebook', 'facebook'") < studioApp.indexOf("['instagram', 'Instagram', 'instagram'"));
   assert.ok(studioApp.indexOf("['instagram', 'Instagram', 'instagram'") < studioApp.indexOf("['threads', 'Threads', 'threads'"));
   assert.ok(studioApp.indexOf("['threads', 'Threads', 'threads'") < studioApp.indexOf("['github', 'GitHub', 'github'"));
@@ -297,6 +322,9 @@ try {
   assert.ok(studioCss.includes('.social-drag-handle'));
   assert.ok(studioCss.includes('.topbar-save'));
   assert.ok(studioApp.includes("$('#add-featured-link').addEventListener"));
+  assert.ok(studioApp.includes("$('#add-image-block').addEventListener"));
+  assert.ok(studioApp.includes("isNew ? '/api/image-blocks' : `/api/image-blocks/${editor.dataset.blockId}`"));
+  assert.ok(studioApp.includes('imagePosition'));
   assert.ok(!studioApp.includes('toggleOnly'));
   assert.ok(studioApp.includes("$('.link-editor__meta small', editor).textContent"));
   assert.ok(studioApp.includes("await api('/api/home'"));
@@ -329,11 +357,13 @@ try {
   assert.ok(studioServer.includes("url.pathname === '/api/fortunes/restore'"));
   assert.ok(studioServer.includes("url.pathname === '/api/answers/validate'"));
   assert.ok(studioServer.includes("url.pathname === '/api/answers/apply'"));
+  assert.ok(studioServer.includes("url.pathname === '/api/image-blocks'"));
+  assert.ok(studioServer.includes('fontOptions'));
   assert.ok(studioServer.includes("await resolvePackageBin('astro')"));
   assert.ok(!studioServer.includes("'astro', 'astro.js'"));
   assert.ok(studioServer.includes("ASTRO_DEV_BACKGROUND: 'studio-managed'"));
 
-  console.log('Profile tools check passed (autosave, answer validation, fortune editing, and Studio content writes are valid).');
+  console.log('Profile tools check passed (autosave, answer validation, image blocks, fonts, fortune editing, and Studio writes are valid).');
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
 }

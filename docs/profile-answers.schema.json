@@ -68,6 +68,27 @@
         }
       }
     },
+    "imageBlocks": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "image"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "image": { "type": "string", "pattern": "^/images/[A-Za-z0-9._/-]+$" },
+          "imageAlt": { "type": "string", "maxLength": 300 },
+          "description": { "type": "string", "maxLength": 5000 },
+          "placement": { "enum": ["before-links", "between-links-sections", "after-sections"], "default": "after-sections" },
+          "imageLayout": { "enum": ["full", "split-left", "split-right", "poster"], "default": "full" },
+          "imageAspect": { "enum": ["auto", "landscape", "square", "portrait"], "default": "landscape" },
+          "imagePosition": { "enum": ["center", "top", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"], "default": "center" },
+          "tags": { "type": "array", "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 80 } }
+        }
+      }
+    },
     "playlist": {
       "type": ["object", "null"],
       "additionalProperties": false,
@@ -88,6 +109,8 @@
       "additionalProperties": false,
       "properties": {
         "sectionsLayout": { "enum": ["grid", "list"], "default": "grid" },
+        "bodyFont": { "enum": ["system", "noto-sans-tc", "noto-serif-tc", "lxgw-wenkai-tc"], "default": "system" },
+        "displayFont": { "enum": ["system", "noto-sans-tc", "noto-serif-tc", "lxgw-wenkai-tc"], "default": "system" },
         "homeOrder": {
           "type": "array",
           "minItems": 5,

@@ -23,14 +23,19 @@ Studio 的寫入 API 不會部署到 `dist`，GitHub Pages 上也不存在。圖
 
 連結管理分為個人資料下方的社群 Icons，以及首頁 Links 卡片。社群服務目錄會顯示尚未建立的項目；首次儲存時才建立對應 Markdown。兩種連結都能選擇 `src/lib/icons.ts` 的內建 Icon，或將自訂圖檔上傳到 `public/images/` 並寫入 `image` 欄位。
 
+圖片板塊是 `blocks/*.md` 中的 `layout: image`。Studio 可建立與維護滿版、左右分割、海報式版型，並設定比例、裁切焦點、替代文字、Markdown 附文及顯示錨點。`placement` 會實際錨定在 Links 前、Links 後或 About 後；若對應首頁板塊被隱藏，圖片板塊會移到主要內容尾端，避免內容消失。
+
+字型使用 `src/data/font-presets.json` 白名單。`system` 不發出外部請求；其他選項由 Google Fonts 載入，且目前只收錄 SIL Open Font License 1.1 字型。內文與展示標題可分開設定。
+
 ## 欄位責任
 
 | 使用者操作 | 實際檔案 | 驗證來源 |
 |---|---|---|
-| 基本資料、字級、About 排版 | `profile/main.md` | Studio + Astro collection schema |
+| 基本資料、字型、字級、About 排版 | `profile/main.md` | Studio + Astro collection schema |
 | 首頁五大板塊順序、顯示與標題 | `profile/main.md` 的 `homeOrder`、`homeVisibility`、`aboutHeading`、`linksHeading` | 順序固定五個唯一值；顯示設定可為任意子集合 |
 | 社群連結 | `links/*.md` | URL protocol、content schema |
 | 自介卡片 | `sections/*.md` | `order`、`visible`、layout |
+| 圖片板塊 | `blocks/*.md` | 圖片路徑、區域、版型、比例、焦點與替代文字 |
 | 播放清單／抽籤／Notion | `blocks/*.md` | 各 block 的條件驗證 |
 | 籤桶內容 | `fortunes.json` | 共用籤桶模組的 ID、等級、分類、訊息、啟用數與 revision 驗證 |
 

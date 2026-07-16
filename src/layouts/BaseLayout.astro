@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { withBase } from '../lib/paths';
+import { getFontPreset, getGoogleFontsUrl } from '../lib/font-presets';
 import ThemeToggle from '../components/ThemeToggle.astro';
 interface Props {
   title: string;
@@ -9,6 +10,8 @@ interface Props {
   pageClass?: string;
   fontScale?: number;
   smallTextScale?: number;
+  bodyFont?: string;
+  displayFont?: string;
 }
 const {
   title,
@@ -17,15 +20,26 @@ const {
   pageClass,
   fontScale = 1,
   smallTextScale = 1,
+  bodyFont = 'system',
+  displayFont = 'system',
 } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const socialImage = image ? new URL(withBase(image) ?? '', Astro.site) : undefined;
 const favicon = withBase('/favicon.svg');
+const bodyFontPreset = getFontPreset(bodyFont);
+const displayFontPreset = getFontPreset(displayFont);
+const bodyFontFamily = bodyFont === 'system'
+  ? '"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif'
+  : bodyFontPreset.cssFamily;
+const displayFontFamily = displayFont === 'system'
+  ? '"Noto Serif TC", "Noto Serif JP", "Yu Mincho", "Songti TC", serif'
+  : displayFontPreset.cssFamily;
+const googleFontsUrl = getGoogleFontsUrl(bodyFont, displayFont);
 ---
 <!doctype html>
 <html
   lang="zh-Hant"
-  style={`font-size: ${fontScale * 100}%; --small-text-base: ${smallTextScale}rem;`}
+  style={`font-size: ${fontScale * 100}%; --small-text-base: ${smallTextScale}rem; --font-body: ${bodyFontFamily}; --font-display: ${displayFontFamily};`}
 >
   <head>
     <meta charset="UTF-8" />
@@ -44,6 +58,13 @@ const favicon = withBase('/favicon.svg');
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href={favicon} />
+    {googleFontsUrl && (
+      <>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="stylesheet" href={googleFontsUrl} />
+      </>
+    )}
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />

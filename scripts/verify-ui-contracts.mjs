@@ -48,7 +48,11 @@ const contracts = [
   ['tonearm touch target remains 44px wide', /width:\s*44px/.test(tonearmRule)],
   ['turntable buttons remain at least 44px tall', /min-height:\s*44px/.test(buttonRule)],
   ['obsolete undefined page background token is absent', !css.includes('var(--page-bg)')],
-  ['home section order and visibility are controlled by validated profile content', /profile\.data\.homeOrder\.filter\(\(section\) => profile\.data\.homeVisibility\.includes\(section\)\)\.map/.test(indexPage) && contentConfig.includes("homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))") && contentConfig.includes("homeVisibility: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))") && contentConfig.includes("new Set(items).size === items.length")],
+  ['home section order and visibility are controlled by validated profile content', indexPage.includes('const visibleHomeSections = profile.data.homeOrder.filter') && indexPage.includes('visibleHomeSections.map') && contentConfig.includes("homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))") && contentConfig.includes("homeVisibility: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))") && contentConfig.includes("new Set(items).size === items.length")],
+  ['custom blocks render at their configured home anchors', indexPage.includes('blocksBeforeLinks') && indexPage.includes('blocksAfterLinks') && indexPage.includes('blocksAfterAbout') && indexPage.includes('fallbackBlocks')],
+  ['image blocks expose layout, aspect, focal point, and required image validation', contentConfig.includes("'image'") && contentConfig.includes('imageLayout:') && contentConfig.includes('imageAspect:') && contentConfig.includes('imagePosition:') && contentConfig.includes("data.layout === 'image' && !data.image")],
+  ['image blocks have responsive full, split, and poster treatments', css.includes('.custom-block--image .custom-block__body') && css.includes('.image-block--split-left') && css.includes('.image-block--poster') && css.includes('object-position: var(--image-position, center)')],
+  ['profile typography is selected from the font allowlist', contentConfig.includes("bodyFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc'])") && indexPage.includes('bodyFont={profile.data.bodyFont}') && indexPage.includes('displayFont={profile.data.displayFont}')],
   ['fortune block participates in ordered rendering without falling through', indexPage.includes("section === 'fortune'") && indexPage.includes('...fortuneBlocks') && indexPage.includes('fortunes={fortunes}')],
   ['fortune data uses the validated single-file collection', contentConfig.includes("file('src/content/fortunes.json')") && contentConfig.includes("z.enum(['大吉', '中吉', '小吉'])")],
   ['fortune ids are unique and messages are non-empty', fortuneBucketIsValid && new Set(fortuneIds).size === fortuneIds.length],
@@ -60,8 +64,8 @@ const contracts = [
   ['expanded YouTube player is not clipped to the old 380px limit', css.includes('max-height: 700px') && !css.includes('max-height: 380px')],
   ['track and status rows reserve stable two-line space', titleRule.includes('block-size: 2.7em') && statusRule.includes('block-size: 3em')],
   ['YouTube frame joins the black player surface without a pale border', videoRule.includes('width: 100%') && videoRule.includes('border: 0') && videoRule.includes('background: #000')],
-  ['name uses the unified sans-serif body face', nameRule.includes('font-family: var(--font-body)')],
-  ['section and card titles use the readable sans face', sectionHeadingRule.includes('font-family: var(--font-body)') && sectionCardTitleRule.includes('font-family: var(--font-body)') && embedCardTitleRule.includes('font-family: var(--font-body)')],
+  ['name uses the selectable display face', nameRule.includes('font-family: var(--font-display)')],
+  ['section and card titles use the selectable display face', sectionHeadingRule.includes('font-family: var(--font-display)') && sectionCardTitleRule.includes('font-family: var(--font-display)') && embedCardTitleRule.includes('font-family: var(--font-display)')],
   ['theme toggle exposes and synchronizes pressed state', themeToggle.includes('aria-pressed="false"') && themeToggle.includes('syncToggleState')],
 ];
 

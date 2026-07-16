@@ -23,6 +23,8 @@ const profile = defineCollection({
     aboutHeading: z.string().default('About me'),
     linksHeading: z.string().default('Links'),
     sectionsLayout: z.enum(['list', 'grid']).default('list'),
+    bodyFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default('system'),
+    displayFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default('system'),
     fontScale: z.number().min(0.9).max(1.2).default(1),
     smallTextScale: z.number().min(0.9).max(1.35).default(1),
     tagline: z.union([z.string(), z.array(z.string()).min(1)]),
@@ -65,7 +67,7 @@ const blocks = defineCollection({
     placement: z.enum(['before-links', 'between-links-sections', 'after-sections']),
     order: z.number().default(100),
     visible: z.boolean().default(true),
-    layout: z.enum(['card', 'plain', 'embed', 'turntable', 'fortune']).default('card'),
+    layout: z.enum(['card', 'plain', 'image', 'embed', 'turntable', 'fortune']).default('card'),
     provider: z.enum(['notion', 'youtube']).optional(),
     url: z.url().optional(),
     embedMode: z.enum(['preview', 'inline']).default('preview'),
@@ -73,8 +75,19 @@ const blocks = defineCollection({
     continuousPlayback: z.boolean().default(true),
     height: z.number().int().min(320).max(1200).default(600),
     image: z.string().optional(),
+    imageAlt: z.string().max(300).default(''),
+    imageLayout: z.enum(['full', 'split-left', 'split-right', 'poster']).default('full'),
+    imageAspect: z.enum(['auto', 'landscape', 'square', 'portrait']).default('landscape'),
+    imagePosition: z.enum(['center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right']).default('center'),
     tags: z.array(z.string()).default([]),
   }).superRefine((data, context) => {
+    if (data.layout === 'image' && !data.image) {
+      context.addIssue({
+        code: 'custom',
+        path: ['image'],
+        message: 'Image blocks require an image path.',
+      });
+    }
     if (data.layout === 'embed' && !data.url) {
       context.addIssue({
         code: 'custom',

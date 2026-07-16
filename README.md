@@ -23,7 +23,7 @@ Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，或在 PowerShell
 
 也可以在 Windows 使用 `npm.cmd run studio`；其他環境使用 `npm run studio`。
 
-前往 `http://localhost:4322`，即可編輯基本資料與圖片、拖曳首頁板塊、調整社群連結，並在右側即時檢查桌面／手機畫面。預設採手動儲存，修改會先留在 Studio 草稿中，再由頂端固定列的「儲存並更新」一次寫入並刷新預覽；也可切換「自動更新（5 秒）」，停止修改五秒且欄位有效時才會批次寫入。狀態列固定顯示「已儲存」、「尚未儲存」或「更新中」，不會因提示長度改變而跳動。Studio 不會被打包進 GitHub Pages。完整欄位與安全邊界請見 [`docs/PROFILE_CONTENT_MODEL.md`](docs/PROFILE_CONTENT_MODEL.md)。
+前往 `http://localhost:4322`，即可編輯基本資料、字型與圖片，建立可指定區域及版型的圖片板塊、拖曳首頁板塊、調整社群連結，並在右側即時檢查桌面／手機畫面。預設採手動儲存，修改會先留在 Studio 草稿中，再由頂端固定列的「儲存並更新」一次寫入並刷新預覽；也可切換「自動更新（5 秒）」，停止修改五秒且欄位有效時才會批次寫入。狀態列固定顯示「已儲存」、「尚未儲存」或「更新中」，不會因提示長度改變而跳動。Studio 不會被打包進 GitHub Pages。完整欄位與安全邊界請見 [`docs/PROFILE_CONTENT_MODEL.md`](docs/PROFILE_CONTENT_MODEL.md)。
 
 請優先使用 `localhost` 開啟 Studio 與網站預覽。YouTube 嵌入播放器可能無法把 `127.0.0.1` 視為有效的本機來源，導致公開播放清單在正式網站可以播放、在本機預覽卻顯示無法讀取。
 
@@ -80,6 +80,15 @@ smallTextScale: 1.15 # 0.9～1.35，額外放大小字
 ```
 
 兩個欄位皆可省略，預設值為 `1`。如果只覺得說明文字太小，建議先保留 `fontScale: 1`，將 `smallTextScale` 調成 `1.1`～`1.2`。
+
+內文與標題字型可分開選擇：
+
+```yaml
+bodyFont: noto-sans-tc
+displayFont: noto-serif-tc
+```
+
+支援值為 `system`、`noto-sans-tc`、`noto-serif-tc`、`lxgw-wenkai-tc`。`system` 不會載入外部資源；其他選項透過 Google Fonts 載入，授權資訊記錄於 `THIRD_PARTY_NOTICES.md`。不接受任意字型網址。
 
 ## 新增連結
 
@@ -143,7 +152,29 @@ tags: [Learning, Building]
 - `between-links-sections`：Links 與 About me 之間
 - `after-sections`：About me 後
 
-首頁會依照上述位置輸出：個人資料與社群 icon → `before-links` → Links → `between-links-sections` → About me → `after-sections`。因此預設的唱盤會在 Links 與 About me 後方；若想把唱盤移到 Links 上方，只需將它的 `placement` 改成 `before-links`。
+這三個值是相對錨點：`before-links` 會緊貼在 Links 前、`between-links-sections` 會緊貼在 Links 後、`after-sections` 會緊貼在 About me 後，即使五大首頁板塊重新排序也會跟著對應板塊移動。若 Links 或 About me 被隱藏，相關自訂區塊會移到主要內容尾端，避免一併消失。唱盤、抽籤與 Notion 屬於五大首頁板塊，位置仍由 `homeOrder` 控制。
+
+### 圖片板塊
+
+可直接在 Profile Studio 的「圖片板塊」新增，或複製 `src/content/blocks/image-showcase.md`：
+
+```yaml
+---
+title: 旅行照片
+placement: between-links-sections
+order: 10
+visible: true
+layout: image
+image: /images/travel.jpg
+imageAlt: 海邊夕陽與遠方山脈
+imageLayout: split-left
+imageAspect: landscape
+imagePosition: center
+tags: [Travel]
+---
+```
+
+Markdown 內文會成為附加文字。`imageLayout` 支援 `full`、`split-left`、`split-right`、`poster`；`imageAspect` 支援 `auto`、`landscape`、`square`、`portrait`；`imagePosition` 可用中央、上下左右及四角對應的英文值控制裁切焦點。
 
 ### 內嵌 Notion 頁面
 
@@ -190,7 +221,7 @@ tags: [Shuffle, YouTube]
 
 播放器會等到訪客按下唱針後才載入 YouTube，並從唱盤下方向下展開，避免預先顯示播放清單縮圖或讓未互動的訪客載入播放器。播放器會隨機選取單支影片、顯示目前 YouTube 曲名，唱臂會依播放進度從外圈往唱片中心移動；暫停、結束或播放失敗時會回到唱臂架。使用滑鼠或觸控拖曳唱臂可跳轉播放時間，鍵盤方向鍵每次調整 5 秒、搭配 Shift 調整 15 秒，Home／End 可跳至開頭／結尾。「換一首」會避開目前曲目重新抽選。私人清單、禁止嵌入或受地區限制的影片可能無法播放。YouTube 播放器必須保持可見、至少 `200 × 200px`，且不得以自訂介面遮擋。
 
-`layout` 可選 `card`、`plain`、`embed` 或 `turntable`。同一位置內使用 `order` 排序。新增文字、圖片、標籤與調整位置只需修改 Markdown；若要新增全新的視覺種類或互動行為，則需要擴充 Astro component 與 CSS。
+`layout` 可選 `card`、`plain`、`image`、`embed`、`turntable` 或 `fortune`。同一位置內使用 `order` 排序。新增文字、圖片、標籤與調整位置只需修改 Markdown；若要新增全新的視覺種類或互動行為，則需要擴充 Astro component 與 CSS。
 
 
 ## GitHub Pages 部署

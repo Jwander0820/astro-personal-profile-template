@@ -2,6 +2,11 @@ import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/pro
 import path from 'node:path';
 
 const HOME_SECTIONS = ['about', 'turntable', 'links', 'fortune', 'notion'];
+const FONT_PRESETS = ['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc'];
+const IMAGE_BLOCK_PLACEMENTS = ['before-links', 'between-links-sections', 'after-sections'];
+const IMAGE_BLOCK_LAYOUTS = ['full', 'split-left', 'split-right', 'poster'];
+const IMAGE_BLOCK_ASPECTS = ['auto', 'landscape', 'square', 'portrait'];
+const IMAGE_BLOCK_POSITIONS = ['center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
 const STARTER_SECTIONS = new Set(['about', 'live', 'music', 'projects']);
 const STARTER_LINKS = new Set(['github', 'live-archive', 'monthly-playlist', 'projects']);
 const SERVICE_DEFAULTS = {
@@ -236,6 +241,8 @@ export async function loadStudioContent(projectRoot) {
       aboutHeading: 'About me',
       linksHeading: 'Links',
       sectionsLayout: 'list',
+      bodyFont: 'system',
+      displayFont: 'system',
       fontScale: 1,
       smallTextScale: 1,
       ...profile.data,
@@ -255,6 +262,8 @@ export async function saveStudioProfile(projectRoot, input) {
   const tagline = assertStringArray(input.tagline, '關鍵字', { min: 1, max: 6 });
   const fontScale = Number(input.fontScale ?? current.data.fontScale ?? 1);
   const smallTextScale = Number(input.smallTextScale ?? current.data.smallTextScale ?? 1);
+  const bodyFont = FONT_PRESETS.includes(input.bodyFont) ? input.bodyFont : current.data.bodyFont ?? 'system';
+  const displayFont = FONT_PRESETS.includes(input.displayFont) ? input.displayFont : current.data.displayFont ?? 'system';
   if (fontScale < 0.9 || fontScale > 1.2) throw new Error('整體字級必須介於 0.9～1.2。');
   if (smallTextScale < 0.9 || smallTextScale > 1.35) throw new Error('小字比例必須介於 0.9～1.35。');
   const { name: _legacyName, ...currentData } = current.data;
@@ -267,6 +276,8 @@ export async function saveStudioProfile(projectRoot, input) {
     avatar: assertImagePath(input.avatar, '頭像') || undefined,
     background: assertImagePath(input.background, '背景圖片') || undefined,
     sectionsLayout: ['list', 'grid'].includes(input.sectionsLayout) ? input.sectionsLayout : 'grid',
+    bodyFont,
+    displayFont,
     fontScale,
     smallTextScale,
     tagline,
@@ -504,9 +515,26 @@ export function validateProfileAnswers(input) {
       image: assertText(item.image, '圖片路徑', { max: 300 }),
     };
   });
+  const imageBlocks = (input.imageBlocks ?? []).map((item, index) => {
+    if (!isObject(item)) throw new Error(`第 ${index + 1} 個圖片板塊格式不正確。`);
+    return {
+      id: assertSlug(item.id, '圖片板塊 ID'),
+      title: assertText(item.title, '圖片板塊標題', { required: true, max: 80 }),
+      image: assertImagePath(item.image, '圖片板塊圖片'),
+      imageAlt: assertText(item.imageAlt, '圖片替代文字', { max: 300 }),
+      description: assertText(item.description, '圖片板塊文字', { max: 5000 }),
+      placement: IMAGE_BLOCK_PLACEMENTS.includes(item.placement) ? item.placement : 'after-sections',
+      imageLayout: IMAGE_BLOCK_LAYOUTS.includes(item.imageLayout) ? item.imageLayout : 'full',
+      imageAspect: IMAGE_BLOCK_ASPECTS.includes(item.imageAspect) ? item.imageAspect : 'landscape',
+      imagePosition: IMAGE_BLOCK_POSITIONS.includes(item.imagePosition) ? item.imagePosition : 'center',
+      tags: assertStringArray(item.tags ?? [], '圖片板塊標籤', { max: 8 }),
+    };
+  });
+  if (imageBlocks.some((block) => !block.image)) throw new Error('圖片板塊圖片為必填欄位。');
   assertUnique(socials, 'service', '社群服務');
   assertUnique(links, 'id', '精選連結 ID');
   assertUnique(sections, 'id', '自介區塊 ID');
+  assertUnique(imageBlocks, 'id', '圖片板塊 ID');
   const appearance = isObject(input.appearance) ? input.appearance : {};
   const homeOrder = appearance.homeOrder ?? HOME_SECTIONS;
   if (!Array.isArray(homeOrder) || homeOrder.length !== 5 || new Set(homeOrder).size !== 5 || homeOrder.some((item) => !HOME_SECTIONS.includes(item))) {
@@ -523,13 +551,57 @@ export function validateProfileAnswers(input) {
     socials,
     links,
     sections,
+    imageBlocks,
     playlist,
     appearance: {
       sectionsLayout: appearance.sectionsLayout === 'list' ? 'list' : 'grid',
       homeOrder,
+      bodyFont: FONT_PRESETS.includes(appearance.bodyFont) ? appearance.bodyFont : 'system',
+      displayFont: FONT_PRESETS.includes(appearance.displayFont) ? appearance.displayFont : 'system',
     },
     features: { fortune: input.features?.fortune !== false },
   };
+}
+
+export async function saveStudioImageBlock(projectRoot, id, input) {
+  const safeId = assertSlug(id, '圖片板塊 ID');
+  if (!isObject(input)) throw new Error('圖片板塊格式不正確。');
+  const blockPath = safeFile(projectRoot, 'src', 'content', 'blocks', `${safeId}.md`);
+  let current = { data: {}, body: '' };
+  try {
+    current = await readMarkdownFile(blockPath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  if (current.data.layout && current.data.layout !== 'image') throw new Error('這個 ID 已被其他板塊使用。');
+  const order = Number(input.order ?? current.data.order ?? 100);
+  if (!Number.isFinite(order) || order < 0 || order > 10000) throw new Error('圖片板塊順序必須介於 0～10000。');
+  const next = {
+    ...current.data,
+    title: assertText(input.title ?? current.data.title, '圖片板塊標題', { required: true, max: 80 }),
+    placement: IMAGE_BLOCK_PLACEMENTS.includes(input.placement) ? input.placement : current.data.placement ?? 'after-sections',
+    order,
+    visible: input.visible === undefined ? Boolean(current.data.visible ?? true) : Boolean(input.visible),
+    layout: 'image',
+    image: assertImagePath(input.image ?? current.data.image, '圖片路徑'),
+    imageAlt: assertText(input.imageAlt ?? current.data.imageAlt, '圖片替代文字', { max: 300 }),
+    imageLayout: IMAGE_BLOCK_LAYOUTS.includes(input.imageLayout) ? input.imageLayout : current.data.imageLayout ?? 'full',
+    imageAspect: IMAGE_BLOCK_ASPECTS.includes(input.imageAspect) ? input.imageAspect : current.data.imageAspect ?? 'landscape',
+    imagePosition: IMAGE_BLOCK_POSITIONS.includes(input.imagePosition) ? input.imagePosition : current.data.imagePosition ?? 'center',
+    tags: assertStringArray(input.tags ?? current.data.tags ?? [], '圖片板塊標籤', { max: 8 }),
+  };
+  if (!next.image) throw new Error('圖片板塊必須選擇圖片。');
+  const body = assertText(input.body ?? current.body, '圖片板塊文字', { max: 5000 });
+  await atomicWrite(blockPath, stringifyMarkdown(next, body));
+  return { id: safeId, file: `blocks/${safeId}.md`, data: next, body };
+}
+
+export async function createStudioImageBlock(projectRoot, input) {
+  if (!isObject(input)) throw new Error('新圖片板塊格式不正確。');
+  const id = input.id
+    ? assertSlug(input.id, '圖片板塊 ID')
+    : `studio-image-${Date.now().toString(36)}`;
+  return saveStudioImageBlock(projectRoot, id, input);
 }
 
 export async function saveStudioSocialOrder(projectRoot, input) {
@@ -577,6 +649,8 @@ export function previewProfileAnswers(rawInput) {
       linkTitles: answers.links.map((link) => link.title),
       sectionCount: answers.sections.length,
       sectionTitles: answers.sections.map((section) => section.title),
+      imageBlockCount: answers.imageBlocks.length,
+      imageBlockTitles: answers.imageBlocks.map((block) => block.title),
       playlistEnabled: Boolean(answers.playlist),
       fortuneEnabled: answers.features.fortune,
       homeOrder: answers.appearance.homeOrder,
@@ -596,6 +670,8 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
     tagline: input.identity.tagline,
     bio: input.identity.bio,
     sectionsLayout: input.appearance.sectionsLayout,
+    bodyFont: input.appearance.bodyFont,
+    displayFont: input.appearance.displayFont,
   });
   await saveHomeOrder(projectRoot, input.appearance.homeOrder);
 
@@ -650,6 +726,25 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
       layout: 'card',
       tags: section.tags,
     }, section.description);
+  }
+
+  for (const block of current.blocks.filter((item) => item.id.startsWith('generated-image-'))) {
+    await setVisible(projectRoot, 'blocks', block.id, false);
+  }
+  for (const [index, block] of input.imageBlocks.entries()) {
+    await upsertMarkdown(projectRoot, 'blocks', `generated-image-${block.id}`, {
+      title: block.title,
+      placement: block.placement,
+      order: (index + 1) * 10,
+      visible: true,
+      layout: 'image',
+      image: block.image,
+      imageAlt: block.imageAlt,
+      imageLayout: block.imageLayout,
+      imageAspect: block.imageAspect,
+      imagePosition: block.imagePosition,
+      tags: block.tags,
+    }, block.description);
   }
 
   if (input.playlist) {

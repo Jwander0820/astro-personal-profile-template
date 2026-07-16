@@ -1,0 +1,38 @@
+[
+  {
+    "id": "system",
+    "label": "系統預設",
+    "description": "不載入外部字型，優先使用裝置內建的繁中字型。",
+    "cssFamily": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", system-ui, sans-serif",
+    "googleFamily": null,
+    "license": null,
+    "licenseUrl": null
+  },
+  {
+    "id": "noto-sans-tc",
+    "label": "Noto Sans TC",
+    "description": "清楚中性的繁體中文黑體，適合長文與介面。",
+    "cssFamily": "\"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif",
+    "googleFamily": "Noto Sans TC:wght@400;500;600;700;900",
+    "license": "SIL Open Font License 1.1",
+    "licenseUrl": "https://github.com/notofonts/noto-cjk/blob/main/Sans/LICENSE"
+  },
+  {
+    "id": "noto-serif-tc",
+    "label": "Noto Serif TC",
+    "description": "帶有書卷感的繁體中文明體，適合標題與個人文字。",
+    "cssFamily": "\"Noto Serif TC\", \"Songti TC\", \"PMingLiU\", serif",
+    "googleFamily": "Noto Serif TC:wght@400;600;700;900",
+    "license": "SIL Open Font License 1.1",
+    "licenseUrl": "https://github.com/notofonts/noto-cjk/blob/main/Serif/LICENSE"
+  },
+  {
+    "id": "lxgw-wenkai-tc",
+    "label": "LXGW WenKai TC",
+    "description": "自然溫和的繁體中文楷體，適合日記感與生活型自介。",
+    "cssFamily": "\"LXGW WenKai TC\", \"Kaiti TC\", \"DFKai-SB\", cursive",
+    "googleFamily": "LXGW WenKai TC:wght@300;400;700",
+    "license": "SIL Open Font License 1.1",
+    "licenseUrl": "https://github.com/lxgw/LxgwWenkaiTC/blob/main/OFL.txt"
+  }
+]

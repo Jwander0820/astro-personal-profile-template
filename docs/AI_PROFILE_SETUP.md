@@ -11,7 +11,7 @@
 Agent 應分兩輪詢問：
 
 1. 必填：顯示名稱、一句話身分、1～6 個關鍵字、自我介紹。
-2. 選填：國家／地區、社群網站、精選連結、About me 卡片、YouTube 播放清單、抽籤功能與排版偏好。
+2. 選填：國家／地區、社群網站、精選連結、About me 卡片、圖片板塊、YouTube 播放清單、抽籤功能、字型與排版偏好。
 
 回答時可以很口語。Agent 的工作是整理語句、確認不確定的網址，最後產生符合 `docs/profile-answers.schema.json` 的 `profile.answers.json`。
 
@@ -32,8 +32,10 @@ Agent 應分兩輪詢問：
 - 想放哪些社群網站？請提供服務名稱與完整網址。
 - 是否有重要的專案、文章、作品集或歌單連結？每個項目可附一句說明和標籤。
 - About me 想分成哪些卡片？例如「關於我」、「音樂」、「專案」、「旅行」。
+- 是否要加入大圖板塊？若要，提供圖片路徑、替代文字、附加說明，以及希望放在 Links 前、Links 後或 About 後。
 - 是否要使用 YouTube 播放清單唱盤？若要，提供網址中的 `list` ID。
 - 是否保留「今日手氣」抽籤？
+- 內文與標題要使用系統預設、Noto Sans TC、Noto Serif TC 或 LXGW WenKai TC？可跳過。
 
 ## 套用與檢查
 
@@ -51,7 +53,7 @@ npm run build
 
 - 更新 `src/content/profile/main.md`。
 - 隱藏舊的社群 icon，建立 `generated-social-*.md`。
-- 更新 `generated-link-*.md` 與 `generated-*.md` 自介卡片。
+- 更新 `generated-link-*.md`、`generated-*.md` 自介卡片與 `generated-image-*.md` 圖片板塊。
 - 原本手寫的自訂 Markdown 不會被刪除；範本預設自介卡片會被隱藏。
 - 依回答啟用或停用唱盤與抽籤。
 

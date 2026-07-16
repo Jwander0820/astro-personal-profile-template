@@ -16,11 +16,11 @@
         <span><strong>Profile Studio</strong><small>本機內容編輯台</small></span>
       </div>
       <div class="topbar-status">
+        <button class="topbar-save" id="save-all" type="button" disabled>儲存並更新</button>
         <label class="save-mode"><span>儲存方式</span><select id="save-mode"><option value="manual">手動儲存</option><option value="auto">自動更新（5 秒）</option></select></label>
         <div class="save-status" id="save-status" data-status="clean" role="status" aria-live="polite">
           <span class="save-status__dot" aria-hidden="true"></span><span id="save-status-text">已儲存</span>
         </div>
-        <button class="topbar-save" id="save-all" type="button" disabled>儲存並更新</button>
         <div class="connection"><span class="connection-dot" aria-hidden="true"></span>只寫入這個專案</div>
       </div>
     </header>
@@ -35,6 +35,7 @@
         <nav class="tabs" aria-label="編輯項目" role="tablist">
           <button class="tab is-active" id="profile-tab" type="button" role="tab" data-panel="profile" aria-controls="profile-panel" aria-selected="true" tabindex="0">基本資料</button>
           <button class="tab" id="order-tab" type="button" role="tab" data-panel="order" aria-controls="order-panel" aria-selected="false" tabindex="-1">首頁板塊</button>
+          <button class="tab" id="images-tab" type="button" role="tab" data-panel="images" aria-controls="images-panel" aria-selected="false" tabindex="-1">圖片板塊</button>
           <button class="tab" id="links-tab" type="button" role="tab" data-panel="links" aria-controls="links-panel" aria-selected="false" tabindex="-1">連結管理</button>
           <button class="tab" id="fortunes-tab" type="button" role="tab" data-panel="fortunes" aria-controls="fortunes-panel" aria-selected="false" tabindex="-1">籤桶管理</button>
           <button class="tab" id="ai-tab" type="button" role="tab" data-panel="ai" aria-controls="ai-panel" aria-selected="false" tabindex="-1">AI 匯入</button>
@@ -68,9 +69,12 @@
             <legend>閱讀與排版</legend>
             <div class="form-grid form-grid--settings">
               <label><span>About me 排版</span><select name="sectionsLayout"><option value="grid">兩欄卡片</option><option value="list">單欄列表</option></select></label>
+              <label><span>內文字型</span><select name="bodyFont"></select><small id="body-font-description"></small></label>
+              <label><span>標題／展示字型</span><select name="displayFont"></select><small id="display-font-description"></small></label>
               <label><span>整體字級 <output id="font-output">1</output></span><input name="fontScale" type="range" min="0.9" max="1.2" step="0.05" /></label>
               <label><span>小字比例 <output id="small-font-output">1</output></span><input name="smallTextScale" type="range" min="0.9" max="1.35" step="0.05" /></label>
             </div>
+            <p class="fieldset-note">字型選單只提供專案白名單。系統預設不會連線；其他選項會從 Google Fonts 載入 SIL OFL 開放授權字型。</p>
           </fieldset>
           <div class="actions"><button class="primary-action" type="submit">儲存基本資料</button><span class="save-note">會更新 profile/main.md</span></div>
         </form>
@@ -79,6 +83,15 @@
           <div class="panel-intro"><h2>首頁板塊</h2><p>調整順序、開關顯示，並展開修改各板塊內容。個人封面與社群小圖示固定在最上方。</p></div>
           <ol class="order-board" id="order-list"></ol>
           <div class="actions"><button class="primary-action" id="save-order" type="button">儲存板塊設定</button><span class="save-note">關閉只會隱藏，不會刪除 Markdown</span></div>
+        </section>
+
+        <section class="panel" id="images-panel" data-panel-name="images" role="tabpanel" aria-labelledby="images-tab" hidden>
+          <div class="panel-intro image-panel-intro">
+            <div><h2>圖片板塊</h2><p>建立獨立的大圖內容，可指定顯示區域、左右分割、海報式覆字、裁切比例與圖片焦點。文字支援 Markdown，也可以留空。</p></div>
+            <button class="secondary-action" id="add-image-block" type="button">＋ 新增圖片板塊</button>
+          </div>
+          <div id="new-image-block"></div>
+          <div class="image-block-editor-list" id="image-block-list"></div>
         </section>
 
         <section class="panel" id="links-panel" data-panel-name="links" role="tabpanel" aria-labelledby="links-tab" hidden>

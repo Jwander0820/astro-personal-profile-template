@@ -240,15 +240,32 @@ function switchMarkup(visible, label) {
   return `<label class="switch-control" title="${escapeHtml(label)}"><span>顯示</span><input name="visible" type="checkbox" ${visible ? 'checked' : ''} /><span class="switch-track" aria-hidden="true"></span></label>`;
 }
 
+function fontOptionsMarkup(selected) {
+  return (state.content.fontOptions ?? []).map((font) => (
+    `<option value="${escapeHtml(font.id)}" ${font.id === selected ? 'selected' : ''}>${escapeHtml(font.label)}</option>`
+  )).join('');
+}
+
+function updateFontDescription(name) {
+  const select = $(`#profile-panel select[name="${name}"]`);
+  const font = (state.content.fontOptions ?? []).find((item) => item.id === select.value);
+  const target = name === 'bodyFont' ? $('#body-font-description') : $('#display-font-description');
+  target.textContent = font ? `${font.description}${font.license ? `｜${font.license}` : ''}` : '';
+}
+
 function populateProfile() {
   const form = $('#profile-panel');
   const profile = state.content.profile;
-  ['displayName', 'title', 'location', 'archiveLabel', 'avatar', 'background', 'sectionsLayout', 'fontScale', 'smallTextScale', 'bio'].forEach((key) => {
+  form.elements.bodyFont.innerHTML = fontOptionsMarkup(profile.bodyFont ?? 'system');
+  form.elements.displayFont.innerHTML = fontOptionsMarkup(profile.displayFont ?? 'system');
+  ['displayName', 'title', 'location', 'archiveLabel', 'avatar', 'background', 'sectionsLayout', 'bodyFont', 'displayFont', 'fontScale', 'smallTextScale', 'bio'].forEach((key) => {
     if (form.elements[key]) form.elements[key].value = profile[key] ?? '';
   });
   form.elements.tagline.value = Array.isArray(profile.tagline) ? profile.tagline.join(', ') : profile.tagline;
   $('#font-output').value = profile.fontScale ?? 1;
   $('#small-font-output').value = profile.smallTextScale ?? 1;
+  updateFontDescription('bodyFont');
+  updateFontDescription('displayFont');
 }
 
 function getBlock(id) {
@@ -447,6 +464,140 @@ function bindHomeEditors() {
       await submitSaveUnit(key, $('button[type="submit"]', form));
     });
   });
+}
+
+function imageBlockEditorMarkup(block, isNew = false) {
+  const data = block?.data ?? {
+    title: '',
+    placement: 'after-sections',
+    order: 100,
+    visible: true,
+    image: '',
+    imageAlt: '',
+    imageLayout: 'full',
+    imageAspect: 'landscape',
+    imagePosition: 'center',
+    tags: [],
+  };
+  const preview = data.image
+    ? `<img src="${escapeHtml(assetUrl(data.image))}" alt="" />`
+    : '';
+  return `<details class="image-block-editor" data-block-id="${escapeHtml(block?.id ?? '')}" data-new="${isNew}">
+    <summary><span class="image-block-preview">${preview}</span><span class="link-editor__meta"><strong>${escapeHtml(isNew ? '新增圖片板塊' : data.title)}</strong><small>${escapeHtml(isNew ? '選擇圖片與顯示區域' : block.file)}</small></span><span class="count-badge">${escapeHtml(data.imageLayout)}</span><span class="disclosure" aria-hidden="true">⌄</span></summary>
+    <form class="image-block-editor__body">
+      <div class="image-block-fields">
+        ${isNew ? '<label><span>識別名稱</span><input name="id" placeholder="travel-photo" pattern="[a-z0-9][a-z0-9-]*" required /></label>' : ''}
+        <label><span>板塊標題</span><input name="title" value="${escapeHtml(data.title)}" maxlength="80" required /></label>
+        <label><span>顯示區域</span><select name="placement">
+          <option value="before-links" ${data.placement === 'before-links' ? 'selected' : ''}>Links 前</option>
+          <option value="between-links-sections" ${data.placement === 'between-links-sections' ? 'selected' : ''}>Links 後</option>
+          <option value="after-sections" ${data.placement === 'after-sections' ? 'selected' : ''}>About 後</option>
+        </select></label>
+        <label><span>版型</span><select name="imageLayout">
+          <option value="full" ${data.imageLayout === 'full' ? 'selected' : ''}>滿版圖片＋下方文字</option>
+          <option value="split-left" ${data.imageLayout === 'split-left' ? 'selected' : ''}>圖片左／文字右</option>
+          <option value="split-right" ${data.imageLayout === 'split-right' ? 'selected' : ''}>文字左／圖片右</option>
+          <option value="poster" ${data.imageLayout === 'poster' ? 'selected' : ''}>海報式覆字</option>
+        </select></label>
+        <label><span>圖片比例</span><select name="imageAspect">
+          <option value="auto" ${data.imageAspect === 'auto' ? 'selected' : ''}>保留原圖</option>
+          <option value="landscape" ${data.imageAspect === 'landscape' ? 'selected' : ''}>橫幅 16:9</option>
+          <option value="square" ${data.imageAspect === 'square' ? 'selected' : ''}>正方形 1:1</option>
+          <option value="portrait" ${data.imageAspect === 'portrait' ? 'selected' : ''}>直式 4:5</option>
+        </select></label>
+        <label><span>圖片焦點</span><select name="imagePosition">
+          <option value="center" ${data.imagePosition === 'center' ? 'selected' : ''}>中央</option>
+          <option value="top" ${data.imagePosition === 'top' ? 'selected' : ''}>上方</option>
+          <option value="bottom" ${data.imagePosition === 'bottom' ? 'selected' : ''}>下方</option>
+          <option value="left" ${data.imagePosition === 'left' ? 'selected' : ''}>左側</option>
+          <option value="right" ${data.imagePosition === 'right' ? 'selected' : ''}>右側</option>
+          <option value="top-left" ${data.imagePosition === 'top-left' ? 'selected' : ''}>左上</option>
+          <option value="top-right" ${data.imagePosition === 'top-right' ? 'selected' : ''}>右上</option>
+          <option value="bottom-left" ${data.imagePosition === 'bottom-left' ? 'selected' : ''}>左下</option>
+          <option value="bottom-right" ${data.imagePosition === 'bottom-right' ? 'selected' : ''}>右下</option>
+        </select></label>
+        <label><span>排序數字</span><input name="order" type="number" min="0" max="10000" value="${Number(data.order ?? 100)}" /></label>
+        <div class="field-wide image-input-row">
+          <label><span>圖片路徑</span><input name="image" value="${escapeHtml(data.image ?? '')}" placeholder="/images/photo.jpg" required /></label>
+          <label class="file-button">上傳圖片<input class="image-block-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" /></label>
+        </div>
+        <label class="field-wide"><span>替代文字</span><input name="imageAlt" value="${escapeHtml(data.imageAlt ?? '')}" maxlength="300" placeholder="描述圖片內容，純裝飾圖片可留空" /></label>
+        <label class="field-wide"><span>附加文字 <i>選填</i></span><textarea name="body" rows="5" maxlength="5000">${escapeHtml(block?.body ?? '')}</textarea><small>支援 Markdown；滿版版型會顯示在圖片下方。</small></label>
+        <label class="field-wide"><span>標籤</span><input name="tags" value="${escapeHtml((data.tags ?? []).join(', '))}" placeholder="Travel, Photography" /></label>
+      </div>
+      <div class="image-block-editor__footer">${switchMarkup(Boolean(data.visible), '圖片板塊顯示設定')}<button class="secondary-action" type="submit">${isNew ? '建立圖片板塊' : '儲存圖片板塊'}</button></div>
+    </form>
+  </details>`;
+}
+
+function bindImageBlockEditor(editor) {
+  const form = $('form', editor);
+  const isNew = editor.dataset.new === 'true';
+  const key = `image-block:${editor.dataset.blockId}`;
+  const persist = async () => {
+    const values = Object.fromEntries(new FormData(form));
+    values.visible = form.elements.visible.checked;
+    values.order = Number(values.order);
+    values.tags = values.tags.split(/[,，]/).map((item) => item.trim()).filter(Boolean);
+    const endpoint = isNew ? '/api/image-blocks' : `/api/image-blocks/${editor.dataset.blockId}`;
+    const result = await api(endpoint, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(values) });
+    const index = state.content.blocks.findIndex((item) => item.id === result.block.id);
+    if (index >= 0) state.content.blocks[index] = result.block;
+    else state.content.blocks.push(result.block);
+    if (isNew) renderImageBlockManager();
+    else {
+      $('summary strong', editor).textContent = result.block.data.title;
+      $('summary small', editor).textContent = result.block.file;
+      $('.count-badge', editor).textContent = result.block.data.imageLayout;
+      const preview = $('.image-block-preview', editor);
+      preview.innerHTML = `<img src="${escapeHtml(assetUrl(result.block.data.image))}" alt="" />`;
+    }
+    return { result, message: `已儲存圖片板塊「${result.block.data.title}」。` };
+  };
+  if (!isNew) {
+    registerSaveTask(key, { validate: (report) => report ? form.reportValidity() : form.checkValidity(), run: persist });
+    bindSaveUnit(form, key);
+  }
+  $('.image-block-upload', form).addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+      const imagePath = await uploadAsset(file);
+      form.elements.image.value = imagePath;
+      const preview = $('.image-block-preview', editor);
+      preview.innerHTML = `<img src="${escapeHtml(assetUrl(imagePath))}" alt="" />`;
+      if (!isNew) saveCoordinator.markDirty(key);
+      toast(`圖片已放入 ${imagePath}。`);
+    } catch (error) {
+      toast(error.message, true);
+    }
+  });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    const button = $('button[type="submit"]', form);
+    if (isNew) await runExplicitSave(persist, button);
+    else await submitSaveUnit(key, button);
+  });
+}
+
+function renderImageBlockManager() {
+  const blocks = state.content.blocks
+    .filter((block) => block.data.layout === 'image')
+    .sort((a, b) => (a.data.order ?? 100) - (b.data.order ?? 100));
+  $('#new-image-block').innerHTML = '';
+  $('#image-block-list').innerHTML = blocks.map((block) => imageBlockEditorMarkup(block)).join('');
+  $$('.image-block-editor', $('#image-block-list')).forEach(bindImageBlockEditor);
+}
+
+function showNewImageBlock() {
+  const container = $('#new-image-block');
+  if (container.innerHTML) { container.innerHTML = ''; return; }
+  container.innerHTML = imageBlockEditorMarkup(null, true);
+  const editor = $('.image-block-editor', container);
+  editor.open = true;
+  bindImageBlockEditor(editor);
+  $('input[name="id"]', editor).focus();
 }
 
 function socialEntries() {
@@ -920,6 +1071,7 @@ function renderAnswerSummary(preview) {
     <dt>社群連結</dt><dd>${summary.socialCount} 個：${escapeHtml(list(summary.socialServices))}</dd>
     <dt>精選連結</dt><dd>${summary.linkCount} 個：${escapeHtml(list(summary.linkTitles))}</dd>
     <dt>自介卡片</dt><dd>${summary.sectionCount} 個：${escapeHtml(list(summary.sectionTitles))}</dd>
+    <dt>圖片板塊</dt><dd>${summary.imageBlockCount} 個：${escapeHtml(list(summary.imageBlockTitles))}</dd>
     <dt>播放清單</dt><dd>${summary.playlistEnabled ? '啟用' : '停用'}</dd>
     <dt>今日手氣</dt><dd>${summary.fortuneEnabled ? '啟用' : '停用'}</dd>
   </dl>${preview.warnings.length ? `<ul>${preview.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>` : ''}`;
@@ -1005,6 +1157,8 @@ function bindEvents() {
   });
   form.elements.fontScale.addEventListener('input', () => { $('#font-output').value = form.elements.fontScale.value; });
   form.elements.smallTextScale.addEventListener('input', () => { $('#small-font-output').value = form.elements.smallTextScale.value; });
+  form.elements.bodyFont.addEventListener('change', () => updateFontDescription('bodyFont'));
+  form.elements.displayFont.addEventListener('change', () => updateFontDescription('displayFont'));
   $('#avatar-upload').addEventListener('change', (event) => uploadProfileImage(event.target.files[0], 'avatar').catch((error) => toast(error.message, true)));
   $('#background-upload').addEventListener('change', (event) => uploadProfileImage(event.target.files[0], 'background').catch((error) => toast(error.message, true)));
   registerSaveTask('home', {
@@ -1032,6 +1186,7 @@ function bindEvents() {
     await submitSaveUnit('home', event.currentTarget);
   });
   $('#add-featured-link').addEventListener('click', showNewFeaturedEditor);
+  $('#add-image-block').addEventListener('click', showNewImageBlock);
   $('#fortune-search').addEventListener('input', renderFortuneList);
   $('#fortune-sort').addEventListener('change', renderFortuneList);
   $('#add-fortune').addEventListener('click', addFortune);
@@ -1135,7 +1290,7 @@ async function initialize() {
     state.order = [...state.content.profile.homeOrder];
     state.homeVisibility = [...state.content.profile.homeVisibility];
     state.socialOrderDraft = state.content.links.filter((link) => link.data.group === 'social').sort((a, b) => (a.data.order ?? 100) - (b.data.order ?? 100)).map((link) => link.id);
-    populateProfile(); renderOrder(); renderLinkManager(); renderFortuneManager();
+    populateProfile(); renderOrder(); renderImageBlockManager(); renderLinkManager(); renderFortuneManager();
     $('#preview').src = state.content.previewUrl;
     setSaveStatus('clean');
     $('#loading').hidden = true;

@@ -12,15 +12,24 @@ const { block, fortunes = [] } = Astro.props;
 const { Content } = await render(block);
 const imageUrl = withBase(block.data.image);
 const isEmbed = block.data.layout === 'embed';
+const isImage = block.data.layout === 'image';
 const isTurntable = block.data.layout === 'turntable';
 const isFortune = block.data.layout === 'fortune';
 const embedUrl = block.data.url;
 const embedLabel = block.data.provider === 'notion' ? '在 Notion 開啟' : '開啟完整內容';
+const imagePosition = block.data.imagePosition.replace('-', ' ');
 ---
 <section class:list={['content-section', 'custom-block', `custom-block--${block.data.layout}`]} aria-labelledby={`block-${block.id}`}>
   <h2 id={`block-${block.id}`}>{block.data.title}</h2>
-  <div class="custom-block__body">
-    {imageUrl && <img src={imageUrl} alt="" loading="lazy" />}
+  <div
+    class:list={[
+      'custom-block__body',
+      isImage && `image-block--${block.data.imageLayout}`,
+      isImage && `image-block--${block.data.imageAspect}`,
+    ]}
+    style={isImage ? `--image-position: ${imagePosition};` : undefined}
+  >
+    {imageUrl && <img src={imageUrl} alt={block.data.imageAlt} loading="lazy" />}
     <div class="custom-block__content"><Content /></div>
     {isTurntable && block.data.playlistId && (
       <TurntablePlayer
