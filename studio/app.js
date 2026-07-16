@@ -7,6 +7,7 @@ const state = {
   fortuneBucket: null,
   fortuneDraft: [],
   fortuneDirty: false,
+  socialOrderDraft: [],
   validatedAnswers: null,
   toastTimer: null,
   previewRequest: 0,
@@ -77,9 +78,9 @@ async function api(url, options = {}) {
 const saveStatusLabels = {
   clean: '已儲存',
   dirty: '尚未儲存',
-  scheduled: '等待自動更新',
-  saving: '儲存中',
-  refreshing: '更新預覽中',
+  scheduled: '待更新',
+  saving: '更新中',
+  refreshing: '更新中',
   error: '更新失敗',
 };
 
@@ -87,6 +88,8 @@ function setSaveStatus(status, detail = '') {
   const element = $('#save-status');
   element.dataset.status = status;
   $('#save-status-text').textContent = detail || saveStatusLabels[status];
+  const saveAll = $('#save-all');
+  if (saveAll) saveAll.disabled = ['saving', 'refreshing'].includes(status) || !saveCoordinator.hasPending();
 }
 
 function refreshPreview(revision = state.content?.contentRevision ?? 0, timeoutMs = 8000) {
@@ -95,40 +98,30 @@ function refreshPreview(revision = state.content?.contentRevision ?? 0, timeoutM
   const requestId = ++state.previewRequest;
   const url = new URL(state.content.previewUrl);
   url.searchParams.set('studioRevision', String(revision));
+  url.searchParams.set('studioRequest', String(requestId));
+  frame.classList.add('is-refreshing');
+  frame.setAttribute('aria-busy', 'true');
   return new Promise((resolve, reject) => {
     let timer;
-    let retryTimer;
-    let attempt = 0;
-    const maximumAttempts = 3;
     const cleanup = () => {
       clearTimeout(timer);
-      clearTimeout(retryTimer);
       frame.removeEventListener('load', handleLoad);
       frame.removeEventListener('error', handleError);
+      frame.classList.remove('is-refreshing');
+      frame.removeAttribute('aria-busy');
       if (state.previewPending === settle) state.previewPending = null;
     };
     const settle = (result, error) => {
       cleanup();
       if (error) reject(error); else resolve(result);
     };
-    const navigate = () => {
-      attempt += 1;
-      url.searchParams.set('studioRequest', `${requestId}-${attempt}`);
-      frame.src = url.href;
-    };
-    const handleLoad = () => {
-      if (attempt < maximumAttempts) {
-        retryTimer = setTimeout(navigate, attempt * 250);
-        return;
-      }
-      settle({ loaded: true, revision, attempts: attempt });
-    };
+    const handleLoad = () => settle({ loaded: true, revision });
     const handleError = () => settle(null, new Error('預覽頁載入失敗。'));
     state.previewPending = settle;
     frame.addEventListener('load', handleLoad);
     frame.addEventListener('error', handleError, { once: true });
     timer = setTimeout(() => settle(null, new Error('內容已儲存，但預覽更新逾時。')), timeoutMs);
-    navigate();
+    frame.src = url.href;
   });
 }
 
@@ -140,7 +133,7 @@ async function finishSave(result, message) {
     if (!preview.superseded) setSaveStatus('clean');
     toast(message);
   } catch (error) {
-    setSaveStatus('error', '內容已儲存・預覽失敗');
+    setSaveStatus('error');
     toast(error.message, true);
   }
 }
@@ -160,10 +153,14 @@ const saveCoordinator = createSaveCoordinator({
     if (!task.validate(true)) throw new Error('請先修正欄位內容再儲存。');
     return task.run({ revision });
   },
-  refresh: async ({ result }) => refreshSavedContent(result.result, result.message),
+  refresh: async ({ result, results, batch }) => refreshSavedContent(
+    result.result,
+    batch ? `${results.length} 項修改已儲存並更新。` : result.message,
+  ),
   onStatus: ({ status, hasNewerChanges, contentSaved, error }) => {
-    if (status === 'saving' && hasNewerChanges) setSaveStatus('saving', '儲存中・有新修改');
-    else if (status === 'error' && contentSaved) setSaveStatus('error', '內容已儲存・預覽失敗');
+    if (status === 'saving' && hasNewerChanges) setSaveStatus('saving');
+    else if (status === 'error' && contentSaved) setSaveStatus('error');
+    else if (status === 'clean' && saveCoordinator.hasPending()) setSaveStatus('dirty');
     else setSaveStatus(status);
     if (status === 'error' && error) toast(error.message, true);
   },
@@ -192,6 +189,17 @@ async function submitSaveUnit(key, button) {
   try { await saveCoordinator.submit(key); }
   catch { /* onStatus 已顯示可操作的錯誤。 */ }
   finally { if (button) button.disabled = false; }
+}
+
+async function submitAllPending() {
+  const pendingKeys = saveCoordinator.pendingKeys();
+  const invalidKey = pendingKeys.find((key) => saveTasks.get(key)?.validate(true) === false);
+  if (invalidKey) {
+    setSaveStatus('dirty');
+    toast('請先修正尚未完成的欄位，再儲存全部修改。', true);
+    return;
+  }
+  await saveCoordinator.submitAll();
 }
 
 async function runExplicitSave(run, button) {
@@ -457,8 +465,10 @@ function socialEntries() {
   return entries.sort((a, b) => {
     const aPresetOrder = socialPresets.findIndex((preset) => preset.id === a.preset.id);
     const bPresetOrder = socialPresets.findIndex((preset) => preset.id === b.preset.id);
-    const aOrder = a.link?.data.order ?? (aPresetOrder >= 0 ? (aPresetOrder + 1) * 10 : 10000);
-    const bOrder = b.link?.data.order ?? (bPresetOrder >= 0 ? (bPresetOrder + 1) * 10 : 10000);
+    const aDraftOrder = a.link ? state.socialOrderDraft.indexOf(a.link.id) : -1;
+    const bDraftOrder = b.link ? state.socialOrderDraft.indexOf(b.link.id) : -1;
+    const aOrder = aDraftOrder >= 0 ? (aDraftOrder + 1) * 10 : (a.link?.data.order ?? (aPresetOrder >= 0 ? (aPresetOrder + 1) * 10 : 10000));
+    const bOrder = bDraftOrder >= 0 ? (bDraftOrder + 1) * 10 : (b.link?.data.order ?? (bPresetOrder >= 0 ? (bPresetOrder + 1) * 10 : 10000));
     return aOrder - bOrder || a.preset.label.localeCompare(b.preset.label);
   });
 }
@@ -473,7 +483,7 @@ function socialEditorMarkup(preset, link, position) {
   const id = link?.id ?? `studio-social-${preset.id}`;
   return `<details class="link-editor" data-link-id="${escapeHtml(id)}" data-kind="social" data-exists="${Boolean(link)}" data-order="${escapeHtml(data.order)}">
     <summary class="link-editor__summary">
-      <span class="social-order-number" aria-label="目前順序第 ${position} 位">${String(position).padStart(2, '0')}</span>
+      <button class="social-drag-handle" type="button" draggable="${Boolean(link)}" aria-label="拖曳調整 ${escapeHtml(preset.label)} 的顯示順序" ${link ? '' : 'disabled'}><span class="social-order-number" aria-hidden="true">${String(position).padStart(2, '0')}</span><span class="social-drag-glyph" aria-hidden="true">••</span></button>
       <span class="icon-preview"><img src="${escapeHtml(previewUrl(data.icon, data.image))}" alt="" /></span>
       <span class="link-editor__meta"><strong>${escapeHtml(preset.label)}</strong><small>${escapeHtml(editorStatus(link))}</small></span>
       ${switchMarkup(Boolean(data.visible), `${preset.label}顯示設定`)}
@@ -534,36 +544,29 @@ function bindLinkEditor(editor) {
   const switchControl = $('.switch-control', editor);
   switchControl.addEventListener('click', (event) => event.stopPropagation());
   switchControl.addEventListener('keydown', (event) => event.stopPropagation());
-  $$('[data-social-move]', editor).forEach((button) => {
-    button.addEventListener('click', async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      await moveSocialLink(editor, button.dataset.socialMove, button);
-    });
-  });
-  visibility.addEventListener('change', async () => {
+  bindSocialOrderControls(editor);
+  bindSocialDrag(editor);
+  visibility.addEventListener('change', () => {
     if (!exists) {
       editor.open = true;
       if (visibility.checked) toast('先填寫網址，再儲存即可開啟這個項目。');
-      return;
     }
-    const result = await runExplicitSave(() => persistLinkEditor(editor, true), null);
-    if (!result) {
-      visibility.checked = !visibility.checked;
-    }
+    $('.link-editor__meta small', editor).textContent = '尚未儲存';
+    saveCoordinator.markDirty(key);
+    updateSocialCount();
   });
-  if (exists) {
+  if (exists || editor.dataset.kind === 'social') {
     registerSaveTask(key, {
       validate: (report) => report ? form.reportValidity() : form.checkValidity(),
-      run: () => persistLinkEditor(editor, false),
+      run: () => persistLinkEditor(editor),
     });
-    bindSaveUnit(form, key, { ignore: (event) => event.target === visibility });
+    bindSaveUnit(form, key);
   }
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const button = $('button[type="submit"]', form);
-    if (exists) await submitSaveUnit(key, button);
-    else await runExplicitSave(() => persistLinkEditor(editor, false), button);
+    if (exists || editor.dataset.kind === 'social') await submitSaveUnit(key, button);
+    else await runExplicitSave(() => persistLinkEditor(editor), button);
   });
   form.elements.icon.addEventListener('change', () => updateEditorIcon(editor));
   form.elements.iconUpload.addEventListener('change', async (event) => {
@@ -611,60 +614,125 @@ function linkPayload(editor) {
   };
 }
 
-async function persistLinkEditor(editor, toggleOnly) {
+async function persistLinkEditor(editor) {
   const form = $('form', editor);
-  if (!toggleOnly && !form.reportValidity()) throw new Error('請先填完名稱與網址。');
+  if (!form.reportValidity()) throw new Error('請先填完名稱與網址。');
   const isNewFeatured = editor.dataset.kind === 'featured' && editor.dataset.exists !== 'true';
   const endpoint = isNewFeatured ? '/api/links' : `/api/links/${editor.dataset.linkId}`;
-  const current = state.content.links.find((item) => item.id === editor.dataset.linkId);
-  const payload = toggleOnly
-    ? { ...current.data, body: current.body, visible: $('input[name="visible"]', editor).checked }
-    : linkPayload(editor);
+  const payload = linkPayload(editor);
   const result = await api(endpoint, { method: isNewFeatured ? 'POST' : 'PUT', body: JSON.stringify(payload) });
   const index = state.content.links.findIndex((item) => item.id === result.link.id);
   if (index >= 0) state.content.links[index] = result.link;
   else state.content.links.push(result.link);
-  if (toggleOnly) {
-    $('.link-editor__meta small', editor).textContent = editorStatus(result.link);
-    updateSocialCount();
-  } else {
+  if (isNewFeatured) {
     const scrollTop = $('.editor').scrollTop;
     $('#new-featured-link').innerHTML = '';
     renderLinkManager();
     requestAnimationFrame(() => { $('.editor').scrollTop = scrollTop; });
+  } else {
+    const wasNewSocial = editor.dataset.kind === 'social' && editor.dataset.exists !== 'true';
+    editor.dataset.exists = 'true';
+    editor.dataset.linkId = result.link.id;
+    $('.link-editor__meta strong', editor).textContent = result.link.data.title;
+    $('.link-editor__meta small', editor).textContent = editorStatus(result.link);
+    $('.save-note', editor).textContent = result.link.file;
+    if (wasNewSocial) {
+      state.socialOrderDraft.push(result.link.id);
+      const placeholder = $('.social-order-placeholder', editor);
+      if (placeholder) {
+        placeholder.outerHTML = '<span class="social-order-actions"><button type="button" data-social-move="up" aria-label="上移此社群 icon">↑</button><button type="button" data-social-move="down" aria-label="下移此社群 icon">↓</button></span>';
+      }
+      $('.social-drag-handle', editor).disabled = false;
+      $('.social-drag-handle', editor).draggable = true;
+      bindSocialOrderControls(editor);
+      bindSocialDrag(editor);
+    }
+    updateSocialOrderControls();
+    updateSocialCount();
   }
-  return { result, message: toggleOnly ? '顯示設定已更新。' : `已儲存 ${result.link.data.title}。` };
+  return { result, message: `已儲存 ${result.link.data.title}。` };
 }
 
-async function moveSocialLink(editor, direction, button) {
+function bindSocialOrderControls(editor) {
+  const dragHandle = $('.social-drag-handle', editor);
+  if (dragHandle && dragHandle.dataset.bound !== 'true') {
+    dragHandle.dataset.bound = 'true';
+    dragHandle.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+  }
+  $$('[data-social-move]', editor).forEach((button) => {
+    if (button.dataset.bound === 'true') return;
+    button.dataset.bound = 'true';
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      moveSocialLink(editor, button.dataset.socialMove);
+    });
+  });
+}
+
+function configuredSocialEditors() {
+  return $$('.link-editor[data-kind="social"][data-exists="true"]', $('#social-link-list'));
+}
+
+function syncSocialOrderDraft() {
+  state.socialOrderDraft = configuredSocialEditors().map((editor) => editor.dataset.linkId);
+}
+
+function bindSocialDrag(editor) {
+  if (editor.dataset.kind !== 'social' || editor.dataset.dragBound === 'true') return;
+  editor.dataset.dragBound = 'true';
+  const dragHandle = $('.social-drag-handle', editor);
+  dragHandle.addEventListener('dragstart', (event) => {
+    if (editor.dataset.exists !== 'true') {
+      event.preventDefault();
+      return;
+    }
+    editor.dataset.dragStartOrder = state.socialOrderDraft.join('|');
+    editor.classList.add('is-dragging');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', editor.dataset.linkId);
+  });
+  editor.addEventListener('dragover', (event) => {
+    const dragging = $('.link-editor.is-dragging', $('#social-link-list'));
+    if (!dragging || dragging === editor || editor.dataset.exists !== 'true') return;
+    event.preventDefault();
+    const before = event.clientY < editor.getBoundingClientRect().top + editor.offsetHeight / 2;
+    $('#social-link-list').insertBefore(dragging, before ? editor : editor.nextSibling);
+    syncSocialOrderDraft();
+    updateSocialOrderControls();
+  });
+  dragHandle.addEventListener('dragend', () => {
+    editor.classList.remove('is-dragging');
+    syncSocialOrderDraft();
+    if (editor.dataset.dragStartOrder !== state.socialOrderDraft.join('|')) saveCoordinator.markDirty('social-order');
+    delete editor.dataset.dragStartOrder;
+  });
+}
+
+function moveSocialLink(editor, direction) {
   const configured = $$('.link-editor[data-kind="social"][data-exists="true"]', $('#social-link-list'));
   const index = configured.indexOf(editor);
   const target = configured[index + (direction === 'up' ? -1 : 1)];
   if (!target) return;
-  const currentLink = state.content.links.find((item) => item.id === editor.dataset.linkId);
-  const targetLink = state.content.links.find((item) => item.id === target.dataset.linkId);
-  if (!currentLink || !targetLink) return;
-  const currentOrder = Number(currentLink.data.order ?? 100);
-  const targetOrder = Number(targetLink.data.order ?? 100);
-  const result = await runExplicitSave(async () => {
-    const saved = await api('/api/social-order', {
-      method: 'PUT',
-      body: JSON.stringify({
-        links: [
-          { id: currentLink.id, order: targetOrder },
-          { id: targetLink.id, order: currentOrder },
-        ],
-      }),
-    });
-    saved.links.forEach((link) => {
-      const stateIndex = state.content.links.findIndex((item) => item.id === link.id);
-      if (stateIndex >= 0) state.content.links[stateIndex] = link;
-    });
-    if (direction === 'up') target.before(editor); else target.after(editor);
-    updateSocialOrderControls();
-    return { result: saved, message: '社群 icon 順序已更新。' };
-  }, button);
-  if (!result) updateSocialOrderControls();
+  if (direction === 'up') target.before(editor); else target.after(editor);
+  syncSocialOrderDraft();
+  updateSocialOrderControls();
+  saveCoordinator.markDirty('social-order');
+}
+
+async function persistSocialOrder() {
+  const saved = await api('/api/social-order', {
+    method: 'PUT',
+    body: JSON.stringify({ links: state.socialOrderDraft.map((id, index) => ({ id, order: (index + 1) * 10 })) }),
+  });
+  saved.links.forEach((link) => {
+    const stateIndex = state.content.links.findIndex((item) => item.id === link.id);
+    if (stateIndex >= 0) state.content.links[stateIndex] = link;
+  });
+  return { result: saved, message: '社群 icon 順序已儲存。' };
 }
 
 function updateSocialOrderControls() {
@@ -673,7 +741,7 @@ function updateSocialOrderControls() {
     const number = $('.social-order-number', editor);
     if (number) {
       number.textContent = String(index + 1).padStart(2, '0');
-      number.setAttribute('aria-label', `目前順序第 ${index + 1} 位`);
+      $('.social-drag-handle', editor)?.setAttribute('aria-label', `拖曳調整第 ${index + 1} 個社群 icon 的顯示順序`);
     }
   });
   const configured = editors.filter((editor) => editor.dataset.exists === 'true');
@@ -686,8 +754,8 @@ function updateSocialOrderControls() {
 }
 
 function updateSocialCount() {
-  const entries = socialEntries();
-  $('#social-count').textContent = `${entries.filter(({ link }) => link?.data.visible).length} / ${entries.length} 顯示`;
+  const editors = $$('.link-editor[data-kind="social"]', $('#social-link-list'));
+  $('#social-count').textContent = `${editors.filter((editor) => $('input[name="visible"]', editor)?.checked).length} / ${editors.length} 顯示`;
 }
 
 function renderLinkManager() {
@@ -697,6 +765,7 @@ function renderLinkManager() {
     .filter((link) => ['main', 'featured'].includes(link.data.group))
     .sort((a, b) => (a.data.order ?? 100) - (b.data.order ?? 100));
   $('#featured-link-list').innerHTML = featured.map((link) => featuredEditorMarkup(link)).join('');
+  registerSaveTask('social-order', { run: persistSocialOrder });
   updateSocialCount();
   $$('.link-editor', $('#links-panel')).forEach(bindLinkEditor);
   updateSocialOrderControls();
@@ -768,7 +837,7 @@ function fortuneEditorMarkup(fortune, sourceIndex) {
 
 function markFortuneDirty() {
   state.fortuneDirty = true;
-  setSaveStatus('dirty');
+  saveCoordinator.markDirty('fortunes');
 }
 
 function renderFortuneList() {
@@ -888,10 +957,14 @@ function bindEvents() {
     try { localStorage.setItem('profile-studio-save-mode', modeControl.value); } catch { /* 不阻擋本機編輯。 */ }
     toast(modeControl.value === 'auto' ? '已開啟自動更新；停止修改 5 秒後儲存。' : '已切換為手動儲存。');
   });
+  $('#save-all').addEventListener('click', async () => {
+    try { await submitAllPending(); }
+    catch { /* onStatus 已顯示可操作的錯誤。 */ }
+  });
   const tabs = $$('.tab');
   const activateTab = (tab) => {
     const current = $('.tab.is-active')?.dataset.panel;
-    if (current !== tab.dataset.panel && (state.fortuneDirty || saveCoordinator.hasPending())
+    if (current !== tab.dataset.panel && saveCoordinator.hasPending()
       && !window.confirm('目前還有尚未儲存的修改，確定要切換編輯頁籤嗎？')) return false;
     tabs.forEach((item) => {
       const active = item === tab;
@@ -962,11 +1035,8 @@ function bindEvents() {
   $('#fortune-search').addEventListener('input', renderFortuneList);
   $('#fortune-sort').addEventListener('change', renderFortuneList);
   $('#add-fortune').addEventListener('click', addFortune);
-  $('#save-fortunes').addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    button.disabled = true;
-    setSaveStatus('saving');
-    try {
+  registerSaveTask('fortunes', {
+    run: async () => {
       const result = await api('/api/fortunes', {
         method: 'PUT',
         body: JSON.stringify({ fortunes: state.fortuneDraft, expectedRevision: state.fortuneBucket.revision }),
@@ -975,9 +1045,11 @@ function bindEvents() {
       state.fortuneDraft = result.fortunes.map((fortune) => ({ ...fortune }));
       state.fortuneDirty = false;
       renderFortuneManager();
-      await finishSave(result, '籤桶已儲存並建立上一次版本備份。');
-    } catch (error) { setSaveStatus('error'); toast(error.message, true); }
-    finally { button.disabled = false; }
+      return { result, message: '籤桶已儲存並建立上一次版本備份。' };
+    },
+  });
+  $('#save-fortunes').addEventListener('click', async (event) => {
+    await submitSaveUnit('fortunes', event.currentTarget);
   });
   $('#restore-fortunes').addEventListener('click', async (event) => {
     if (!window.confirm('確定要用上一次備份取代目前籤桶嗎？目前版本也會保留下來供下一次復原。')) return;
@@ -992,6 +1064,7 @@ function bindEvents() {
       state.fortuneBucket = result;
       state.fortuneDraft = result.fortunes.map((fortune) => ({ ...fortune }));
       state.fortuneDirty = false;
+      saveCoordinator.reset('fortunes');
       renderFortuneManager();
       await finishSave(result, '已復原上一次籤桶；復原前版本仍可再次復原。');
     } catch (error) { setSaveStatus('error'); toast(error.message, true); }
@@ -1017,7 +1090,7 @@ function bindEvents() {
   });
   $('#apply-answers').addEventListener('click', async (event) => {
     if (!state.validatedAnswers) { toast('請先驗證回答內容。', true); return; }
-    if (saveCoordinator.hasPending() || state.fortuneDirty) { toast('請先儲存或還原目前的 Studio 修改，再套用 AI 回答。', true); return; }
+    if (saveCoordinator.hasPending()) { toast('請先儲存或還原目前的 Studio 修改，再套用 AI 回答。', true); return; }
     if (!window.confirm('確定依摘要套用 AI 回答嗎？這會更新個人資料、產生的連結與自介卡片，以及播放清單和抽籤開關。')) return;
     const button = event.currentTarget;
     button.disabled = true;
@@ -1026,6 +1099,7 @@ function bindEvents() {
       state.content = { ...state.content, ...await api('/api/answers/apply', { method: 'POST', body: JSON.stringify(state.validatedAnswers.answers) }) };
       state.order = [...state.content.profile.homeOrder];
       state.homeVisibility = [...state.content.profile.homeVisibility];
+      state.socialOrderDraft = state.content.links.filter((link) => link.data.group === 'social').sort((a, b) => (a.data.order ?? 100) - (b.data.order ?? 100)).map((link) => link.id);
       populateProfile(); renderOrder(); renderLinkManager();
       await finishSave(state.content, 'AI 回答檔已套用並通過格式驗證。');
       resetAnswerValidation();
@@ -1035,7 +1109,7 @@ function bindEvents() {
   $('#reload-preview').addEventListener('click', async () => {
     setSaveStatus('refreshing');
     try { await refreshPreview(); setSaveStatus('clean'); }
-    catch (error) { setSaveStatus('error', '預覽更新失敗'); toast(error.message, true); }
+    catch (error) { setSaveStatus('error'); toast(error.message, true); }
   });
   $$('.viewport-switch button').forEach((button) => button.addEventListener('click', () => {
     $$('.viewport-switch button').forEach((item) => {
@@ -1046,7 +1120,7 @@ function bindEvents() {
     $('#preview').classList.toggle('is-mobile', button.dataset.width === 'mobile');
   }));
   window.addEventListener('beforeunload', (event) => {
-    if (!state.fortuneDirty && !saveCoordinator.hasPending()) return;
+    if (!saveCoordinator.hasPending()) return;
     event.preventDefault();
   });
 }
@@ -1060,6 +1134,7 @@ async function initialize() {
     state.fortuneDraft = fortuneBucket.fortunes.map((fortune) => ({ ...fortune }));
     state.order = [...state.content.profile.homeOrder];
     state.homeVisibility = [...state.content.profile.homeVisibility];
+    state.socialOrderDraft = state.content.links.filter((link) => link.data.group === 'social').sort((a, b) => (a.data.order ?? 100) - (b.data.order ?? 100)).map((link) => link.id);
     populateProfile(); renderOrder(); renderLinkManager(); renderFortuneManager();
     $('#preview').src = state.content.previewUrl;
     setSaveStatus('clean');

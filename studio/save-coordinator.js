@@ -60,7 +60,7 @@ export function createSaveCoordinator({
     emit(key, 'scheduled');
     entry.timer = setTimeoutFn(() => {
       entry.timer = null;
-      submit(key).catch(() => {});
+      submitAll({ savableOnly: true }).catch(() => {});
     }, delayMs);
   }
 
@@ -74,7 +74,7 @@ export function createSaveCoordinator({
     return entry.revision;
   }
 
-  async function submit(key) {
+  async function submit(key, { refresh: shouldRefresh = true, deferClean = false } = {}) {
     if (disposed) return undefined;
     const entry = entryFor(key);
     clearScheduled(entry);
@@ -107,14 +107,16 @@ export function createSaveCoordinator({
       }
 
       try {
-        emit(key, 'refreshing');
-        await refresh({ key, revision: targetRevision, result });
+        if (shouldRefresh) {
+          emit(key, 'refreshing');
+          await refresh({ key, revision: targetRevision, result });
+        }
       } catch (error) {
         emit(key, 'error', { phase: 'refresh', error, contentSaved: true });
         throw error;
       }
 
-      if (entry.revision === targetRevision) emit(key, 'clean');
+      if (!deferClean && entry.revision === targetRevision) emit(key, 'clean');
       return result;
     })();
     entry.inFlight = operation;
@@ -124,6 +126,35 @@ export function createSaveCoordinator({
       entry.inFlight = null;
       if (entry.revision > entry.savedRevision && mode === 'auto' && !entry.submitAfterFlight) schedule(key);
     }
+  }
+
+  function pendingKeys({ savableOnly = false } = {}) {
+    return [...entries.entries()]
+      .filter(([key, entry]) => entry.revision > entry.savedRevision && (!savableOnly || canSave({ key })))
+      .map(([key]) => key);
+  }
+
+  async function submitAll({ savableOnly = false } = {}) {
+    const keys = pendingKeys({ savableOnly });
+    const results = [];
+    for (const key of keys) {
+      const result = await submit(key, { refresh: false, deferClean: true });
+      results.push({ key, revision: entryFor(key).savedRevision, result });
+    }
+    if (results.length === 0) return results;
+
+    const latest = results.at(-1);
+    emit(latest.key, 'refreshing', { batch: true, count: results.length });
+    try {
+      await refresh({ ...latest, results, batch: true });
+    } catch (error) {
+      emit(latest.key, 'error', { phase: 'refresh', error, contentSaved: true, batch: true });
+      throw error;
+    }
+    results.forEach(({ key, revision }) => {
+      if (entryFor(key).revision === revision) emit(key, 'clean', { batch: true });
+    });
+    return results;
   }
 
   function setMode(nextMode) {
@@ -147,11 +178,18 @@ export function createSaveCoordinator({
     return { status: entry.status, revision: entry.revision, savedRevision: entry.savedRevision };
   }
 
+  function reset(key) {
+    const entry = entryFor(key);
+    clearScheduled(entry);
+    entry.savedRevision = entry.revision;
+    entry.submitAfterFlight = false;
+    emit(key, 'clean');
+  }
+
   function dispose() {
     disposed = true;
     entries.forEach(clearScheduled);
   }
 
-  return { markDirty, submit, setMode, hasPending, getStatus, dispose };
+  return { markDirty, submit, submitAll, pendingKeys, reset, setMode, hasPending, getStatus, dispose };
 }
-

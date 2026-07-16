@@ -202,6 +202,25 @@ try {
   assert.deepEqual(coordinatorRefreshes, [{ key: 'profile', revision: 20 }]);
   assert.equal(coordinator.hasPending(), false);
 
+  const batchSaves = [];
+  const batchRefreshes = [];
+  const batchCoordinator = createSaveCoordinator({
+    save: async ({ key, revision }) => {
+      batchSaves.push({ key, revision });
+      return { contentRevision: revision, key };
+    },
+    refresh: async ({ results, batch }) => { batchRefreshes.push({ count: results.length, batch }); },
+  });
+  batchCoordinator.markDirty('profile');
+  batchCoordinator.markDirty('home');
+  await batchCoordinator.submitAll();
+  assert.deepEqual(batchSaves.map(({ key }) => key), ['profile', 'home']);
+  assert.deepEqual(batchRefreshes, [{ count: 2, batch: true }]);
+  assert.equal(batchCoordinator.hasPending(), false);
+  batchCoordinator.markDirty('fortunes');
+  batchCoordinator.reset('fortunes');
+  assert.equal(batchCoordinator.hasPending(), false);
+
   const slowResolvers = [];
   const slowRevisions = [];
   let activeSaves = 0;
@@ -264,14 +283,21 @@ try {
   assert.equal((studioHtml.match(/role="tabpanel"/g) ?? []).length, 5);
   assert.match(studioHtml, /data-width="desktop"[^>]*aria-pressed="true"/);
   assert.match(studioHtml, /data-width="mobile"[^>]*aria-pressed="false"/);
+  assert.match(studioHtml, /id="save-all"[^>]*>儲存並更新<\/button>/);
   assert.ok(studioApp.indexOf("['facebook', 'Facebook', 'facebook'") < studioApp.indexOf("['instagram', 'Instagram', 'instagram'"));
   assert.ok(studioApp.indexOf("['instagram', 'Instagram', 'instagram'") < studioApp.indexOf("['threads', 'Threads', 'threads'"));
   assert.ok(studioApp.indexOf("['threads', 'Threads', 'threads'") < studioApp.indexOf("['github', 'GitHub', 'github'"));
   assert.ok(studioApp.includes("api('/api/social-order'"));
   assert.ok(studioApp.includes('data-social-move="up"'));
+  assert.ok(studioApp.includes('social-drag-handle'));
+  assert.ok(studioApp.includes('dragHandle.addEventListener(\'dragstart\''));
+  assert.ok(studioApp.includes('event.dataTransfer.setData(\'text/plain\''));
+  assert.ok(studioApp.includes("saveCoordinator.markDirty('social-order')"));
   assert.ok(studioCss.includes('.social-order-actions'));
+  assert.ok(studioCss.includes('.social-drag-handle'));
+  assert.ok(studioCss.includes('.topbar-save'));
   assert.ok(studioApp.includes("$('#add-featured-link').addEventListener"));
-  assert.ok(studioApp.includes("if (toggleOnly) {"));
+  assert.ok(!studioApp.includes('toggleOnly'));
   assert.ok(studioApp.includes("$('.link-editor__meta small', editor).textContent"));
   assert.ok(studioApp.includes("await api('/api/home'"));
   assert.ok(studioApp.includes("url.searchParams.set('studioRevision'"));
@@ -286,7 +312,10 @@ try {
   assert.ok(studioApp.includes("item.setAttribute('aria-pressed', active ? 'true' : 'false')"));
   assert.ok(studioApp.includes("await api('/api/answers/validate'"));
   assert.ok(studioApp.includes("await api('/api/answers/apply'"));
-  assert.ok(studioApp.includes('maximumAttempts = 3'));
+  assert.ok(!studioApp.includes('maximumAttempts = 3'));
+  assert.equal((studioApp.match(/frame\.src = url\.href/g) ?? []).length, 1);
+  assert.ok(studioApp.includes('async function submitAllPending()'));
+  assert.ok(studioApp.includes('saveCoordinator.submitAll()'));
   assert.ok(!studioApp.includes('refreshPreview(650)'));
   assert.ok(!studioApp.includes('function refreshPreview(delay = 350)'));
   assert.ok(!studioApp.includes('finally { event.currentTarget.disabled = false; }'));
