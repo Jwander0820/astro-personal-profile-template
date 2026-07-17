@@ -57,7 +57,7 @@ npm run build
 - 原本手寫的自訂 Markdown 不會被刪除；範本預設自介卡片會被隱藏。
 - 依回答啟用或停用唱盤與抽籤。
 
-`profile.answers.json` 已加入 `.gitignore`。網站只需要提交產生後的 Markdown 與圖片，不需要提交原始訪談答案。
+`profile.answers.json` 已加入 `.gitignore`。網站只需要提交產生後的 Markdown 與圖片，不需要提交原始訪談答案。`npm run build` 允許這個本機回答檔存在，並會掃描 Git 已追蹤或未忽略的公開檔案是否含有疑似密鑰；套用回答後，首頁區塊顯示狀態也會依實際產生的內容同步。
 
 ## GitHub Pages 仍需手動完成的部分
 

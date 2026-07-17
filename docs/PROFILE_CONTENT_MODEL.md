@@ -17,9 +17,9 @@ Windows 建議直接雙擊 `start-studio.cmd`，或執行：
 - `http://localhost:4322`：只綁定本機 loopback 的內容編輯台。
 - `http://localhost:4321`：Astro 即時預覽；使用 localhost 可避免 YouTube 嵌入來源辨識問題。
 
-Studio 的寫入 API 不會部署到 `dist`，GitHub Pages 上也不存在。圖片上傳僅接受 PNG、JPG、WebP、GIF、SVG，單檔上限 5 MB，並寫入 `public/images/`。
+Studio 的寫入 API 不會部署到 `dist`，GitHub Pages 上也不存在。圖片上傳僅接受經檔頭驗證的 PNG、JPG、WebP、GIF，單檔上限 5 MB，並寫入 `public/images/`。範本內建的 SVG 仍可作為受信任的靜態資產使用，但 Studio 不接受未清理的 SVG 上傳。
 
-預覽同步預設採用明確儲存；也可切換成 5 秒 debounce 的自動更新。每個表單都有獨立 revision，同一表單同時只會送出一個寫入，舊回應不會清除較新的修改。Markdown 通過驗證並寫入後，Studio 才以內容 revision 重新載入右側 iframe，並分開顯示寫入失敗與預覽載入失敗。輸入到一半的無效內容不會排入背景寫入。
+預覽同步預設採用明確儲存；也可切換成 5 秒 debounce 的自動更新。每個表單都有獨立 revision，同一表單同時只會送出一個寫入；同一檔案的讀取、合併與寫入也會依序執行，避免平行請求互相覆蓋。舊回應不會清除較新的修改。新增項目若需要重繪仍有未儲存的相關表單，Studio 會先阻止操作並提示儲存，避免草稿消失。Markdown 通過驗證並寫入後，Studio 才以內容 revision 重新載入右側 iframe，並分開顯示寫入失敗與預覽載入失敗。輸入到一半的無效內容不會排入背景寫入。
 
 連結管理分為個人資料下方的社群 Icons，以及首頁 Links 卡片。社群服務目錄會顯示尚未建立的項目；首次儲存時才建立對應 Markdown。兩種連結都能選擇 `src/lib/icons.ts` 的內建 Icon，或將自訂圖檔上傳到 `public/images/` 並寫入 `image` 欄位。
 
@@ -51,7 +51,7 @@ GitHub Pages 是靜態主機，無法安全地在公開頁面直接改 repositor
 
 ## 擴充原則
 
-- 新增一般內容欄位時，同步更新 `src/content.config.ts`、Studio 寫入驗證與 JSON Schema。
+- 新增一般內容欄位時，同步更新 `src/content.config.ts`、Studio／回答檔執行期驗證與 JSON Schema；URL 欄位應沿用共用的安全協定規則。
 - 新增全新視覺 block 時，才修改 Astro component 與 CSS。
 - 所有寫入路徑必須限制於 `src/content` 或 `public/images`。
 - AI 產生的檔案使用 `generated-` 前綴，讓重複套用可預測，並避免刪除手寫檔案。

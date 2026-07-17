@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { atomicWriteText, withFileWriteLock } from './file-writes.mjs';
 
 const GRADES = new Set(['大吉', '中吉', '小吉']);
 const CATEGORIES = new Set(['blessing', 'joke']);
@@ -84,17 +85,17 @@ export async function loadFortuneBucket(projectRoot) {
 
 export async function saveFortuneBucket(projectRoot, input) {
   const currentPath = fortunePath(projectRoot);
-  const currentSource = await readFile(currentPath, 'utf8');
-  if (typeof input?.expectedRevision !== 'string' || input.expectedRevision !== revisionFor(currentSource)) throw new FortuneConflictError();
-  const fortunes = validateFortuneBucket(input.fortunes);
-  const nextSource = `${JSON.stringify(fortunes, null, 2)}\n`;
-  const backup = backupPath(projectRoot);
-  await mkdir(path.dirname(backup), { recursive: true });
-  await writeFile(backup, currentSource, 'utf8');
-  const temporaryPath = path.join(path.dirname(currentPath), `.fortunes-${process.pid}-${Date.now()}.tmp`);
-  await writeFile(temporaryPath, nextSource, 'utf8');
-  await rename(temporaryPath, currentPath);
-  return { fortunes, revision: revisionFor(nextSource), summary: summarizeFortuneBucket(fortunes) };
+  return withFileWriteLock(currentPath, async () => {
+    const currentSource = await readFile(currentPath, 'utf8');
+    if (typeof input?.expectedRevision !== 'string' || input.expectedRevision !== revisionFor(currentSource)) throw new FortuneConflictError();
+    const fortunes = validateFortuneBucket(input.fortunes);
+    const nextSource = `${JSON.stringify(fortunes, null, 2)}\n`;
+    const backup = backupPath(projectRoot);
+    await mkdir(path.dirname(backup), { recursive: true });
+    await writeFile(backup, currentSource, 'utf8');
+    await atomicWriteText(currentPath, nextSource);
+    return { fortunes, revision: revisionFor(nextSource), summary: summarizeFortuneBucket(fortunes) };
+  });
 }
 
 export async function restoreFortuneBucket(projectRoot, input) {
@@ -113,4 +114,3 @@ export async function restoreFortuneBucket(projectRoot, input) {
   }
   return saveFortuneBucket(projectRoot, { fortunes, expectedRevision: input?.expectedRevision });
 }
-

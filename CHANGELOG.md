@@ -6,6 +6,21 @@
 
 ## [Unreleased]
 
+### 安全性
+
+- 將 Markdown 原始 HTML 以文字呈現，並在內容 schema、回答檔與 Markdown 轉換階段封鎖危險或無效的 URL 協定。
+- Studio 圖片上傳改為只接受通過檔頭驗證的 PNG、JPG、WebP、GIF，停止接收未清理的 SVG。
+- GitHub Pages workflow 改用最小 job 權限，並以完整 commit SHA 固定官方 Actions。
+- 公開安全掃描改為涵蓋所有 Git 已追蹤文字檔與私密路徑，不再只檢查固定資料夾。
+
+### 修正
+
+- 將同一 Markdown／JSON 檔案的讀取、合併與寫入序列化，避免平行儲存造成更新遺失，並保留籤詩 revision 衝突保護。
+- 拆分公開安全檢查與上游範本預設檢查，使 `profile.answers.json` 與套用後的個人化內容不再阻擋一般 build。
+- 套用回答檔後依實際可見內容同步 `homeVisibility`，並讓回答檔執行期驗證與 JSON Schema 的欄位、數量及列舉限制一致。
+- 新增內容前若相關表單仍有未儲存修改，Studio 會阻止重繪並提示先儲存，避免草稿遭捨棄。
+- YouTube API 載入失敗後會清除失敗狀態，讓使用者可正常重試。
+
 ### 改善
 
 - 新增可自訂顯示區域、滿版／左右分割／海報版型、圖片比例、裁切焦點、替代文字與 Markdown 附文的圖片板塊，並在 Profile Studio 提供建立、上傳與編輯流程。

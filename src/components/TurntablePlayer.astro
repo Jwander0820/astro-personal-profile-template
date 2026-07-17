@@ -107,27 +107,39 @@ const { playlistId, title, continuousPlayback } = Astro.props;
     if (browserWindow.YT?.Player) return Promise.resolve(browserWindow.YT);
     if (youtubeApiPromise) return youtubeApiPromise;
 
-    youtubeApiPromise = new Promise((resolve, reject) => {
-      const previousCallback = browserWindow.onYouTubeIframeAPIReady;
+    const previousCallback = browserWindow.onYouTubeIframeAPIReady;
+    let readyCallback: (() => void) | undefined;
+    let apiScript = document.querySelector<HTMLScriptElement>('script[src="https://www.youtube.com/iframe_api"]');
+    const pending = new Promise<YouTubeNamespace>((resolve, reject) => {
       const timeout = window.setTimeout(() => reject(new Error('YouTube API timeout')), 15000);
 
-      browserWindow.onYouTubeIframeAPIReady = () => {
+      readyCallback = () => {
         previousCallback?.();
         window.clearTimeout(timeout);
         if (browserWindow.YT?.Player) resolve(browserWindow.YT);
         else reject(new Error('YouTube API unavailable'));
       };
+      browserWindow.onYouTubeIframeAPIReady = readyCallback;
 
-      if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-        const script = document.createElement('script');
-        script.src = 'https://www.youtube.com/iframe_api';
-        script.async = true;
-        script.onerror = () => {
+      if (!apiScript) {
+        apiScript = document.createElement('script');
+        apiScript.src = 'https://www.youtube.com/iframe_api';
+        apiScript.async = true;
+        apiScript.onerror = () => {
           window.clearTimeout(timeout);
           reject(new Error('YouTube API failed to load'));
         };
-        document.head.append(script);
+        document.head.append(apiScript);
       }
+    });
+
+    youtubeApiPromise = pending.catch((error) => {
+      youtubeApiPromise = undefined;
+      if (browserWindow.onYouTubeIframeAPIReady === readyCallback) {
+        browserWindow.onYouTubeIframeAPIReady = previousCallback;
+      }
+      if (!browserWindow.YT?.Player) apiScript?.remove();
+      throw error;
     });
 
     return youtubeApiPromise;

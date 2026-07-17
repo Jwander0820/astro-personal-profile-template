@@ -202,6 +202,11 @@ async function submitAllPending() {
   await saveCoordinator.submitAll();
 }
 
+function assertRerenderSafe(isAffected, message) {
+  const affectedKeys = saveCoordinator.pendingKeys().filter(isAffected);
+  if (affectedKeys.length > 0) throw new Error(message);
+}
+
 async function runExplicitSave(run, button) {
   if (button) button.disabled = true;
   setSaveStatus('saving');
@@ -399,6 +404,12 @@ function bindSectionEditor(editor) {
   const isNew = editor.dataset.new === 'true';
   const key = `section:${editor.dataset.sectionId}`;
   const persist = async () => {
+    if (isNew) {
+      assertRerenderSafe(
+        (pendingKey) => pendingKey === 'home' || pendingKey.startsWith('section:') || pendingKey.startsWith('block:'),
+        '請先儲存首頁板塊與 About 卡片草稿，再建立新卡片。',
+      );
+    }
     const values = Object.fromEntries(new FormData(form));
     values.visible = form.elements.visible.checked;
     values.order = Number(values.order);
@@ -519,7 +530,7 @@ function imageBlockEditorMarkup(block, isNew = false) {
         <label><span>排序數字</span><input name="order" type="number" min="0" max="10000" value="${Number(data.order ?? 100)}" /></label>
         <div class="field-wide image-input-row">
           <label><span>圖片路徑</span><input name="image" value="${escapeHtml(data.image ?? '')}" placeholder="/images/photo.jpg" required /></label>
-          <label class="file-button">上傳圖片<input class="image-block-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" /></label>
+          <label class="file-button">上傳圖片<input class="image-block-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif" /></label>
         </div>
         <label class="field-wide"><span>替代文字</span><input name="imageAlt" value="${escapeHtml(data.imageAlt ?? '')}" maxlength="300" placeholder="描述圖片內容，純裝飾圖片可留空" /></label>
         <label class="field-wide"><span>附加文字 <i>選填</i></span><textarea name="body" rows="5" maxlength="5000">${escapeHtml(block?.body ?? '')}</textarea><small>支援 Markdown；滿版版型會顯示在圖片下方。</small></label>
@@ -535,6 +546,12 @@ function bindImageBlockEditor(editor) {
   const isNew = editor.dataset.new === 'true';
   const key = `image-block:${editor.dataset.blockId}`;
   const persist = async () => {
+    if (isNew) {
+      assertRerenderSafe(
+        (pendingKey) => pendingKey.startsWith('image-block:'),
+        '請先儲存其他圖片板塊草稿，再建立新圖片板塊。',
+      );
+    }
     const values = Object.fromEntries(new FormData(form));
     values.visible = form.elements.visible.checked;
     values.order = Number(values.order);
@@ -647,7 +664,7 @@ function socialEditorMarkup(preset, link, position) {
         <label><span>網址</span><input name="url" value="${escapeHtml(data.url)}" placeholder="${escapeHtml(preset.placeholder)}" maxlength="500" required /></label>
         <div class="field-wide icon-controls">
           <label><span>內建 Icon</span><select name="icon">${buildIconOptions(data.icon)}</select></label>
-          <label class="file-button">匯入 Icon<input name="iconUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" /></label>
+          <label class="file-button">匯入 Icon<input name="iconUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif" /></label>
           <button class="text-action clear-custom-icon" type="button" ${data.image ? '' : 'hidden'}>改用內建</button>
           <input name="image" type="hidden" value="${escapeHtml(data.image ?? '')}" />
         </div>
@@ -677,7 +694,7 @@ function featuredEditorMarkup(link, isNew = false) {
         <label><span>卡片樣式</span><select name="style"><option value="primary" ${data.style === 'primary' ? 'selected' : ''}>主要</option><option value="normal" ${data.style === 'normal' ? 'selected' : ''}>一般</option><option value="subtle" ${data.style === 'subtle' ? 'selected' : ''}>低調</option></select></label>
         <div class="field-wide icon-controls">
           <label><span>內建 Icon</span><select name="icon">${buildIconOptions(data.icon)}</select></label>
-          <label class="file-button">匯入 Icon<input name="iconUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" /></label>
+          <label class="file-button">匯入 Icon<input name="iconUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif" /></label>
           <button class="text-action clear-custom-icon" type="button" ${data.image ? '' : 'hidden'}>改用內建</button>
           <input name="image" type="hidden" value="${escapeHtml(data.image ?? '')}" />
         </div>
@@ -769,6 +786,12 @@ async function persistLinkEditor(editor) {
   const form = $('form', editor);
   if (!form.reportValidity()) throw new Error('請先填完名稱與網址。');
   const isNewFeatured = editor.dataset.kind === 'featured' && editor.dataset.exists !== 'true';
+  if (isNewFeatured) {
+    assertRerenderSafe(
+      (pendingKey) => pendingKey === 'social-order' || pendingKey.startsWith('link:'),
+      '請先儲存其他連結與社群排序草稿，再建立新 Link。',
+    );
+  }
   const endpoint = isNewFeatured ? '/api/links' : `/api/links/${editor.dataset.linkId}`;
   const payload = linkPayload(editor);
   const result = await api(endpoint, { method: isNewFeatured ? 'POST' : 'PUT', body: JSON.stringify(payload) });

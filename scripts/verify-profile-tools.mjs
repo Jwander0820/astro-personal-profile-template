@@ -8,17 +8,28 @@ import {
   createStudioImageBlock,
   createStudioLink,
   extractYoutubePlaylistId,
+  loadStudioContent,
   saveHomeSettings,
   saveStudioBlock,
   saveStudioLink,
+  saveStudioProfile,
   saveStudioSocialOrder,
   saveStudioSection,
   previewProfileAnswers,
+  validateProfileAnswers,
 } from './profile-content.mjs';
 import { FortuneConflictError, loadFortuneBucket, restoreFortuneBucket, saveFortuneBucket } from './fortune-content.mjs';
 import { resolvePackageBin } from './package-bin.mjs';
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
 import { createSaveCoordinator } from '../studio/save-coordinator.js';
+import {
+  createContentSafetyMdastPlugin,
+  enforceContentSafety,
+  isSafeHttpUrl,
+  isSafeImagePath,
+  isSafeMarkdownUrl,
+  isSafeProfileUrl,
+} from './content-safety.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), 'profile-tools-'));
@@ -152,6 +163,8 @@ try {
   assert.deepEqual(visibleSections.map((item) => item.id), ['generated-about', 'generated-music']);
   assert.equal(result.blocks.find((item) => item.id === 'turntable')?.data.visible, false);
   assert.equal(result.blocks.find((item) => item.id === 'fortune')?.data.visible, true);
+  assert.equal(result.profile.homeVisibility.includes('turntable'), false);
+  assert.equal(result.profile.homeVisibility.includes('fortune'), true);
   assert.equal(social.data.visible, false);
   assert.equal(social.data.icon, 'instagram');
   assert.deepEqual(reorderedSocials.map((item) => [item.id, item.data.order]), [
@@ -172,8 +185,129 @@ try {
   assert.equal(turntable.data.continuousPlayback, false);
   assert.equal(about.body, 'Updated card.');
   assert.equal(extractYoutubePlaylistId('https://music.youtube.com/playlist?list=PLabcdefghij1234'), 'PLabcdefghij1234');
+  assert.equal(isSafeProfileUrl('https://example.com'), true);
+  assert.equal(isSafeProfileUrl('mailto:hello@example.com'), true);
+  assert.equal(isSafeProfileUrl('https://'), false);
+  assert.equal(isSafeProfileUrl('mailto:'), false);
+  assert.equal(isSafeProfileUrl('java\nscript:alert(1)'), false);
+  assert.equal(isSafeProfileUrl('javascript&colon;alert(1)'), false);
+  assert.equal(isSafeProfileUrl('java&Tab;script&colon;alert(1)'), false);
+  assert.equal(isSafeHttpUrl('https://exa mple.com'), false);
+  assert.equal(isSafeHttpUrl('data:text/html,<script>alert(1)</script>'), false);
+  assert.equal(isSafeImagePath('/images/profile.svg'), true);
+  assert.equal(isSafeImagePath('/images/../private.svg'), false);
+  assert.equal(isSafeImagePath('https://tracker.example/pixel.png'), false);
+  assert.equal(isSafeMarkdownUrl('/notes/example'), true);
+  assert.equal(isSafeMarkdownUrl('javascript:alert(1)'), false);
+  const rawHtmlTree = { type: 'root', children: [{ type: 'html', value: '<script>alert(1)</script>' }] };
+  enforceContentSafety(rawHtmlTree);
+  assert.deepEqual(rawHtmlTree.children[0], { type: 'text', value: '<script>alert(1)</script>' });
+  assert.throws(
+    () => enforceContentSafety({ type: 'root', children: [{ type: 'link', url: 'data:text/html,unsafe', children: [] }] }),
+    /Markdown URL uses a blocked or invalid protocol/,
+  );
+  const safetyPlugin = createContentSafetyMdastPlugin();
+  const pluginHtmlNode = { type: 'html', value: '<img src=x onerror=alert(1)>' };
+  let pluginReplacement;
+  safetyPlugin.html(pluginHtmlNode, { replaceNode: (_node, replacement) => { pluginReplacement = replacement; } });
+  assert.deepEqual(pluginReplacement, { type: 'text', value: '<img src=x onerror=alert(1)>' });
+  assert.throws(
+    () => safetyPlugin.link({ type: 'link', url: 'java&#x73;cript:alert(1)' }, {}),
+    /Markdown URL uses a blocked or invalid protocol/,
+  );
+
+  assert.throws(
+    () => validateProfileAnswers({ ...answers, unexpected: true }),
+    /不支援的欄位.*unexpected/,
+  );
+  assert.throws(
+    () => validateProfileAnswers({
+      ...answers,
+      identity: { ...answers.identity, tagline: ['Code', 'Code'] },
+    }),
+    /關鍵字不可重複/,
+  );
+  assert.throws(
+    () => validateProfileAnswers({
+      ...answers,
+      links: Array.from({ length: 21 }, (_, index) => ({
+        id: `link-${index}`,
+        title: `Link ${index}`,
+        url: 'https://example.com',
+        description: 'Example',
+      })),
+    }),
+    /精選連結數量不可超過 20/,
+  );
+  assert.throws(
+    () => validateProfileAnswers({
+      ...answers,
+      sections: [{
+        id: 'remote-image',
+        title: 'Remote image',
+        description: 'Example',
+        image: 'https://tracker.example/pixel.png',
+      }],
+    }),
+    /圖片路徑必須是 \/images\//,
+  );
+  assert.throws(
+    () => validateProfileAnswers({
+      ...answers,
+      socials: [{ service: 'github', url: 'https://github.com/example', icon: null }],
+    }),
+    /圖示名稱為必填欄位/,
+  );
+  assert.throws(
+    () => validateProfileAnswers({ ...answers, $schema: null }),
+    /\$schema 格式不正確/,
+  );
+
+  const concurrencyRoot = path.join(temporaryRoot, 'concurrency');
+  await mkdir(path.join(concurrencyRoot, 'src'), { recursive: true });
+  await cp(path.join(projectRoot, 'src', 'content'), path.join(concurrencyRoot, 'src', 'content'), { recursive: true });
+  const concurrentContent = await loadStudioContent(concurrencyRoot);
+  await Promise.all([
+    saveStudioProfile(concurrencyRoot, {
+      ...concurrentContent.profile,
+      displayName: 'Mutex Test',
+      title: 'Concurrent profile write',
+      tagline: ['Mutex'],
+      bio: 'Both writes must survive.',
+    }),
+    saveHomeSettings(concurrencyRoot, {
+      homeOrder: ['about', 'links', 'turntable', 'fortune', 'notion'],
+      homeVisibility: ['about', 'links'],
+      aboutHeading: 'Concurrent About',
+      linksHeading: 'Concurrent Links',
+    }),
+  ]);
+  const concurrentResult = await loadStudioContent(concurrencyRoot);
+  assert.equal(concurrentResult.profile.displayName, 'Mutex Test');
+  assert.equal(concurrentResult.profile.aboutHeading, 'Concurrent About');
+  assert.deepEqual(concurrentResult.profile.homeVisibility, ['about', 'links']);
 
   const originalBucket = await loadFortuneBucket(temporaryRoot);
+  const concurrentFortuneWrites = await Promise.allSettled([
+    saveFortuneBucket(temporaryRoot, {
+      fortunes: originalBucket.fortunes.map((fortune, index) => ({
+        ...fortune,
+        note: index === 0 ? 'First concurrent update.' : fortune.note,
+      })),
+      expectedRevision: originalBucket.revision,
+    }),
+    saveFortuneBucket(temporaryRoot, {
+      fortunes: originalBucket.fortunes.map((fortune, index) => ({
+        ...fortune,
+        note: index === 0 ? 'Second concurrent update.' : fortune.note,
+      })),
+      expectedRevision: originalBucket.revision,
+    }),
+  ]);
+  assert.equal(concurrentFortuneWrites.filter(({ status }) => status === 'fulfilled').length, 1);
+  assert.equal(concurrentFortuneWrites.filter(({ status }) => status === 'rejected').length, 1);
+  assert.ok(concurrentFortuneWrites.find(({ status }) => status === 'rejected')?.reason instanceof FortuneConflictError);
+  const concurrentFortuneBucket = await loadFortuneBucket(temporaryRoot);
   const addedFortune = {
     id: 'studio-contract',
     grade: '小吉',
@@ -183,13 +317,13 @@ try {
     visible: true,
   };
   const savedBucket = await saveFortuneBucket(temporaryRoot, {
-    fortunes: [...originalBucket.fortunes, addedFortune],
-    expectedRevision: originalBucket.revision,
+    fortunes: [...concurrentFortuneBucket.fortunes, addedFortune],
+    expectedRevision: concurrentFortuneBucket.revision,
   });
   assert.equal(savedBucket.fortunes.at(-1)?.id, 'studio-contract');
-  assert.equal(savedBucket.summary.total, originalBucket.summary.total + 1);
+  assert.equal(savedBucket.summary.total, concurrentFortuneBucket.summary.total + 1);
   await assert.rejects(
-    saveFortuneBucket(temporaryRoot, { fortunes: savedBucket.fortunes, expectedRevision: originalBucket.revision }),
+    saveFortuneBucket(temporaryRoot, { fortunes: savedBucket.fortunes, expectedRevision: concurrentFortuneBucket.revision }),
     (error) => error instanceof FortuneConflictError && error.status === 409,
   );
   await assert.rejects(
@@ -287,11 +421,12 @@ try {
   rejectsStudioRequest(localJsonRequest('localhost:4322', ''), 403);
   rejectsStudioRequest(localJsonRequest('localhost:4322', 'http://localhost:4322', 'POST', 'text/plain'), 415);
 
-  const [studioCss, studioApp, studioHtml, studioServer] = await Promise.all([
+  const [studioCss, studioApp, studioHtml, studioServer, turntablePlayer] = await Promise.all([
     readFile(path.join(projectRoot, 'studio', 'style.css'), 'utf8'),
     readFile(path.join(projectRoot, 'studio', 'app.js'), 'utf8'),
     readFile(path.join(projectRoot, 'studio', 'index.html'), 'utf8'),
     readFile(path.join(projectRoot, 'scripts', 'studio-server.mjs'), 'utf8'),
+    readFile(path.join(projectRoot, 'src', 'components', 'TurntablePlayer.astro'), 'utf8'),
   ]);
   assert.match(studioCss, /body\s*\{[^}]*min-width:\s*1200px/);
   assert.match(studioCss, /html,\s*body\s*\{[^}]*height:\s*100%;[^}]*overflow:\s*hidden/);
@@ -344,6 +479,8 @@ try {
   assert.equal((studioApp.match(/frame\.src = url\.href/g) ?? []).length, 1);
   assert.ok(studioApp.includes('async function submitAllPending()'));
   assert.ok(studioApp.includes('saveCoordinator.submitAll()'));
+  assert.ok(studioApp.includes('assertRerenderSafe('));
+  assert.ok(!studioApp.includes('image/svg+xml'));
   assert.ok(!studioApp.includes('refreshPreview(650)'));
   assert.ok(!studioApp.includes('function refreshPreview(delay = 350)'));
   assert.ok(!studioApp.includes('finally { event.currentTarget.disabled = false; }'));
@@ -359,9 +496,13 @@ try {
   assert.ok(studioServer.includes("url.pathname === '/api/answers/apply'"));
   assert.ok(studioServer.includes("url.pathname === '/api/image-blocks'"));
   assert.ok(studioServer.includes('fontOptions'));
+  assert.ok(!studioServer.includes("'image/svg+xml': { extension"));
+  assert.ok(studioServer.includes('if (!format.matches(buffer))'));
+  assert.ok(studioServer.includes("'image/png': { extension: '.png'"));
   assert.ok(studioServer.includes("await resolvePackageBin('astro')"));
   assert.ok(!studioServer.includes("'astro', 'astro.js'"));
   assert.ok(studioServer.includes("ASTRO_DEV_BACKGROUND: 'studio-managed'"));
+  assert.ok(turntablePlayer.includes('youtubeApiPromise = undefined'));
 
   console.log('Profile tools check passed (autosave, answer validation, image blocks, fonts, fortune editing, and Studio writes are valid).');
 } finally {

@@ -1,5 +1,7 @@
-import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
+import { isSafeHttpUrl, isSafeImagePath, isSafeProfileUrl } from './content-safety.mjs';
+import { atomicWriteText, withFileWriteLock } from './file-writes.mjs';
 
 const HOME_SECTIONS = ['about', 'turntable', 'links', 'fortune', 'notion'];
 const FONT_PRESETS = ['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc'];
@@ -121,8 +123,10 @@ function assertText(value, label, { required = false, max = 5000 } = {}) {
     if (required) throw new Error(`${label}為必填欄位。`);
     return '';
   }
-  if (typeof value !== 'string' || value.trim().length > max) throw new Error(`${label}格式不正確。`);
-  return value.trim();
+  if (typeof value !== 'string' || value.length > max) throw new Error(`${label}格式不正確。`);
+  const text = value.trim();
+  if (required && !text) throw new Error(`${label}為必填欄位。`);
+  return text;
 }
 
 function assertSlug(value, label = 'ID') {
@@ -133,22 +137,21 @@ function assertSlug(value, label = 'ID') {
 
 function assertUrl(value, label = '網址') {
   const url = assertText(value, label, { required: true, max: 500 });
-  if (url.startsWith('mailto:') || url.startsWith('#')) return url;
-  try {
-    const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error();
-  } catch {
+  if (!isSafeProfileUrl(url)) {
     throw new Error(`${label}必須是 http(s)、mailto 或頁面錨點。`);
   }
   return url;
 }
 
+function assertProvidedText(value, label, { max = 5000 } = {}) {
+  if (value === undefined) return '';
+  if (value === null) throw new Error(`${label}格式不正確。`);
+  return assertText(value, label, { max });
+}
+
 function assertHttpUrl(value, label = '網址') {
   const url = assertText(value, label, { required: true, max: 500 });
-  try {
-    const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error();
-  } catch {
+  if (!isSafeHttpUrl(url)) {
     throw new Error(`${label}必須是完整的 http(s) 網址。`);
   }
   return url;
@@ -170,16 +173,34 @@ function assertStringArray(value, label, { min = 0, max = 12 } = {}) {
   return value.map((item) => assertText(item, label, { required: true, max: 80 }));
 }
 
+function assertAllowedKeys(value, allowedKeys, label) {
+  const allowed = new Set(allowedKeys);
+  const unknown = Object.keys(value).filter((key) => !allowed.has(key));
+  if (unknown.length > 0) throw new Error(`${label}包含不支援的欄位：${unknown.join('、')}。`);
+}
+
+function assertObjectArray(value, label, max) {
+  if (!Array.isArray(value)) throw new Error(`${label}必須是陣列。`);
+  if (value.length > max) throw new Error(`${label}數量不可超過 ${max}。`);
+  return value;
+}
+
+function assertOptionalEnum(value, allowed, label, fallback) {
+  if (value === undefined) return fallback;
+  if (!allowed.includes(value)) throw new Error(`${label}包含不支援的值。`);
+  return value;
+}
+
 function assertUnique(items, key, label) {
   const values = items.map((item) => item[key]);
   if (new Set(values).size !== values.length) throw new Error(`${label}不可重複。`);
   return items;
 }
 
-function assertImagePath(value, label) {
-  const imagePath = assertText(value, label, { max: 300 });
+function assertImagePath(value, label, { required = false } = {}) {
+  const imagePath = assertText(value, label, { required, max: 300 });
   if (!imagePath) return '';
-  if (!/^\/images\/[A-Za-z0-9._/-]+$/.test(imagePath) || imagePath.includes('..')) {
+  if (!isSafeImagePath(imagePath)) {
     throw new Error(`${label}必須是 /images/ 下的安全路徑。`);
   }
   return imagePath;
@@ -192,19 +213,6 @@ function safeFile(root, ...segments) {
     throw new Error('拒絕存取內容目錄以外的檔案。');
   }
   return resolved;
-}
-
-async function atomicWrite(filePath, content) {
-  await mkdir(path.dirname(filePath), { recursive: true });
-  const temporaryPath = `${filePath}.${process.pid}.tmp`;
-  await writeFile(temporaryPath, content, 'utf8');
-  try {
-    await rename(temporaryPath, filePath);
-  } catch (error) {
-    if (error.code !== 'EEXIST' && error.code !== 'EPERM') throw error;
-    await writeFile(filePath, content, 'utf8');
-    await unlink(temporaryPath).catch(() => {});
-  }
 }
 
 async function readMarkdownFile(filePath) {
@@ -258,33 +266,33 @@ export async function saveStudioProfile(projectRoot, input) {
   if (!isObject(input)) throw new Error('個人資料格式不正確。');
   const contentRoot = safeFile(projectRoot, 'src', 'content');
   const profilePath = safeFile(contentRoot, 'profile', 'main.md');
-  const current = await readMarkdownFile(profilePath);
-  const tagline = assertStringArray(input.tagline, '關鍵字', { min: 1, max: 6 });
-  const fontScale = Number(input.fontScale ?? current.data.fontScale ?? 1);
-  const smallTextScale = Number(input.smallTextScale ?? current.data.smallTextScale ?? 1);
-  const bodyFont = FONT_PRESETS.includes(input.bodyFont) ? input.bodyFont : current.data.bodyFont ?? 'system';
-  const displayFont = FONT_PRESETS.includes(input.displayFont) ? input.displayFont : current.data.displayFont ?? 'system';
-  if (fontScale < 0.9 || fontScale > 1.2) throw new Error('整體字級必須介於 0.9～1.2。');
-  if (smallTextScale < 0.9 || smallTextScale > 1.35) throw new Error('小字比例必須介於 0.9～1.35。');
-  const { name: _legacyName, ...currentData } = current.data;
-  const next = {
-    ...currentData,
-    displayName: assertText(input.displayName, '顯示名稱', { required: true, max: 80 }),
-    title: assertText(input.title, '一句話身分', { required: true, max: 120 }),
-    location: assertText(input.location, '地點', { max: 100 }) || undefined,
-    archiveLabel: assertText(input.archiveLabel, '封面標籤', { max: 100 }) || undefined,
-    avatar: assertImagePath(input.avatar, '頭像') || undefined,
-    background: assertImagePath(input.background, '背景圖片') || undefined,
-    sectionsLayout: ['list', 'grid'].includes(input.sectionsLayout) ? input.sectionsLayout : 'grid',
-    bodyFont,
-    displayFont,
-    fontScale,
-    smallTextScale,
-    tagline,
-  };
-  const body = assertText(input.bio, '自我介紹', { required: true, max: 5000 });
-  await atomicWrite(profilePath, stringifyMarkdown(next, body));
-  return { ...next, bio: body };
+  return updateMarkdownFile(profilePath, async (current) => {
+    const tagline = assertStringArray(input.tagline, '關鍵字', { min: 1, max: 6 });
+    const fontScale = Number(input.fontScale ?? current.data.fontScale ?? 1);
+    const smallTextScale = Number(input.smallTextScale ?? current.data.smallTextScale ?? 1);
+    const bodyFont = FONT_PRESETS.includes(input.bodyFont) ? input.bodyFont : current.data.bodyFont ?? 'system';
+    const displayFont = FONT_PRESETS.includes(input.displayFont) ? input.displayFont : current.data.displayFont ?? 'system';
+    if (fontScale < 0.9 || fontScale > 1.2) throw new Error('整體字級必須介於 0.9～1.2。');
+    if (smallTextScale < 0.9 || smallTextScale > 1.35) throw new Error('小字比例必須介於 0.9～1.35。');
+    const { name: _legacyName, ...currentData } = current.data;
+    const next = {
+      ...currentData,
+      displayName: assertText(input.displayName, '顯示名稱', { required: true, max: 80 }),
+      title: assertText(input.title, '一句話身分', { required: true, max: 120 }),
+      location: assertText(input.location, '地點', { max: 100 }) || undefined,
+      archiveLabel: assertText(input.archiveLabel, '封面標籤', { max: 100 }) || undefined,
+      avatar: assertImagePath(input.avatar, '頭像') || undefined,
+      background: assertImagePath(input.background, '背景圖片') || undefined,
+      sectionsLayout: ['list', 'grid'].includes(input.sectionsLayout) ? input.sectionsLayout : 'grid',
+      bodyFont,
+      displayFont,
+      fontScale,
+      smallTextScale,
+      tagline,
+    };
+    const body = assertText(input.bio, '自我介紹', { required: true, max: 5000 });
+    return { data: next, body, result: { ...next, bio: body } };
+  });
 }
 
 export async function saveHomeOrder(projectRoot, input) {
@@ -293,10 +301,11 @@ export async function saveHomeOrder(projectRoot, input) {
     throw new Error('首頁順序必須包含全部五個板塊且不得重複。');
   }
   const profilePath = safeFile(projectRoot, 'src', 'content', 'profile', 'main.md');
-  const current = await readMarkdownFile(profilePath);
-  current.data.homeOrder = input;
-  await atomicWrite(profilePath, stringifyMarkdown(current.data, current.body));
-  return input;
+  return updateMarkdownFile(profilePath, async (current) => ({
+    data: { ...current.data, homeOrder: input },
+    body: current.body,
+    result: input,
+  }));
 }
 
 export async function saveHomeSettings(projectRoot, input) {
@@ -312,12 +321,16 @@ export async function saveHomeSettings(projectRoot, input) {
     throw new Error('首頁板塊顯示設定包含不支援的項目。');
   }
   const profilePath = safeFile(projectRoot, 'src', 'content', 'profile', 'main.md');
-  const current = await readMarkdownFile(profilePath);
-  current.data.homeOrder = order;
-  current.data.homeVisibility = visibility;
-  current.data.aboutHeading = assertText(input.aboutHeading ?? current.data.aboutHeading ?? 'About me', 'About 標題', { required: true, max: 80 });
-  current.data.linksHeading = assertText(input.linksHeading ?? current.data.linksHeading ?? 'Links', 'Links 標題', { required: true, max: 80 });
-  await atomicWrite(profilePath, stringifyMarkdown(current.data, current.body));
+  const profile = await updateMarkdownFile(profilePath, async (current) => {
+    const data = {
+      ...current.data,
+      homeOrder: order,
+      homeVisibility: visibility,
+      aboutHeading: assertText(input.aboutHeading ?? current.data.aboutHeading ?? 'About me', 'About 標題', { required: true, max: 80 }),
+      linksHeading: assertText(input.linksHeading ?? current.data.linksHeading ?? 'Links', 'Links 標題', { required: true, max: 80 }),
+    };
+    return { data, body: current.body, result: data };
+  });
   const blockVisibility = {
     turntable: visibility.includes('turntable'),
     fortune: visibility.includes('fortune'),
@@ -327,8 +340,8 @@ export async function saveHomeSettings(projectRoot, input) {
   return {
     homeOrder: order,
     homeVisibility: visibility,
-    aboutHeading: current.data.aboutHeading,
-    linksHeading: current.data.linksHeading,
+    aboutHeading: profile.aboutHeading,
+    linksHeading: profile.linksHeading,
   };
 }
 
@@ -337,68 +350,65 @@ export async function saveStudioBlock(projectRoot, id, input) {
   if (!['turntable', 'notion-embed', 'fortune'].includes(safeId)) throw new Error('這個首頁板塊目前不支援編輯。');
   if (!isObject(input)) throw new Error('板塊格式不正確。');
   const blockPath = safeFile(projectRoot, 'src', 'content', 'blocks', `${safeId}.md`);
-  const current = await readMarkdownFile(blockPath);
-  const body = assertText(input.body ?? current.body, '板塊說明', { max: 5000 });
-  const common = {
-    ...current.data,
-    title: assertText(input.title ?? current.data.title, '板塊標題', { required: true, max: 80 }),
-    visible: input.visible === undefined ? Boolean(current.data.visible) : Boolean(input.visible),
-  };
-  let next;
-  if (safeId === 'turntable') {
-    next = {
-      ...common,
-      layout: 'turntable',
-      provider: 'youtube',
-      playlistId: extractYoutubePlaylistId(input.playlist ?? input.playlistId ?? current.data.playlistId),
-      continuousPlayback: input.continuousPlayback === undefined
-        ? Boolean(current.data.continuousPlayback)
-        : Boolean(input.continuousPlayback),
+  return updateMarkdownFile(blockPath, async (current) => {
+    const body = assertText(input.body ?? current.body, '板塊說明', { max: 5000 });
+    const common = {
+      ...current.data,
+      title: assertText(input.title ?? current.data.title, '板塊標題', { required: true, max: 80 }),
+      visible: input.visible === undefined ? Boolean(current.data.visible) : Boolean(input.visible),
     };
-  } else if (safeId === 'notion-embed') {
-    const height = Number(input.height ?? current.data.height ?? 600);
-    if (!Number.isInteger(height) || height < 320 || height > 1200) throw new Error('Notion 預覽高度必須介於 320～1200。');
-    next = {
-      ...common,
-      layout: 'embed',
-      provider: 'notion',
-      url: assertHttpUrl(input.url ?? current.data.url, 'Notion 公開頁面網址'),
-      embedMode: ['preview', 'inline'].includes(input.embedMode) ? input.embedMode : 'preview',
-      height,
-    };
-  } else {
-    next = { ...common, layout: 'fortune' };
-  }
-  await atomicWrite(blockPath, stringifyMarkdown(next, body));
-  return { id: safeId, file: `blocks/${safeId}.md`, data: next, body };
+    let next;
+    if (safeId === 'turntable') {
+      next = {
+        ...common,
+        layout: 'turntable',
+        provider: 'youtube',
+        playlistId: extractYoutubePlaylistId(input.playlist ?? input.playlistId ?? current.data.playlistId),
+        continuousPlayback: input.continuousPlayback === undefined
+          ? Boolean(current.data.continuousPlayback)
+          : Boolean(input.continuousPlayback),
+      };
+    } else if (safeId === 'notion-embed') {
+      const height = Number(input.height ?? current.data.height ?? 600);
+      if (!Number.isInteger(height) || height < 320 || height > 1200) throw new Error('Notion 預覽高度必須介於 320～1200。');
+      next = {
+        ...common,
+        layout: 'embed',
+        provider: 'notion',
+        url: assertHttpUrl(input.url ?? current.data.url, 'Notion 公開頁面網址'),
+        embedMode: ['preview', 'inline'].includes(input.embedMode) ? input.embedMode : 'preview',
+        height,
+      };
+    } else {
+      next = { ...common, layout: 'fortune' };
+    }
+    const result = { id: safeId, file: `blocks/${safeId}.md`, data: next, body };
+    return { data: next, body, result };
+  });
 }
 
 export async function saveStudioSection(projectRoot, id, input) {
   const safeId = assertSlug(id, '卡片 ID');
   if (!isObject(input)) throw new Error('About 卡片格式不正確。');
   const sectionPath = safeFile(projectRoot, 'src', 'content', 'sections', `${safeId}.md`);
-  let current = { data: {}, body: '' };
-  try {
-    current = await readMarkdownFile(sectionPath);
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-  }
-  const order = Number(input.order ?? current.data.order ?? 100);
-  if (!Number.isFinite(order) || order < 0 || order > 10000) throw new Error('卡片順序必須介於 0～10000。');
-  const image = assertImagePath(input.image ?? current.data.image, '卡片圖片');
-  const next = {
-    ...current.data,
-    title: assertText(input.title, '卡片標題', { required: true, max: 80 }),
-    slug: assertSlug(input.slug ?? current.data.slug ?? safeId, '卡片 slug'),
-    image: image || undefined,
-    order,
-    visible: input.visible === undefined ? Boolean(current.data.visible ?? true) : Boolean(input.visible),
-    layout: ['card', 'compact'].includes(input.layout) ? input.layout : current.data.layout ?? 'card',
-    tags: assertStringArray(input.tags ?? current.data.tags ?? [], '卡片標籤', { max: 8 }),
-  };
-  const body = assertText(input.body ?? current.body, '卡片內容', { max: 5000 });
-  await atomicWrite(sectionPath, stringifyMarkdown(next, body));
-  return { id: safeId, file: `sections/${safeId}.md`, data: next, body };
+  return updateMarkdownFile(sectionPath, async (current) => {
+    const order = Number(input.order ?? current.data.order ?? 100);
+    if (!Number.isFinite(order) || order < 0 || order > 10000) throw new Error('卡片順序必須介於 0～10000。');
+    const image = assertImagePath(input.image ?? current.data.image, '卡片圖片');
+    const next = {
+      ...current.data,
+      title: assertText(input.title, '卡片標題', { required: true, max: 80 }),
+      slug: assertSlug(input.slug ?? current.data.slug ?? safeId, '卡片 slug'),
+      image: image || undefined,
+      order,
+      visible: input.visible === undefined ? Boolean(current.data.visible ?? true) : Boolean(input.visible),
+      layout: ['card', 'compact'].includes(input.layout) ? input.layout : current.data.layout ?? 'card',
+      tags: assertStringArray(input.tags ?? current.data.tags ?? [], '卡片標籤', { max: 8 }),
+    };
+    const body = assertText(input.body ?? current.body, '卡片內容', { max: 5000 });
+    const result = { id: safeId, file: `sections/${safeId}.md`, data: next, body };
+    return { data: next, body, result };
+  }, { allowMissing: true });
 }
 
 export async function createStudioSection(projectRoot, input) {
@@ -411,43 +421,39 @@ export async function saveStudioLink(projectRoot, id, input) {
   const safeId = assertSlug(id, '連結 ID');
   if (!isObject(input)) throw new Error('連結格式不正確。');
   const linkPath = safeFile(projectRoot, 'src', 'content', 'links', `${safeId}.md`);
-  let current = { data: {}, body: '' };
-  try {
-    current = await readMarkdownFile(linkPath);
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-  }
-  const group = ['social', 'main', 'featured', 'footer'].includes(input.group)
-    ? input.group
-    : current.data.group ?? 'featured';
-  const layout = ['icon', 'card', 'compact'].includes(input.layout)
-    ? input.layout
-    : current.data.layout ?? (group === 'social' ? 'icon' : 'card');
-  const style = ['primary', 'normal', 'subtle'].includes(input.style)
-    ? input.style
-    : current.data.style ?? 'normal';
-  const order = Number(input.order ?? current.data.order ?? 100);
-  if (!Number.isFinite(order) || order < 0 || order > 10000) throw new Error('連結順序必須介於 0～10000。');
-  const image = assertImagePath(input.image, '自訂 Icon');
-  const tags = assertStringArray(input.tags ?? current.data.tags ?? [], '連結標籤', { max: 8 });
-  const body = input.body === undefined
-    ? current.body
-    : assertText(input.body, '連結說明', { max: 3000 });
-  const next = {
-    ...current.data,
-    title: assertText(input.title, '連結名稱', { required: true, max: 80 }),
-    url: assertUrl(input.url),
-    icon: assertSlug(input.icon ?? current.data.icon ?? 'arrow', 'Icon 名稱'),
-    group,
-    order,
-    visible: Boolean(input.visible),
-    layout,
-    style,
-    image: image || undefined,
-    tags,
-  };
-  await atomicWrite(linkPath, stringifyMarkdown(next, body));
-  return { id: safeId, file: `links/${safeId}.md`, data: next, body };
+  return updateMarkdownFile(linkPath, async (current) => {
+    const group = ['social', 'main', 'featured', 'footer'].includes(input.group)
+      ? input.group
+      : current.data.group ?? 'featured';
+    const layout = ['icon', 'card', 'compact'].includes(input.layout)
+      ? input.layout
+      : current.data.layout ?? (group === 'social' ? 'icon' : 'card');
+    const style = ['primary', 'normal', 'subtle'].includes(input.style)
+      ? input.style
+      : current.data.style ?? 'normal';
+    const order = Number(input.order ?? current.data.order ?? 100);
+    if (!Number.isFinite(order) || order < 0 || order > 10000) throw new Error('連結順序必須介於 0～10000。');
+    const image = assertImagePath(input.image, '自訂 Icon');
+    const tags = assertStringArray(input.tags ?? current.data.tags ?? [], '連結標籤', { max: 8 });
+    const body = input.body === undefined
+      ? current.body
+      : assertText(input.body, '連結說明', { max: 3000 });
+    const next = {
+      ...current.data,
+      title: assertText(input.title, '連結名稱', { required: true, max: 80 }),
+      url: assertUrl(input.url),
+      icon: assertSlug(input.icon ?? current.data.icon ?? 'arrow', 'Icon 名稱'),
+      group,
+      order,
+      visible: Boolean(input.visible),
+      layout,
+      style,
+      image: image || undefined,
+      tags,
+    };
+    const result = { id: safeId, file: `links/${safeId}.md`, data: next, body };
+    return { data: next, body, result };
+  }, { allowMissing: true });
 }
 
 export async function createStudioLink(projectRoot, input) {
@@ -460,15 +466,17 @@ export async function createStudioLink(projectRoot, input) {
 
 async function upsertMarkdown(projectRoot, collection, id, data, body) {
   const filePath = safeFile(projectRoot, 'src', 'content', collection, `${assertSlug(id)}.md`);
-  await atomicWrite(filePath, stringifyMarkdown(data, body));
+  await withFileWriteLock(filePath, () => atomicWriteText(filePath, stringifyMarkdown(data, body)));
 }
 
 async function setVisible(projectRoot, collection, id, visible) {
   const filePath = safeFile(projectRoot, 'src', 'content', collection, `${assertSlug(id)}.md`);
   try {
-    const current = await readMarkdownFile(filePath);
-    current.data.visible = visible;
-    await atomicWrite(filePath, stringifyMarkdown(current.data, current.body));
+    await updateMarkdownFile(filePath, async (current) => ({
+      data: { ...current.data, visible },
+      body: current.body,
+      result: undefined,
+    }));
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
   }
@@ -477,56 +485,71 @@ async function setVisible(projectRoot, collection, id, visible) {
 export function validateProfileAnswers(input) {
   if (!isObject(input) || input.version !== 1) throw new Error('回答檔 version 必須為 1。');
   if (!isObject(input.identity)) throw new Error('回答檔缺少 identity。');
+  assertAllowedKeys(input, ['$schema', 'version', 'identity', 'socials', 'links', 'sections', 'imageBlocks', 'playlist', 'features', 'appearance'], '回答檔');
+  if (input.$schema !== undefined && typeof input.$schema !== 'string') throw new Error('$schema 格式不正確。');
+  assertAllowedKeys(input.identity, ['displayName', 'title', 'location', 'tagline', 'bio'], 'identity');
+  const tagline = assertStringArray(input.identity.tagline, '關鍵字', { min: 1, max: 6 });
+  if (new Set(tagline).size !== tagline.length) throw new Error('關鍵字不可重複。');
   const identity = {
     displayName: assertText(input.identity.displayName, '顯示名稱', { required: true, max: 80 }),
     title: assertText(input.identity.title, '一句話身分', { required: true, max: 120 }),
     location: assertText(input.identity.location, '地點', { max: 100 }),
-    tagline: assertStringArray(input.identity.tagline, '關鍵字', { min: 1, max: 6 }),
+    tagline,
     bio: assertText(input.identity.bio, '自我介紹', { required: true, max: 5000 }),
   };
-  const socials = (input.socials ?? []).map((item, index) => {
+  const socialInput = input.socials === undefined ? [] : assertObjectArray(input.socials, '社群連結', 20);
+  const socials = socialInput.map((item, index) => {
     if (!isObject(item)) throw new Error(`第 ${index + 1} 個社群連結格式不正確。`);
+    assertAllowedKeys(item, ['service', 'title', 'url', 'icon'], `第 ${index + 1} 個社群連結`);
     const service = assertSlug(item.service, '社群服務');
     return {
       service,
-      title: assertText(item.title, '社群名稱', { max: 80 }) || SERVICE_DEFAULTS[service]?.title || service,
+      title: assertProvidedText(item.title, '社群名稱', { max: 80 }) || SERVICE_DEFAULTS[service]?.title || service,
       url: assertUrl(item.url, '社群網址'),
-      icon: assertSlug(item.icon || SERVICE_DEFAULTS[service]?.icon || 'arrow', '圖示名稱'),
+      icon: item.icon === undefined
+        ? SERVICE_DEFAULTS[service]?.icon || 'arrow'
+        : assertSlug(item.icon, '圖示名稱'),
     };
   });
-  const links = (input.links ?? []).map((item, index) => {
+  const linkInput = input.links === undefined ? [] : assertObjectArray(input.links, '精選連結', 20);
+  const links = linkInput.map((item, index) => {
     if (!isObject(item)) throw new Error(`第 ${index + 1} 個精選連結格式不正確。`);
+    assertAllowedKeys(item, ['id', 'title', 'url', 'description', 'icon', 'tags'], `第 ${index + 1} 個精選連結`);
     return {
       id: assertSlug(item.id, '精選連結 ID'),
       title: assertText(item.title, '精選連結名稱', { required: true, max: 80 }),
       url: assertUrl(item.url, '精選連結網址'),
       description: assertText(item.description, '精選連結說明', { required: true, max: 500 }),
-      icon: assertSlug(item.icon || 'arrow', '圖示名稱'),
+      icon: item.icon === undefined ? 'arrow' : assertSlug(item.icon, '圖示名稱'),
       tags: assertStringArray(item.tags ?? [], '精選連結標籤', { max: 6 }),
     };
   });
-  const sections = (input.sections ?? []).map((item, index) => {
+  const sectionInput = input.sections === undefined ? [] : assertObjectArray(input.sections, '自介區塊', 12);
+  const sections = sectionInput.map((item, index) => {
     if (!isObject(item)) throw new Error(`第 ${index + 1} 個自介區塊格式不正確。`);
+    assertAllowedKeys(item, ['id', 'title', 'description', 'tags', 'image'], `第 ${index + 1} 個自介區塊`);
     return {
       id: assertSlug(item.id, '自介區塊 ID'),
       title: assertText(item.title, '自介區塊名稱', { required: true, max: 80 }),
       description: assertText(item.description, '自介區塊內容', { required: true, max: 2000 }),
       tags: assertStringArray(item.tags ?? [], '自介區塊標籤', { max: 8 }),
-      image: assertText(item.image, '圖片路徑', { max: 300 }),
+      image: item.image === undefined ? '' : assertImagePath(item.image, '圖片路徑', { required: true }),
     };
   });
-  const imageBlocks = (input.imageBlocks ?? []).map((item, index) => {
+  const imageBlockInput = input.imageBlocks === undefined ? [] : assertObjectArray(input.imageBlocks, '圖片板塊', 8);
+  const imageBlocks = imageBlockInput.map((item, index) => {
     if (!isObject(item)) throw new Error(`第 ${index + 1} 個圖片板塊格式不正確。`);
+    assertAllowedKeys(item, ['id', 'title', 'image', 'imageAlt', 'description', 'placement', 'imageLayout', 'imageAspect', 'imagePosition', 'tags'], `第 ${index + 1} 個圖片板塊`);
     return {
       id: assertSlug(item.id, '圖片板塊 ID'),
       title: assertText(item.title, '圖片板塊標題', { required: true, max: 80 }),
-      image: assertImagePath(item.image, '圖片板塊圖片'),
-      imageAlt: assertText(item.imageAlt, '圖片替代文字', { max: 300 }),
-      description: assertText(item.description, '圖片板塊文字', { max: 5000 }),
-      placement: IMAGE_BLOCK_PLACEMENTS.includes(item.placement) ? item.placement : 'after-sections',
-      imageLayout: IMAGE_BLOCK_LAYOUTS.includes(item.imageLayout) ? item.imageLayout : 'full',
-      imageAspect: IMAGE_BLOCK_ASPECTS.includes(item.imageAspect) ? item.imageAspect : 'landscape',
-      imagePosition: IMAGE_BLOCK_POSITIONS.includes(item.imagePosition) ? item.imagePosition : 'center',
+      image: assertImagePath(item.image, '圖片板塊圖片', { required: true }),
+      imageAlt: assertProvidedText(item.imageAlt, '圖片替代文字', { max: 300 }),
+      description: assertProvidedText(item.description, '圖片板塊文字', { max: 5000 }),
+      placement: assertOptionalEnum(item.placement, IMAGE_BLOCK_PLACEMENTS, '圖片板塊位置', 'after-sections'),
+      imageLayout: assertOptionalEnum(item.imageLayout, IMAGE_BLOCK_LAYOUTS, '圖片板塊版型', 'full'),
+      imageAspect: assertOptionalEnum(item.imageAspect, IMAGE_BLOCK_ASPECTS, '圖片板塊比例', 'landscape'),
+      imagePosition: assertOptionalEnum(item.imagePosition, IMAGE_BLOCK_POSITIONS, '圖片板塊焦點', 'center'),
       tags: assertStringArray(item.tags ?? [], '圖片板塊標籤', { max: 8 }),
     };
   });
@@ -535,17 +558,28 @@ export function validateProfileAnswers(input) {
   assertUnique(links, 'id', '精選連結 ID');
   assertUnique(sections, 'id', '自介區塊 ID');
   assertUnique(imageBlocks, 'id', '圖片板塊 ID');
-  const appearance = isObject(input.appearance) ? input.appearance : {};
+  if (input.appearance !== undefined && !isObject(input.appearance)) throw new Error('appearance 格式不正確。');
+  const appearance = input.appearance ?? {};
+  assertAllowedKeys(appearance, ['sectionsLayout', 'bodyFont', 'displayFont', 'homeOrder'], 'appearance');
+  const sectionsLayout = assertOptionalEnum(appearance.sectionsLayout, ['grid', 'list'], 'sectionsLayout', 'grid');
+  const bodyFont = assertOptionalEnum(appearance.bodyFont, FONT_PRESETS, 'bodyFont', 'system');
+  const displayFont = assertOptionalEnum(appearance.displayFont, FONT_PRESETS, 'displayFont', 'system');
   const homeOrder = appearance.homeOrder ?? HOME_SECTIONS;
   if (!Array.isArray(homeOrder) || homeOrder.length !== 5 || new Set(homeOrder).size !== 5 || homeOrder.some((item) => !HOME_SECTIONS.includes(item))) {
     throw new Error('appearance.homeOrder 必須包含五個首頁板塊。');
   }
+  if (input.playlist !== null && input.playlist !== undefined && !isObject(input.playlist)) throw new Error('playlist 格式不正確。');
+  if (isObject(input.playlist)) assertAllowedKeys(input.playlist, ['youtubePlaylistId', 'title', 'description'], 'playlist');
   const playlist = input.playlist === null || input.playlist === undefined ? null : {
     youtubePlaylistId: assertText(input.playlist.youtubePlaylistId, 'YouTube 播放清單 ID', { required: true, max: 100 }),
-    title: assertText(input.playlist.title, '播放清單名稱', { max: 80 }) || 'PLAY！',
-    description: assertText(input.playlist.description, '播放清單說明', { max: 500 }) || '按下唱針，隨機抽一首歌。',
+    title: assertProvidedText(input.playlist.title, '播放清單名稱', { max: 80 }) || 'PLAY！',
+    description: assertProvidedText(input.playlist.description, '播放清單說明', { max: 500 }) || '按下唱針，隨機抽一首歌。',
   };
   if (playlist && !/^[A-Za-z0-9_-]{10,}$/.test(playlist.youtubePlaylistId)) throw new Error('YouTube 播放清單 ID 格式不正確。');
+  if (input.features !== undefined && !isObject(input.features)) throw new Error('features 格式不正確。');
+  const features = input.features ?? {};
+  assertAllowedKeys(features, ['fortune'], 'features');
+  if (features.fortune !== undefined && typeof features.fortune !== 'boolean') throw new Error('features.fortune 必須是布林值。');
   return {
     identity,
     socials,
@@ -554,46 +588,57 @@ export function validateProfileAnswers(input) {
     imageBlocks,
     playlist,
     appearance: {
-      sectionsLayout: appearance.sectionsLayout === 'list' ? 'list' : 'grid',
+      sectionsLayout,
       homeOrder,
-      bodyFont: FONT_PRESETS.includes(appearance.bodyFont) ? appearance.bodyFont : 'system',
-      displayFont: FONT_PRESETS.includes(appearance.displayFont) ? appearance.displayFont : 'system',
+      bodyFont,
+      displayFont,
     },
-    features: { fortune: input.features?.fortune !== false },
+    features: { fortune: features.fortune !== false },
   };
+}
+
+async function updateMarkdownFile(filePath, update, { allowMissing = false } = {}) {
+  return withFileWriteLock(filePath, async () => {
+    let current;
+    try {
+      current = await readMarkdownFile(filePath);
+    } catch (error) {
+      if (!allowMissing || error.code !== 'ENOENT') throw error;
+      current = { data: {}, body: '' };
+    }
+    const mutation = await update(current);
+    await atomicWriteText(filePath, stringifyMarkdown(mutation.data, mutation.body));
+    return mutation.result;
+  });
 }
 
 export async function saveStudioImageBlock(projectRoot, id, input) {
   const safeId = assertSlug(id, '圖片板塊 ID');
   if (!isObject(input)) throw new Error('圖片板塊格式不正確。');
   const blockPath = safeFile(projectRoot, 'src', 'content', 'blocks', `${safeId}.md`);
-  let current = { data: {}, body: '' };
-  try {
-    current = await readMarkdownFile(blockPath);
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-  }
-  if (current.data.layout && current.data.layout !== 'image') throw new Error('這個 ID 已被其他板塊使用。');
-  const order = Number(input.order ?? current.data.order ?? 100);
-  if (!Number.isFinite(order) || order < 0 || order > 10000) throw new Error('圖片板塊順序必須介於 0～10000。');
-  const next = {
-    ...current.data,
-    title: assertText(input.title ?? current.data.title, '圖片板塊標題', { required: true, max: 80 }),
-    placement: IMAGE_BLOCK_PLACEMENTS.includes(input.placement) ? input.placement : current.data.placement ?? 'after-sections',
-    order,
-    visible: input.visible === undefined ? Boolean(current.data.visible ?? true) : Boolean(input.visible),
-    layout: 'image',
-    image: assertImagePath(input.image ?? current.data.image, '圖片路徑'),
-    imageAlt: assertText(input.imageAlt ?? current.data.imageAlt, '圖片替代文字', { max: 300 }),
-    imageLayout: IMAGE_BLOCK_LAYOUTS.includes(input.imageLayout) ? input.imageLayout : current.data.imageLayout ?? 'full',
-    imageAspect: IMAGE_BLOCK_ASPECTS.includes(input.imageAspect) ? input.imageAspect : current.data.imageAspect ?? 'landscape',
-    imagePosition: IMAGE_BLOCK_POSITIONS.includes(input.imagePosition) ? input.imagePosition : current.data.imagePosition ?? 'center',
-    tags: assertStringArray(input.tags ?? current.data.tags ?? [], '圖片板塊標籤', { max: 8 }),
-  };
-  if (!next.image) throw new Error('圖片板塊必須選擇圖片。');
-  const body = assertText(input.body ?? current.body, '圖片板塊文字', { max: 5000 });
-  await atomicWrite(blockPath, stringifyMarkdown(next, body));
-  return { id: safeId, file: `blocks/${safeId}.md`, data: next, body };
+  return updateMarkdownFile(blockPath, async (current) => {
+    if (current.data.layout && current.data.layout !== 'image') throw new Error('這個 ID 已被其他板塊使用。');
+    const order = Number(input.order ?? current.data.order ?? 100);
+    if (!Number.isFinite(order) || order < 0 || order > 10000) throw new Error('圖片板塊順序必須介於 0～10000。');
+    const next = {
+      ...current.data,
+      title: assertText(input.title ?? current.data.title, '圖片板塊標題', { required: true, max: 80 }),
+      placement: IMAGE_BLOCK_PLACEMENTS.includes(input.placement) ? input.placement : current.data.placement ?? 'after-sections',
+      order,
+      visible: input.visible === undefined ? Boolean(current.data.visible ?? true) : Boolean(input.visible),
+      layout: 'image',
+      image: assertImagePath(input.image ?? current.data.image, '圖片路徑'),
+      imageAlt: assertText(input.imageAlt ?? current.data.imageAlt, '圖片替代文字', { max: 300 }),
+      imageLayout: IMAGE_BLOCK_LAYOUTS.includes(input.imageLayout) ? input.imageLayout : current.data.imageLayout ?? 'full',
+      imageAspect: IMAGE_BLOCK_ASPECTS.includes(input.imageAspect) ? input.imageAspect : current.data.imageAspect ?? 'landscape',
+      imagePosition: IMAGE_BLOCK_POSITIONS.includes(input.imagePosition) ? input.imagePosition : current.data.imagePosition ?? 'center',
+      tags: assertStringArray(input.tags ?? current.data.tags ?? [], '圖片板塊標籤', { max: 8 }),
+    };
+    if (!next.image) throw new Error('圖片板塊必須選擇圖片。');
+    const body = assertText(input.body ?? current.body, '圖片板塊文字', { max: 5000 });
+    const result = { id: safeId, file: `blocks/${safeId}.md`, data: next, body };
+    return { data: next, body, result };
+  }, { allowMissing: true });
 }
 
 export async function createStudioImageBlock(projectRoot, input) {
@@ -610,24 +655,20 @@ export async function saveStudioSocialOrder(projectRoot, input) {
   }
   const ids = input.links.map((item) => assertSlug(item?.id, '社群連結 ID'));
   assertUnique(ids.map((id) => ({ id })), 'id', '社群連結');
-  const pending = await Promise.all(input.links.map(async (item, index) => {
+  return Promise.all(input.links.map(async (item, index) => {
     const id = ids[index];
     const linkPath = safeFile(projectRoot, 'src', 'content', 'links', `${id}.md`);
-    const current = await readMarkdownFile(linkPath);
-    if (current.data.group !== 'social') throw new Error(`${id} 不是社群連結。`);
     const order = Number(item.order);
     if (!Number.isFinite(order) || order < 0 || order > 10000) throw new Error('社群排序必須介於 0 到 10000。');
-    return { id, linkPath, current, order };
-  }));
-  await Promise.all(pending.map(({ linkPath, current, order }) => {
-    const data = { ...current.data, order };
-    return atomicWrite(linkPath, stringifyMarkdown(data, current.body));
-  }));
-  return pending.map(({ id, current, order }) => ({
-    id,
-    file: `links/${id}.md`,
-    data: { ...current.data, order },
-    body: current.body,
+    return updateMarkdownFile(linkPath, async (current) => {
+      if (current.data.group !== 'social') throw new Error(`${id} 不是社群連結。`);
+      const data = { ...current.data, order };
+      return {
+        data,
+        body: current.body,
+        result: { id, file: `links/${id}.md`, data, body: current.body },
+      };
+    });
   }));
 }
 
@@ -673,7 +714,6 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
     bodyFont: input.appearance.bodyFont,
     displayFont: input.appearance.displayFont,
   });
-  await saveHomeOrder(projectRoot, input.appearance.homeOrder);
 
   for (const link of current.links.filter((item) => item.data.group === 'social')) {
     await setVisible(projectRoot, 'links', link.id, false);
@@ -763,6 +803,19 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
     await setVisible(projectRoot, 'blocks', 'turntable', false);
   }
   await setVisible(projectRoot, 'blocks', 'fortune', input.features.fortune);
+  const nextContent = await loadStudioContent(projectRoot);
+  const homeVisibility = [];
+  if (nextContent.sections.some((section) => section.data.visible)) homeVisibility.push('about');
+  if (nextContent.blocks.some((block) => block.id === 'turntable' && block.data.visible)) homeVisibility.push('turntable');
+  if (nextContent.links.some((link) => ['main', 'featured'].includes(link.data.group) && link.data.visible)) homeVisibility.push('links');
+  if (nextContent.blocks.some((block) => block.id === 'fortune' && block.data.visible)) homeVisibility.push('fortune');
+  if (nextContent.blocks.some((block) => block.id === 'notion-embed' && block.data.visible)) homeVisibility.push('notion');
+  await saveHomeSettings(projectRoot, {
+    homeOrder: input.appearance.homeOrder,
+    homeVisibility,
+    aboutHeading: current.profile.aboutHeading,
+    linksHeading: current.profile.linksHeading,
+  });
   return loadStudioContent(projectRoot);
 }
 

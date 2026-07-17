@@ -95,14 +95,21 @@ async function readJson(request) {
 
 async function saveImage(input) {
   if (!input || typeof input.name !== 'string' || typeof input.dataUrl !== 'string') throw new Error('圖片資料不完整。');
-  const match = input.dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif|svg\+xml));base64,([A-Za-z0-9+/=]+)$/);
-  if (!match) throw new Error('僅支援 PNG、JPG、WebP、GIF 或 SVG。');
-  const extensionByType = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif', 'image/svg+xml': '.svg' };
+  const match = input.dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) throw new Error('僅支援 PNG、JPG、WebP 或 GIF。');
+  const imageFormats = {
+    'image/png': { extension: '.png', matches: (buffer) => buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
+    'image/jpeg': { extension: '.jpg', matches: (buffer) => buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff },
+    'image/webp': { extension: '.webp', matches: (buffer) => buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP' },
+    'image/gif': { extension: '.gif', matches: (buffer) => ['GIF87a', 'GIF89a'].includes(buffer.toString('ascii', 0, 6)) },
+  };
+  const format = imageFormats[match[1]];
   const originalBase = path.basename(input.name, path.extname(input.name));
   const safeBase = originalBase.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'profile-image';
-  const fileName = `${safeBase}${extensionByType[match[1]]}`;
+  const fileName = `${safeBase}${format.extension}`;
   const buffer = Buffer.from(match[2], 'base64');
   if (buffer.length > 5 * 1024 * 1024) throw new Error('圖片不可超過 5 MB。');
+  if (!format.matches(buffer)) throw new Error('圖片內容與宣告格式不一致。');
   await writeFile(path.join(projectRoot, 'public', 'images', fileName), buffer);
   return `/images/${fileName}`;
 }

@@ -2,14 +2,17 @@ import { defineCollection } from 'astro:content';
 import { file } from 'astro/loaders';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
+import { isSafeHttpUrl, isSafeImagePath, isSafeProfileUrl } from '../scripts/content-safety.mjs';
+
+const imagePath = z.string().refine(isSafeImagePath, 'Images must use a safe path under /images/.');
 
 const profile = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/profile' }),
   schema: z.object({
     displayName: z.string(),
     title: z.string(),
-    avatar: z.string().optional(),
-    background: z.string().optional(),
+    avatar: imagePath.optional(),
+    background: imagePath.optional(),
     location: z.string().optional(),
     archiveLabel: z.string().optional(),
     homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))
@@ -35,14 +38,14 @@ const links = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/links' }),
   schema: z.object({
     title: z.string(),
-    url: z.string(),
+    url: z.string().refine(isSafeProfileUrl, 'URL must use http(s), mailto, or a page anchor.'),
     icon: z.string().default('arrow'),
     group: z.enum(['social', 'main', 'featured', 'footer']),
     order: z.number().default(100),
     visible: z.boolean().default(true),
     layout: z.enum(['icon', 'card', 'compact']).default('card'),
     style: z.enum(['primary', 'normal', 'subtle']).default('normal'),
-    image: z.string().optional(),
+    image: imagePath.optional(),
     tags: z.array(z.string()).optional(),
   }),
 });
@@ -52,7 +55,7 @@ const sections = defineCollection({
   schema: z.object({
     title: z.string(),
     slug: z.string(),
-    image: z.string().optional(),
+    image: imagePath.optional(),
     order: z.number().default(100),
     visible: z.boolean().default(true),
     layout: z.enum(['card', 'compact']).default('card'),
@@ -69,12 +72,12 @@ const blocks = defineCollection({
     visible: z.boolean().default(true),
     layout: z.enum(['card', 'plain', 'image', 'embed', 'turntable', 'fortune']).default('card'),
     provider: z.enum(['notion', 'youtube']).optional(),
-    url: z.url().optional(),
+    url: z.string().refine(isSafeHttpUrl, 'Embed URL must use http(s).').optional(),
     embedMode: z.enum(['preview', 'inline']).default('preview'),
     playlistId: z.string().regex(/^[A-Za-z0-9_-]{10,}$/, 'Invalid YouTube playlist ID.').optional(),
     continuousPlayback: z.boolean().default(true),
     height: z.number().int().min(320).max(1200).default(600),
-    image: z.string().optional(),
+    image: imagePath.optional(),
     imageAlt: z.string().max(300).default(''),
     imageLayout: z.enum(['full', 'split-left', 'split-right', 'poster']).default('full'),
     imageAspect: z.enum(['auto', 'landscape', 'square', 'portrait']).default('landscape'),

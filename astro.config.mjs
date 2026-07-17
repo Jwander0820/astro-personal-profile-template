@@ -1,4 +1,6 @@
 import { defineConfig } from 'astro/config';
+import { satteri } from '@astrojs/markdown-satteri';
+import { createContentSafetyMdastPlugin } from './scripts/content-safety.mjs';
 
 const [repositoryOwner, repositoryName] = process.env.GITHUB_REPOSITORY?.split('/') ?? [];
 const normalizedOwner = repositoryOwner?.toLowerCase();
@@ -14,4 +16,9 @@ export default defineConfig({
   site,
   base,
   output: 'static',
+  markdown: {
+    processor: satteri({
+      mdastPlugins: [createContentSafetyMdastPlugin()],
+    }),
+  },
 });

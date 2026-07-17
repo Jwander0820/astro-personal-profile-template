@@ -1,76 +1,92 @@
 import assert from 'node:assert/strict';
-import { access, readFile, readdir } from 'node:fs/promises';
-import { constants } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { readFile, readdir } from 'node:fs/promises';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
+const execFileAsync = promisify(execFile);
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const textExtensions = new Set(['.astro', '.css', '.html', '.js', '.json', '.md', '.mjs', '.ts', '.yml', '.yaml']);
-const scanRoots = ['docs', 'scripts', 'src', 'studio'];
-const rootFiles = ['AGENTS.md', 'CHANGELOG.md', 'README.md', 'astro.config.mjs', 'package.json'];
+const privatePaths = new Set([
+  'profile.answers.json',
+  '.env',
+  '.env.local',
+  '.env.production',
+  'docs/PROJECT_HANDOFF.md',
+  'docs/RELEASE_PROCESS.md',
+]);
+const privatePrefixes = [
+  'docs/specs/',
+  'docs/verification/',
+  'docs/releases/',
+  'docs/ai/cases/',
+  '.studio-backups/',
+  '.agents/',
+  '.codex/',
+];
+const ignoredDirectories = new Set([
+  '.git', '.astro', '.agents', '.codex', '.npm', '.pnpm-store', '.studio-backups',
+  'dist', 'node_modules',
+]);
+const textExtensions = new Set([
+  '.astro', '.cmd', '.css', '.html', '.js', '.json', '.md', '.mjs', '.svg', '.ts', '.txt', '.yml', '.yaml',
+]);
+const extensionlessTextFiles = new Set(['LICENSE']);
 
-async function exists(relativePath) {
+function normalizePath(value) {
+  return value.replaceAll('\\', '/');
+}
+
+function isPrivatePath(relativePath) {
+  const normalized = normalizePath(relativePath);
+  return privatePaths.has(normalized) || privatePrefixes.some((prefix) => normalized.startsWith(prefix));
+}
+
+function isTextFile(relativePath) {
+  return textExtensions.has(path.extname(relativePath).toLowerCase()) || extensionlessTextFiles.has(path.basename(relativePath));
+}
+
+async function listPublicFiles() {
   try {
-    await access(path.join(projectRoot, relativePath), constants.F_OK);
-    return true;
+    const { stdout } = await execFileAsync(
+      'git',
+      ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
+      { cwd: projectRoot, encoding: 'buffer' },
+    );
+    return stdout.toString('utf8').split('\0').filter(Boolean).map(normalizePath);
   } catch {
-    return false;
+    return null;
   }
 }
 
-async function collectTextFiles(relativeDirectory) {
-  const directory = path.join(projectRoot, relativeDirectory);
+async function collectLocalTextFiles(directory = projectRoot, relativeDirectory = '') {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
-    const relativePath = path.join(relativeDirectory, entry.name);
-    if (entry.isDirectory()) files.push(...await collectTextFiles(relativePath));
-    else if (textExtensions.has(path.extname(entry.name).toLowerCase())) files.push(relativePath);
+    if (entry.isDirectory() && ignoredDirectories.has(entry.name)) continue;
+    const relativePath = normalizePath(path.join(relativeDirectory, entry.name));
+    if (isPrivatePath(relativePath)) continue;
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...await collectLocalTextFiles(absolutePath, relativePath));
+    else if (isTextFile(relativePath)) files.push(relativePath);
   }
   return files;
 }
 
-for (const privateFile of ['profile.answers.json', '.env', '.env.local', '.env.production']) {
-  assert.equal(await exists(privateFile), false, `${privateFile} 不得出現在公開模板工作樹。`);
-}
-
-const profile = await readFile(path.join(projectRoot, 'src', 'content', 'profile', 'main.md'), 'utf8');
-assert.match(profile, /^displayName:\s*你的名字$/m, '預設顯示名稱必須是通用 placeholder。');
-assert.doesNotMatch(profile, /^name:/m, '公開模板不保留舊的個人名稱欄位。');
-assert.doesNotMatch(profile, /^location:/m, '公開模板預設不應公開地區。');
-assert.match(profile, /^bodyFont:\s*system$/m, '公開模板預設內文字型不得產生外部請求。');
-assert.match(profile, /^displayFont:\s*system$/m, '公開模板預設展示字型不得產生外部請求。');
-
-const turntable = await readFile(path.join(projectRoot, 'src', 'content', 'blocks', 'turntable.md'), 'utf8');
-const placeholderPlaylistId = 'PL1234567890abcdef';
-const approvedPublicPlaylistIds = new Set(['PLlaN88a7y2_oK0nKMjZSwdU_njxUYWykm']);
-const playlistId = turntable.match(/^playlistId:\s*([A-Za-z0-9_-]+)$/m)?.[1];
-assert.ok(playlistId, '唱盤必須提供格式正確的 playlistId。');
-if (playlistId === placeholderPlaylistId) {
-  assert.match(turntable, /^visible:\s*false$/m, '使用 placeholder 播放清單時，唱盤預設必須停用。');
-} else {
-  assert.equal(approvedPublicPlaylistIds.has(playlistId), true, '唱盤只允許 placeholder 或維護者明確核准的公開播放清單。');
-}
-
-const linksDirectory = path.join(projectRoot, 'src', 'content', 'links');
-for (const entry of await readdir(linksDirectory, { withFileTypes: true })) {
-  if (!entry.isFile() || path.extname(entry.name) !== '.md') continue;
-  const content = await readFile(path.join(linksDirectory, entry.name), 'utf8');
-  const email = content.match(/^url:\s*mailto:([^\s]+)$/m)?.[1];
-  if (email) assert.equal(email.endsWith('@example.com'), true, `${entry.name} 必須使用 example.com email。`);
-  for (const url of content.matchAll(/^url:\s*(https?:\/\/[^\s]+)$/gm)) {
-    const parsed = new URL(url[1]);
-    const accountPath = ['github.com', 'www.threads.net'].includes(parsed.hostname) && parsed.pathname !== '/';
-    if (accountPath) assert.match(parsed.pathname, /yourname/, `${entry.name} 不得包含真實社群帳號。`);
+const publicFiles = await listPublicFiles();
+if (publicFiles) {
+  for (const privatePath of publicFiles.filter(isPrivatePath)) {
+    assert.fail(`${privatePath} 不得被 Git 追蹤。`);
   }
 }
 
-const scannedFiles = [...rootFiles, ...(await Promise.all(scanRoots.map(collectTextFiles))).flat()];
+const scannedFiles = (publicFiles ?? await collectLocalTextFiles()).filter(isTextFile);
 const secretPatterns = [
   ['OpenAI API key', /\bsk-[A-Za-z0-9_-]{20,}\b/],
   ['GitHub token', /\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}\b/],
   ['Google API key', /\bAIza[A-Za-z0-9_-]{30,}\b/],
-  ['private key', /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/],
+  ['AWS access key', /\bAKIA[0-9A-Z]{16}\b/],
+  ['private key', /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/],
 ];
 
 for (const relativePath of scannedFiles) {
@@ -80,4 +96,14 @@ for (const relativePath of scannedFiles) {
   }
 }
 
-console.log(`Template safety check passed (${scannedFiles.length} public text files scanned).`);
+const workflow = await readFile(path.join(projectRoot, '.github', 'workflows', 'deploy.yml'), 'utf8');
+const actionReferences = [...workflow.matchAll(/uses:\s+([^\s@]+)@([^\s#]+)/g)];
+assert.ok(actionReferences.length > 0, '部署 workflow 必須使用明確的 Actions。');
+for (const [, action, reference] of actionReferences) {
+  assert.match(reference, /^[0-9a-f]{40}$/, `${action} 必須固定到完整 commit SHA。`);
+}
+assert.match(workflow, /^permissions:\s*\{\}\s*$/m, 'workflow 預設權限必須為空。');
+assert.match(workflow, /build:[\s\S]*?permissions:\s*\r?\n\s+contents:\s*read/, 'build job 只能取得 contents: read。');
+assert.match(workflow, /deploy:[\s\S]*?permissions:\s*\r?\n\s+pages:\s*write\s*\r?\n\s+id-token:\s*write/, 'deploy job 只能取得 Pages 部署所需權限。');
+
+console.log(`Template safety check passed (${scannedFiles.length} tracked or unignored text files scanned).`);

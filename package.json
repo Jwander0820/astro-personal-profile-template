@@ -18,10 +18,13 @@
     "check:ui": "node scripts/verify-ui-contracts.mjs",
     "check:profile-tools": "node scripts/verify-profile-tools.mjs",
     "check:template-safety": "node scripts/verify-template-safety.mjs",
+    "check:template-defaults": "node scripts/verify-template-defaults.mjs",
+    "check:template": "npm run check:template-defaults && npm run check:template-safety",
     "preview": "astro preview"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",
+    "@astrojs/markdown-satteri": "^0.3.4",
     "astro": "^7.0.9",
     "typescript": "^5.7.2"
   }
