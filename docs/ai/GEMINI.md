@@ -8,6 +8,8 @@
 4. 要求最終只輸出 JSON，存成 `profile.answers.json`，或直接複製到 Profile Studio。
 5. 在 Studio 先按「驗證回答」並核對摘要，再按「確認套用」。若 URL 或必填欄位錯誤，回 Gemini 修正，不要手動猜測資料。
 
+Gemini Apps 的一般對話介面只負責產生 JSON，不會直接修改本機 repository、commit 或部署。若改用具備 repository 與 Git 存取能力的 coding agent，請使用 [`../AI_PROFILE_SETUP.md`](../AI_PROFILE_SETUP.md) 的一站式提示詞。
+
 Gemini Apps 的檔案內容與帳號資料處理方式可能依帳號類型及設定不同；只提供願意交給該服務處理的內容，並避免真實 secret。
 
 ## Gemini API（未來可選整合）
@@ -26,4 +28,3 @@ Gemini API 官方支援以 JSON Schema 約束結構化輸出，但只支援 JSON
 - [Gemini Apps 上傳與分析檔案](https://support.google.com/gemini/answer/14903178)
 - [Gemini API Structured outputs](https://ai.google.dev/gemini-api/docs/structured-output)
 - [Gemini API key 安全指南](https://ai.google.dev/gemini-api/docs/api-key)
-

@@ -1,6 +1,7 @@
 # Astro 個人簡介
 
 以 Astro 製作的靜態個人名片／Link in Bio 網站。採行動優先設計，個人資料、連結、首頁內容與自訂區塊都可由 Markdown 管理。
+可參考的範例 https://jwander0820.github.io/astro-personal-profile-template/
 
 ## 本機開發
 
@@ -31,11 +32,17 @@ Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，或在 PowerShell
 
 ### 讓 AI 引導建立自介
 
-若不熟悉程式，可以把 fork／clone 後的專案交給 Codex 或其他 coding agent，輸入：
+若不熟悉程式，可以先 fork／clone 到自己的 repository，再把專案交給 Codex 或其他具備檔案、終端機與 Git 存取能力的 coding agent。若只想建立並檢查內容，輸入：
 
 > 請依照 AGENTS.md 的個人自介流程訪談我，產生 profile.answers.json、套用內容並執行 build。沒有得到答案的選填資料請留空，不要自行杜撰。
 
-AI 問答流程、資料格式與 GitHub Pages 手動步驟請見 [`docs/AI_PROFILE_SETUP.md`](docs/AI_PROFILE_SETUP.md)。可直接使用 [provider-neutral 訪談提示詞](docs/ai/PROFILE_INTERVIEW_PROMPT.md)，Gemini 使用方式見 [`docs/ai/GEMINI.md`](docs/ai/GEMINI.md)。Studio 會先驗證回答並顯示影響摘要，只有再次確認後才會寫入；完全不使用 AI 也能透過 Studio 或 Markdown 完成全部設定。
+若希望由同一個 Agent 一站式處理內容與 GitHub Pages 發布，輸入：
+
+> 請依照 AGENTS.md 訪談我建立個人自介。訪談完成後，產生並驗證 profile.answers.json，使用既有 profile:apply 流程更新 src/content，執行完整 build。Build 成功後，請列出即將公開的個人資料與 Git 變更摘要，等待我確認發布；我確認後，先確認 origin 是我自己的 repository，再建立與本次內容相符的 commit、推送至部署分支，並回報 GitHub Pages workflow 結果。若尚未完成 GitHub Actions、Pages 或 Git 權限設定，請停止發布並告訴我需要完成的步驟。不要提交 profile.answers.json，也不要把個人資料推到上游模板 repository。
+
+這個模式仍會在 push 前停下來讓使用者確認一次，因為姓名、地點、email 與連結可能會成為公開網站內容。確認後，Agent 才會 commit、push，並在可存取 GitHub 狀態時追蹤部署結果。第一次部署通常仍要由 repository 擁有者啟用 fork 的 Actions，並在 **Settings → Pages → Build and deployment** 將 Source 設為 **GitHub Actions**。
+
+AI 問答流程、資料格式、完整的一站式步驟與 GitHub Pages 設定請見 [`docs/AI_PROFILE_SETUP.md`](docs/AI_PROFILE_SETUP.md)。只有一般聊天介面、不能存取 repository 的 AI，可使用 [provider-neutral 訪談提示詞](docs/ai/PROFILE_INTERVIEW_PROMPT.md) 產生 JSON，再貼到 Profile Studio；Gemini 使用方式見 [`docs/ai/GEMINI.md`](docs/ai/GEMINI.md)。Studio 會先驗證回答並顯示影響摘要，只有再次確認後才會寫入；完全不使用 AI 也能透過 Studio 或 Markdown 完成全部設定。
 
 也可以複製 `profile.answers.example.json`，自行填寫後執行：
 

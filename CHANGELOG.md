@@ -44,6 +44,7 @@
 - 統一以 npm 管理依賴，改用 `package-lock.json` 提供可重現安裝。
 - 更新 GitHub Pages workflow，以 `npm ci` 與 `npm run build` 完成部署建置。
 - 同步更新 README、AI 設定流程與 Profile Studio 指引中的操作命令。
+- 補上 Codex／coding agent 的一站式提示詞與發布交接流程，涵蓋 JSON 自動套用、build、公開內容確認、remote 檢查、commit／push 及 GitHub Pages 結果回報。
 - 新增 Cloudflare Pages 部署、V1 升級、release notes 草稿與 RC 驗證清單。
 - 完整 build 新增模板安全檢查，阻擋私人回答檔、常見憑證格式與個人化預設內容。
 

@@ -12,9 +12,10 @@ Use the guided setup flow in `docs/AI_PROFILE_SETUP.md`.
 4. Convert confirmed answers to `profile.answers.json`. This file is gitignored because it can contain personal information.
 5. Run `npm run profile:apply -- profile.answers.json`.
 6. Run `npm run build`. Fix content validation errors, but do not redesign components unless the user explicitly requests a new visual feature.
-7. Summarize the generated content and tell the user to run `npm run studio` for visual review.
+7. Review the generated public content and Git diff. Summarize what will be public, including any location, email, employer, or private-looking URL, and tell the user they can run `npm run studio` for visual review.
+8. If the user requested the end-to-end publish flow, wait for one explicit post-build confirmation before publishing. Then verify that `origin` belongs to the user rather than the upstream template, commit only the intended content and public assets, push the deployment branch (normally `main`), and report the GitHub Actions result or the exact remaining setup step.
 
-Do not commit, push, publish, enable GitHub Actions, or change repository settings unless the user explicitly asks. Never request or store GitHub passwords or personal access tokens in profile content.
+Do not commit, push, publish, enable GitHub Actions, or change repository settings unless the user explicitly asks. Even when publishing was requested in the initial prompt, do not push before the post-build public-content summary and confirmation. Never push personal content to the upstream template repository. Never request or store GitHub passwords or personal access tokens in profile content.
 
 ## Content boundaries
 
