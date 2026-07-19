@@ -528,12 +528,13 @@ export function validateProfileAnswers(input) {
   const sections = sectionInput.map((item, index) => {
     if (!isObject(item)) throw new Error(`第 ${index + 1} 個自介區塊格式不正確。`);
     assertAllowedKeys(item, ['id', 'title', 'description', 'tags', 'image'], `第 ${index + 1} 個自介區塊`);
+    const image = item.image === undefined ? '' : assertImagePath(item.image, '圖片路徑', { required: true });
     return {
       id: assertSlug(item.id, '自介區塊 ID'),
       title: assertText(item.title, '自介區塊名稱', { required: true, max: 80 }),
       description: assertText(item.description, '自介區塊內容', { required: true, max: 2000 }),
       tags: assertStringArray(item.tags ?? [], '自介區塊標籤', { max: 8 }),
-      image: item.image === undefined ? '' : assertImagePath(item.image, '圖片路徑', { required: true }),
+      ...(image ? { image } : {}),
     };
   });
   const imageBlockInput = input.imageBlocks === undefined ? [] : assertObjectArray(input.imageBlocks, '圖片板塊', 8);
@@ -581,6 +582,7 @@ export function validateProfileAnswers(input) {
   assertAllowedKeys(features, ['fortune'], 'features');
   if (features.fortune !== undefined && typeof features.fortune !== 'boolean') throw new Error('features.fortune 必須是布林值。');
   return {
+    version: 1,
     identity,
     socials,
     links,

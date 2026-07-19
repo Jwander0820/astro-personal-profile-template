@@ -51,6 +51,7 @@ try {
   assert.match(await readFile(astroCli, 'utf8'), /astro/);
 
   await applyProfileAnswers(temporaryRoot, answers);
+  await applyProfileAnswers(temporaryRoot, answersPreview.answers);
   const result = await applyProfileAnswers(temporaryRoot, answers);
   const social = await saveStudioLink(temporaryRoot, 'studio-social-instagram', {
     title: 'Instagram',
@@ -125,6 +126,7 @@ try {
 
   assert.equal(result.profile.displayName, '你的名字');
   assert.equal(answersPreview.summary.displayName, '你的名字');
+  assert.equal(answersPreview.answers.version, 1);
   assert.equal(answersPreview.summary.socialCount, 2);
   assert.equal(answersPreview.summary.sectionCount, 2);
   assert.equal(answersPreview.summary.imageBlockCount, 1);
