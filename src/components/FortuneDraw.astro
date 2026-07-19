@@ -51,7 +51,7 @@ const fortuneJson = JSON.stringify(
 <script>
   type Fortune = {
     id: string;
-    grade: '大吉' | '中吉' | '小吉';
+    grade: '大吉' | '中吉' | '小吉' | '吉' | '末吉' | '凶' | '大凶';
     category: 'blessing' | 'joke';
     message: string;
     note?: string;
@@ -112,7 +112,7 @@ const fortuneJson = JSON.stringify(
         message.textContent = nextFortune.message;
         note.textContent = nextFortune.note ?? '';
         note.hidden = !nextFortune.note;
-        stamp.textContent = nextFortune.category === 'joke' ? '彩蛋' : '吉';
+        stamp.textContent = nextFortune.category === 'joke' ? '彩蛋' : nextFortune.grade;
         root.classList.toggle('is-joke', nextFortune.category === 'joke');
         root.classList.remove('is-drawing');
         root.classList.add('is-revealed');

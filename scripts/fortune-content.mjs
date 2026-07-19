@@ -3,7 +3,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { atomicWriteText, withFileWriteLock } from './file-writes.mjs';
 
-const GRADES = new Set(['大吉', '中吉', '小吉']);
+export const FORTUNE_GRADES = /** @type {const} */ (['大吉', '中吉', '小吉', '吉', '末吉', '凶', '大凶']);
+
+const GRADES = new Set(FORTUNE_GRADES);
 const CATEGORIES = new Set(['blessing', 'joke']);
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
@@ -33,7 +35,7 @@ function normalizeFortune(fortune, index) {
   const message = typeof fortune.message === 'string' ? fortune.message.trim() : '';
   const note = typeof fortune.note === 'string' ? fortune.note.trim() : '';
   if (!ID_PATTERN.test(id)) throw new Error(`第 ${index + 1} 張籤的 ID 必須使用小寫英數字與連字號。`);
-  if (!GRADES.has(fortune.grade)) throw new Error(`籤「${id}」的等級必須是大吉、中吉或小吉。`);
+  if (!GRADES.has(fortune.grade)) throw new Error(`籤「${id}」的等級必須是${FORTUNE_GRADES.join('、')}其中之一。`);
   if (!CATEGORIES.has(fortune.category)) throw new Error(`籤「${id}」的分類必須是 blessing 或 joke。`);
   if (message.length < 1 || message.length > 200) throw new Error(`籤「${id}」的訊息長度必須是 1 到 200 個字。`);
   if (note.length > 300) throw new Error(`籤「${id}」的備註不可超過 300 個字。`);

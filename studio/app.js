@@ -15,6 +15,9 @@ const state = {
 };
 const saveTasks = new Map();
 
+const fortuneGrades = ['大吉', '中吉', '小吉', '吉', '末吉', '凶', '大凶'];
+const fortuneGradeOrder = Object.fromEntries(fortuneGrades.map((grade, index) => [grade, index]));
+
 const homeLabels = {
   about: ['About me', '自介卡片與經歷'],
   turntable: ['播放唱盤', 'YouTube 播放清單'],
@@ -963,7 +966,7 @@ function fortuneSummary(fortunes) {
   return {
     total: fortunes.length,
     visible: visible.length,
-    grades: { 大吉: count('grade', '大吉'), 中吉: count('grade', '中吉'), 小吉: count('grade', '小吉') },
+    grades: Object.fromEntries(fortuneGrades.map((grade) => [grade, count('grade', grade)])),
     categories: { blessing: count('category', 'blessing'), joke: count('category', 'joke') },
     warnings: jokeRatio < 0.2 || jokeRatio > 0.4 ? ['目前啟用籤的玩梗比例偏離建議的約 3 成；這是風格提示，不會阻擋儲存。'] : [],
   };
@@ -974,9 +977,7 @@ function renderFortuneSummary() {
   $('#fortune-summary').innerHTML = [
     `共 ${summary.total} 張`,
     `啟用 ${summary.visible} 張`,
-    `大吉 ${summary.grades.大吉}`,
-    `中吉 ${summary.grades.中吉}`,
-    `小吉 ${summary.grades.小吉}`,
+    ...fortuneGrades.map((grade) => `${grade} ${summary.grades[grade]}`),
     `祝福 ${summary.categories.blessing}`,
     `玩梗 ${summary.categories.joke}`,
   ].map((label) => `<span>${escapeHtml(label)}</span>`).join('');
@@ -995,7 +996,7 @@ function fortuneEditorMarkup(fortune, sourceIndex) {
     <form class="fortune-editor__body">
       <div class="fortune-fields">
         <label><span>ID</span><input name="id" value="${escapeHtml(fortune.id)}" pattern="[a-z0-9][a-z0-9-]*" maxlength="80" required /></label>
-        <label><span>等級</span><select name="grade"><option value="大吉" ${fortune.grade === '大吉' ? 'selected' : ''}>大吉</option><option value="中吉" ${fortune.grade === '中吉' ? 'selected' : ''}>中吉</option><option value="小吉" ${fortune.grade === '小吉' ? 'selected' : ''}>小吉</option></select></label>
+        <label><span>等級</span><select name="grade">${fortuneGrades.map((grade) => `<option value="${grade}" ${fortune.grade === grade ? 'selected' : ''}>${grade}</option>`).join('')}</select></label>
         <label><span>分類</span><select name="category"><option value="blessing" ${fortune.category === 'blessing' ? 'selected' : ''}>祝福</option><option value="joke" ${fortune.category === 'joke' ? 'selected' : ''}>玩梗</option></select></label>
         <label class="switch-control fortune-visible"><span>啟用</span><input name="visible" type="checkbox" ${fortune.visible ? 'checked' : ''} /><span class="switch-track" aria-hidden="true"></span></label>
         <label class="field-wide"><span>籤文</span><textarea name="message" rows="3" maxlength="200" required>${escapeHtml(fortune.message)}</textarea></label>
@@ -1017,11 +1018,10 @@ function markFortuneDirty() {
 function renderFortuneList() {
   const query = $('#fortune-search').value.trim().toLowerCase();
   const sort = $('#fortune-sort').value;
-  const gradeOrder = { 大吉: 0, 中吉: 1, 小吉: 2 };
   const entries = state.fortuneDraft
     .map((fortune, sourceIndex) => ({ fortune, sourceIndex }))
     .filter(({ fortune }) => !query || [fortune.id, fortune.message, fortune.note].some((value) => String(value ?? '').toLowerCase().includes(query)));
-  if (sort === 'grade') entries.sort((a, b) => gradeOrder[a.fortune.grade] - gradeOrder[b.fortune.grade]);
+  if (sort === 'grade') entries.sort((a, b) => fortuneGradeOrder[a.fortune.grade] - fortuneGradeOrder[b.fortune.grade]);
   if (sort === 'category') entries.sort((a, b) => a.fortune.category.localeCompare(b.fortune.category));
   if (sort === 'visible') entries.sort((a, b) => Number(b.fortune.visible) - Number(a.fortune.visible));
   $('#fortune-list').innerHTML = entries.length

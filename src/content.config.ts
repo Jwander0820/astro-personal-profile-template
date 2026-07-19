@@ -3,6 +3,7 @@ import { file } from 'astro/loaders';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
 import { isSafeHttpUrl, isSafeImagePath, isSafeProfileUrl } from '../scripts/content-safety.mjs';
+import { FORTUNE_GRADES } from '../scripts/fortune-content.mjs';
 
 const imagePath = z.string().refine(isSafeImagePath, 'Images must use a safe path under /images/.');
 
@@ -118,7 +119,7 @@ const blocks = defineCollection({
 const fortunes = defineCollection({
   loader: file('src/content/fortunes.json'),
   schema: z.object({
-    grade: z.enum(['大吉', '中吉', '小吉']),
+    grade: z.enum(FORTUNE_GRADES),
     category: z.enum(['blessing', 'joke']),
     message: z.string().trim().min(1, 'Fortune messages cannot be empty.'),
     note: z.string().trim().min(1).optional(),

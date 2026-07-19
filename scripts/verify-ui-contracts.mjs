@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { validateFortuneBucket } from './fortune-content.mjs';
+import { FORTUNE_GRADES, validateFortuneBucket } from './fortune-content.mjs';
 
-const [css, indexPage, linkCard, themeToggle, turntablePlayer, fortuneDraw, contentConfig, fortuneContent] = await Promise.all([
+const [css, indexPage, linkCard, themeToggle, turntablePlayer, fortuneDraw, contentConfig, fortuneContent, studioApp] = await Promise.all([
   readFile(new URL('../src/styles/global.css', import.meta.url), 'utf8'),
   readFile(new URL('../src/pages/index.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/LinkCard.astro', import.meta.url), 'utf8'),
@@ -10,6 +10,7 @@ const [css, indexPage, linkCard, themeToggle, turntablePlayer, fortuneDraw, cont
   readFile(new URL('../src/components/FortuneDraw.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/content.config.ts', import.meta.url), 'utf8'),
   readFile(new URL('../src/content/fortunes.json', import.meta.url), 'utf8'),
+  readFile(new URL('../studio/app.js', import.meta.url), 'utf8'),
 ]);
 
 const fortunes = JSON.parse(fortuneContent);
@@ -54,10 +55,12 @@ const contracts = [
   ['image blocks have responsive full, split, and poster treatments', css.includes('.custom-block--image .custom-block__body') && css.includes('.image-block--split-left') && css.includes('.image-block--poster') && css.includes('object-position: var(--image-position, center)')],
   ['profile typography is selected from the font allowlist', contentConfig.includes("bodyFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc'])") && indexPage.includes('bodyFont={profile.data.bodyFont}') && indexPage.includes('displayFont={profile.data.displayFont}')],
   ['fortune block participates in ordered rendering without falling through', indexPage.includes("section === 'fortune'") && indexPage.includes('...fortuneBlocks') && indexPage.includes('fortunes={fortunes}')],
-  ['fortune data uses the validated single-file collection', contentConfig.includes("file('src/content/fortunes.json')") && contentConfig.includes("z.enum(['大吉', '中吉', '小吉'])")],
+  ['fortune data uses the validated single-file collection', contentConfig.includes("file('src/content/fortunes.json')") && contentConfig.includes('z.enum(FORTUNE_GRADES)')],
   ['fortune ids are unique and messages are non-empty', fortuneBucketIsValid && new Set(fortuneIds).size === fortuneIds.length],
-  ['fortune grades never fall below small luck', fortuneBucketIsValid && fortunes.every((fortune) => ['大吉', '中吉', '小吉'].includes(fortune.grade))],
+  ['fortune grade editing exposes all seven ordered levels', JSON.stringify(FORTUNE_GRADES) === JSON.stringify(['大吉', '中吉', '小吉', '吉', '末吉', '凶', '大凶']) && studioApp.includes("const fortuneGrades = ['大吉', '中吉', '小吉', '吉', '末吉', '凶', '大凶']")],
+  ['starter fortune grades remain at or above small luck', fortuneBucketIsValid && fortunes.every((fortune) => FORTUNE_GRADES.slice(0, 3).includes(fortune.grade))],
   ['fortune draw exposes a native button and polite live result', fortuneDraw.includes('<button type="button"') && fortuneDraw.includes('aria-live="polite"') && fortuneDraw.includes('aria-atomic="true"')],
+  ['fortune draw stamps non-joke fortunes with their actual grade', fortuneDraw.includes("nextFortune.category === 'joke' ? '彩蛋' : nextFortune.grade")],
   ['fortune draw prevents immediate repeats without persistence', fortuneDraw.includes('fortune.id !== currentId') && !fortuneDraw.includes('localStorage') && !fortuneDraw.includes('sessionStorage')],
   ['fortune button remains at least 44px tall and motion can be reduced', /\.fortune-draw__button\s*\{[^}]*min-height:\s*48px/.test(css) && css.includes('.fortune-draw.is-drawing .fortune-draw__urn-area') && css.includes('@media (prefers-reduced-motion: reduce)')],
   ['link cards remain unnumbered', !linkCard.includes('link-track') && !linkCard.includes('position?:') && !indexPage.includes('position={index + 1}')],

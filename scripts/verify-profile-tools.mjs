@@ -18,7 +18,7 @@ import {
   previewProfileAnswers,
   validateProfileAnswers,
 } from './profile-content.mjs';
-import { FortuneConflictError, loadFortuneBucket, restoreFortuneBucket, saveFortuneBucket } from './fortune-content.mjs';
+import { FORTUNE_GRADES, FortuneConflictError, loadFortuneBucket, restoreFortuneBucket, saveFortuneBucket, validateFortuneBucket } from './fortune-content.mjs';
 import { resolvePackageBin } from './package-bin.mjs';
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
 import { createSaveCoordinator } from '../studio/save-coordinator.js';
@@ -310,6 +310,14 @@ try {
   assert.equal(concurrentFortuneWrites.filter(({ status }) => status === 'rejected').length, 1);
   assert.ok(concurrentFortuneWrites.find(({ status }) => status === 'rejected')?.reason instanceof FortuneConflictError);
   const concurrentFortuneBucket = await loadFortuneBucket(temporaryRoot);
+  const sevenGradeBucket = validateFortuneBucket(FORTUNE_GRADES.map((grade, index) => ({
+    id: `grade-${index + 1}`,
+    grade,
+    category: 'blessing',
+    message: `${grade}測試籤。`,
+    visible: true,
+  })));
+  assert.deepEqual(sevenGradeBucket.map((fortune) => fortune.grade), FORTUNE_GRADES);
   const addedFortune = {
     id: 'studio-contract',
     grade: '小吉',
