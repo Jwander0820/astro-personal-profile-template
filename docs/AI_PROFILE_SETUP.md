@@ -27,7 +27,7 @@ Agent 應分兩輪詢問：
 
 回答時可以很口語。Agent 的工作是整理語句、確認不確定的網址，最後產生符合 `docs/profile-answers.schema.json` 的 `profile.answers.json`。
 
-若使用不能存取 repository 的一般 AI 對話介面，它只能完成訪談與 JSON 產出，不能直接修改 content、commit 或部署。此時可使用 [`ai/PROFILE_INTERVIEW_PROMPT.md`](ai/PROFILE_INTERVIEW_PROMPT.md)，再將 JSON 貼到 Profile Studio；Gemini 操作與限制請見 [`ai/GEMINI.md`](ai/GEMINI.md)。
+若使用不能存取 repository 的一般 AI 對話介面，它只能完成訪談與 JSON 產出，不能直接修改 content、commit 或部署。任意能依提示詞輸出 JSON 的 AI 工具都可使用，本流程不要求特定品牌或模型。此時可使用 [`ai/PROFILE_INTERVIEW_PROMPT.md`](ai/PROFILE_INTERVIEW_PROMPT.md)，再將 JSON 貼到 Profile Studio。
 
 ## Coding agent 一站式流程
 

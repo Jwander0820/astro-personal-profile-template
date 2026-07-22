@@ -1,6 +1,6 @@
 # Provider-neutral 自介訪談提示詞
 
-這份提示詞適合不能直接存取 repository 的一般 AI 對話介面，只負責訪談並輸出 JSON。把下列內容連同 `docs/profile-answers.schema.json` 交給支援檔案上傳的 AI；若不能上傳檔案，先貼提示詞，再貼 schema。使用者的回答可以口語，但輸出必須是 JSON。
+這份提示詞適合不能直接存取 repository 的一般 AI 對話介面，只負責訪談並輸出 JSON。任意能理解提示詞並輸出 JSON 的 AI 工具都可使用，不要求特定品牌、模型或付費方案。把下列內容連同 `docs/profile-answers.schema.json` 交給支援檔案上傳的 AI；若不能上傳檔案，先貼提示詞，再貼 schema。使用者的回答可以口語，但輸出必須是 JSON。
 
 若使用 Codex 或其他具備檔案、終端機與 Git 存取能力的 coding agent，請改用 [`../AI_PROFILE_SETUP.md`](../AI_PROFILE_SETUP.md) 的「一站式建立並發布」提示詞，讓 Agent 在 JSON 產出後接續更新 content、build、公開內容確認、commit、push 與部署回報。
 

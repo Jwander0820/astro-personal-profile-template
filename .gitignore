@@ -40,6 +40,7 @@ yarn-error.log*
 
 # Local profile interview answers (may contain personal information)
 profile.answers.json
+profile.answers.ai-test.json
 
 # Local Profile Studio safety backups
 .studio-backups/

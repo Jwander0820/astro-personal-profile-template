@@ -42,7 +42,7 @@ Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，或在 PowerShell
 
 這個模式仍會在 push 前停下來讓使用者確認一次，因為姓名、地點、email 與連結可能會成為公開網站內容。確認後，Agent 才會 commit、push，並在可存取 GitHub 狀態時追蹤部署結果。第一次部署通常仍要由 repository 擁有者啟用 fork 的 Actions，並在 **Settings → Pages → Build and deployment** 將 Source 設為 **GitHub Actions**。
 
-AI 問答流程、資料格式、完整的一站式步驟與 GitHub Pages 設定請見 [`docs/AI_PROFILE_SETUP.md`](docs/AI_PROFILE_SETUP.md)。只有一般聊天介面、不能存取 repository 的 AI，可使用 [provider-neutral 訪談提示詞](docs/ai/PROFILE_INTERVIEW_PROMPT.md) 產生 JSON，再貼到 Profile Studio；Gemini 使用方式見 [`docs/ai/GEMINI.md`](docs/ai/GEMINI.md)。Studio 會先驗證回答並顯示影響摘要，只有再次確認後才會寫入；完全不使用 AI 也能透過 Studio 或 Markdown 完成全部設定。
+AI 問答流程、資料格式、完整的一站式步驟與 GitHub Pages 設定請見 [`docs/AI_PROFILE_SETUP.md`](docs/AI_PROFILE_SETUP.md)。任意能依提示詞輸出 JSON 的 AI 工具都可使用，不綁定特定供應商。只有一般聊天介面、不能存取 repository 的 AI，可使用 [provider-neutral 訪談提示詞](docs/ai/PROFILE_INTERVIEW_PROMPT.md) 產生 JSON，再貼到 Profile Studio。Studio 會先驗證回答並顯示影響摘要，只有再次確認後才會寫入；完全不使用 AI 也能透過 Studio 或 Markdown 完成全部設定。
 
 也可以複製 `profile.answers.example.json`，自行填寫後執行：
 

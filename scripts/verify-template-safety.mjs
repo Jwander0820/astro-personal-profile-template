@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { readFile, readdir } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -53,7 +53,17 @@ async function listPublicFiles() {
       ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
       { cwd: projectRoot, encoding: 'buffer' },
     );
-    return stdout.toString('utf8').split('\0').filter(Boolean).map(normalizePath);
+    const files = stdout.toString('utf8').split('\0').filter(Boolean).map(normalizePath);
+    const existingFiles = await Promise.all(files.map(async (relativePath) => {
+      try {
+        await access(path.join(projectRoot, relativePath));
+        return relativePath;
+      } catch (error) {
+        if (error?.code === 'ENOENT') return null;
+        throw error;
+      }
+    }));
+    return existingFiles.filter(Boolean);
   } catch {
     return null;
   }
