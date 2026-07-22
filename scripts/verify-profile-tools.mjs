@@ -21,7 +21,7 @@ import {
 import { FORTUNE_GRADES, FortuneConflictError, loadFortuneBucket, restoreFortuneBucket, saveFortuneBucket, validateFortuneBucket } from './fortune-content.mjs';
 import { resolvePackageBin } from './package-bin.mjs';
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
-import { createSaveCoordinator } from '../studio/save-coordinator.js';
+import { createSaveCoordinator, createValueChangeTracker } from '../studio/save-coordinator.js';
 import {
   createContentSafetyMdastPlugin,
   enforceContentSafety,
@@ -389,6 +389,24 @@ try {
   batchCoordinator.reset('fortunes');
   assert.equal(batchCoordinator.hasPending(), false);
 
+  let releasePreviewRefresh;
+  let previewRefreshStarted;
+  const previewRefreshReady = new Promise((resolve) => { previewRefreshStarted = resolve; });
+  const refreshCoordinator = createSaveCoordinator({
+    save: async () => ({ contentRevision: 1 }),
+    refresh: () => new Promise((resolve) => {
+      releasePreviewRefresh = resolve;
+      previewRefreshStarted();
+    }),
+  });
+  refreshCoordinator.markDirty('profile');
+  const refreshSave = refreshCoordinator.submit('profile');
+  await previewRefreshReady;
+  assert.equal(refreshCoordinator.getStatus('profile').status, 'refreshing');
+  assert.equal(refreshCoordinator.hasPending(), false, '已寫入、僅等待預覽更新時不應視為未儲存');
+  releasePreviewRefresh();
+  await refreshSave;
+
   const slowResolvers = [];
   const slowRevisions = [];
   let activeSaves = 0;
@@ -414,6 +432,11 @@ try {
   assert.equal(maximumActiveSaves, 1);
   assert.equal(slowCoordinator.getStatus('home').status, 'clean');
   assert.ok(coordinatorStatuses.some((status) => status.status === 'scheduled'));
+
+  const valueChanged = createValueChangeTracker('顯示名稱：原值');
+  assert.equal(valueChanged('顯示名稱：測試更新'), true);
+  assert.equal(valueChanged('顯示名稱：測試更新'), false, 'input 後相同值的 change 不應建立第二筆修改');
+  assert.equal(valueChanged('顯示名稱：再次更新'), true);
 
   const localJsonRequest = (host, origin, method = 'PUT', contentType = 'application/json; charset=utf-8') => ({
     method,
@@ -446,6 +469,7 @@ try {
   assert.match(studioCss, /\.switch-control input\s*\{[^}]*padding:\s*0/);
   assert.match(studioCss, /\.skip-link:focus\s*\{[^}]*transform:\s*translateY\(0\)/);
   assert.match(studioCss, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(studioCss, /\.ai-actions > button\s*\{[^}]*width:\s*112px;[^}]*min-height:\s*46px/);
   assert.match(studioHtml, /<a class="skip-link" href="#editor">/);
   assert.match(studioHtml, /role="tablist"/);
   assert.equal((studioHtml.match(/role="tab"/g) ?? []).length, 6);
@@ -454,6 +478,10 @@ try {
   assert.match(studioHtml, /data-width="mobile"[^>]*aria-pressed="false"/);
   assert.match(studioHtml, /id="save-all"[^>]*>儲存並更新<\/button>/);
   assert.ok(studioHtml.indexOf('id="save-all"') < studioHtml.indexOf('id="save-mode"'));
+  assert.match(studioHtml, /id="save-all"[^>]*aria-keyshortcuts="Control\+S Meta\+S"/);
+  assert.doesNotMatch(studioHtml, /id="save-order"|id="save-fortunes"|>儲存基本資料<\/button>/);
+  assert.match(studioHtml, /id="load-project-answers"[^>]*>.*載入專案回答檔/s);
+  assert.match(studioHtml, /class="actions ai-actions"/);
   assert.ok(studioApp.indexOf("['facebook', 'Facebook', 'facebook'") < studioApp.indexOf("['instagram', 'Instagram', 'instagram'"));
   assert.ok(studioApp.indexOf("['instagram', 'Instagram', 'instagram'") < studioApp.indexOf("['threads', 'Threads', 'threads'"));
   assert.ok(studioApp.indexOf("['threads', 'Threads', 'threads'") < studioApp.indexOf("['github', 'GitHub', 'github'"));
@@ -489,6 +517,16 @@ try {
   assert.equal((studioApp.match(/frame\.src = url\.href/g) ?? []).length, 1);
   assert.ok(studioApp.includes('async function submitAllPending()'));
   assert.ok(studioApp.includes('saveCoordinator.submitAll()'));
+  assert.ok(studioApp.includes('bindDistinctFormChanges(form, callback)'));
+  assert.ok(studioApp.includes('if (!hasChanged(formValueSnapshot(form))) return;'));
+  assert.ok(studioApp.includes('bindDistinctFormChanges(form, updateDraft)'));
+  assert.ok(studioApp.includes("event.key.toLowerCase() !== 's'"));
+  assert.ok(studioApp.includes("window.addEventListener('keyup'"));
+  assert.ok(studioApp.includes('saveAllButton.click()'));
+  assert.equal((studioApp.match(/await submitAllPending\(\)/g) ?? []).length, 2);
+  assert.ok(studioApp.includes("api('/api/answers/project-file')"));
+  assert.ok(!studioApp.includes("$('#save-order')"));
+  assert.ok(!studioApp.includes("$('#save-fortunes')"));
   assert.ok(studioApp.includes('assertRerenderSafe('));
   assert.ok(!studioApp.includes('image/svg+xml'));
   assert.ok(!studioApp.includes('refreshPreview(650)'));
@@ -504,6 +542,8 @@ try {
   assert.ok(studioServer.includes("url.pathname === '/api/fortunes/restore'"));
   assert.ok(studioServer.includes("url.pathname === '/api/answers/validate'"));
   assert.ok(studioServer.includes("url.pathname === '/api/answers/apply'"));
+  assert.ok(studioServer.includes("url.pathname === '/api/answers/project-file'"));
+  assert.ok(studioServer.includes("path.join(projectRoot, 'profile.answers.json')"));
   assert.ok(studioServer.includes("url.pathname === '/api/image-blocks'"));
   assert.ok(studioServer.includes('fontOptions'));
   assert.ok(!studioServer.includes("'image/svg+xml': { extension"));

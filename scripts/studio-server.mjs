@@ -143,6 +143,16 @@ const server = createServer(async (request, response) => {
       sendJson(response, 200, { ...content, icons: Object.keys(icons), fontOptions, previewUrl: `http://localhost:${previewPort}/`, contentRevision });
       return;
     }
+    if (request.method === 'GET' && url.pathname === '/api/answers/project-file') {
+      try {
+        const content = await readFile(path.join(projectRoot, 'profile.answers.json'), 'utf8');
+        sendJson(response, 200, { content, file: 'profile.answers.json' });
+      } catch (error) {
+        if (error.code === 'ENOENT') throw new StudioRequestError(404, '專案根目錄找不到 profile.answers.json；可以改用右側選檔或直接貼上 JSON。');
+        throw error;
+      }
+      return;
+    }
     const iconMatch = url.pathname.match(/^\/api\/icons\/([a-z0-9]+)\.svg$/);
     if (request.method === 'GET' && iconMatch) {
       const icon = (await loadIconCatalog())[iconMatch[1]];

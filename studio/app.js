@@ -1,4 +1,4 @@
-import { createSaveCoordinator } from './save-coordinator.js';
+import { createSaveCoordinator, createValueChangeTracker } from './save-coordinator.js';
 
 const state = {
   content: null,
@@ -173,13 +173,28 @@ function registerSaveTask(key, task) {
   saveTasks.set(key, { validate: () => true, ...task });
 }
 
+function formValueSnapshot(form) {
+  return JSON.stringify(
+    [...new FormData(form).entries()]
+      .filter(([, value]) => typeof value === 'string'),
+  );
+}
+
+function bindDistinctFormChanges(form, callback) {
+  const hasChanged = createValueChangeTracker(formValueSnapshot(form));
+  const handleChange = (event) => {
+    if (!hasChanged(formValueSnapshot(form))) return;
+    callback(event);
+  };
+  form.addEventListener('input', handleChange);
+  form.addEventListener('change', handleChange);
+}
+
 function bindSaveUnit(form, key, { ignore = () => false } = {}) {
-  const markDirty = (event) => {
+  bindDistinctFormChanges(form, (event) => {
     if (event.target.matches('input[type="file"]') || ignore(event)) return;
     saveCoordinator.markDirty(key);
-  };
-  form.addEventListener('input', markDirty);
-  form.addEventListener('change', markDirty);
+  });
 }
 
 async function submitSaveUnit(key, button) {
@@ -1039,8 +1054,7 @@ function renderFortuneList() {
       markFortuneDirty();
       renderFortuneSummary();
     };
-    form.addEventListener('input', updateDraft);
-    form.addEventListener('change', updateDraft);
+    bindDistinctFormChanges(form, updateDraft);
     $$('[data-fortune-move]', form).forEach((button) => button.addEventListener('click', () => {
       const target = button.dataset.fortuneMove === 'up' ? sourceIndex - 1 : sourceIndex + 1;
       if (target < 0 || target >= state.fortuneDraft.length) return;
@@ -1050,7 +1064,7 @@ function renderFortuneList() {
     }));
     $('[data-delete-fortune]', form).addEventListener('click', () => {
       const fortune = state.fortuneDraft[sourceIndex];
-      if (!window.confirm(`確定要從草稿刪除「${fortune.message}」？按下儲存籤桶後才會寫入檔案。`)) return;
+      if (!window.confirm(`確定要從草稿刪除「${fortune.message}」？按下上方「儲存並更新」後才會寫入檔案。`)) return;
       state.fortuneDraft.splice(sourceIndex, 1);
       markFortuneDirty();
       renderFortuneManager();
@@ -1118,7 +1132,7 @@ async function uploadProfileImage(file, targetName) {
   const imagePath = await uploadAsset(file);
   $('#profile-panel').elements[targetName].value = imagePath;
   saveCoordinator.markDirty('profile');
-  toast(`圖片已放入 ${imagePath}，請記得儲存基本資料。`);
+  toast(`圖片已放入 ${imagePath}，請記得按上方「儲存並更新」或 Ctrl+S。`);
 }
 
 function bindEvents() {
@@ -1132,10 +1146,29 @@ function bindEvents() {
     try { localStorage.setItem('profile-studio-save-mode', modeControl.value); } catch { /* 不阻擋本機編輯。 */ }
     toast(modeControl.value === 'auto' ? '已開啟自動更新；停止修改 5 秒後儲存。' : '已切換為手動儲存。');
   });
-  $('#save-all').addEventListener('click', async () => {
+  const saveAllButton = $('#save-all');
+  saveAllButton.addEventListener('click', async () => {
     try { await submitAllPending(); }
     catch { /* onStatus 已顯示可操作的錯誤。 */ }
   });
+  let saveShortcutPending = false;
+  window.addEventListener('keydown', (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') return;
+    event.preventDefault();
+    if (event.repeat) return;
+    saveShortcutPending = true;
+  });
+  window.addEventListener('keyup', (event) => {
+    if (!saveShortcutPending || event.key.toLowerCase() !== 's') return;
+    event.preventDefault();
+    saveShortcutPending = false;
+    if (!saveCoordinator.hasPending()) {
+      toast('目前沒有需要儲存的修改。');
+      return;
+    }
+    saveAllButton.click();
+  });
+  window.addEventListener('blur', () => { saveShortcutPending = false; });
   const tabs = $$('.tab');
   const activateTab = (tab) => {
     const current = $('.tab.is-active')?.dataset.panel;
@@ -1176,7 +1209,8 @@ function bindEvents() {
   bindSaveUnit(form, 'profile');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    await submitSaveUnit('profile', $('.primary-action', form));
+    try { await submitAllPending(); }
+    catch { /* onStatus 已顯示可操作的錯誤。 */ }
   });
   form.elements.fontScale.addEventListener('input', () => { $('#font-output').value = form.elements.fontScale.value; });
   form.elements.smallTextScale.addEventListener('input', () => { $('#small-font-output').value = form.elements.smallTextScale.value; });
@@ -1205,9 +1239,6 @@ function bindEvents() {
       return { result, message: '首頁板塊順序與顯示設定已儲存。' };
     },
   });
-  $('#save-order').addEventListener('click', async (event) => {
-    await submitSaveUnit('home', event.currentTarget);
-  });
   $('#add-featured-link').addEventListener('click', showNewFeaturedEditor);
   $('#add-image-block').addEventListener('click', showNewImageBlock);
   $('#fortune-search').addEventListener('input', renderFortuneList);
@@ -1225,9 +1256,6 @@ function bindEvents() {
       renderFortuneManager();
       return { result, message: '籤桶已儲存並建立上一次版本備份。' };
     },
-  });
-  $('#save-fortunes').addEventListener('click', async (event) => {
-    await submitSaveUnit('fortunes', event.currentTarget);
   });
   $('#restore-fortunes').addEventListener('click', async (event) => {
     if (!window.confirm('確定要用上一次備份取代目前籤桶嗎？目前版本也會保留下來供下一次復原。')) return;
@@ -1251,6 +1279,17 @@ function bindEvents() {
   $('#answers-file').addEventListener('change', async (event) => {
     const file = event.target.files[0];
     if (file) { $('#answers-json').value = await file.text(); resetAnswerValidation(); }
+  });
+  $('#load-project-answers').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      const result = await api('/api/answers/project-file');
+      $('#answers-json').value = result.content;
+      resetAnswerValidation();
+      toast('已載入專案根目錄的 profile.answers.json。');
+    } catch (error) { toast(error.message, true); }
+    finally { button.disabled = false; }
   });
   $('#answers-json').addEventListener('input', resetAnswerValidation);
   $('#validate-answers').addEventListener('click', async (event) => {

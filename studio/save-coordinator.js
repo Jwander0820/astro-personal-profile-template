@@ -1,3 +1,12 @@
+export function createValueChangeTracker(initialValue) {
+  let previousValue = initialValue;
+  return (nextValue) => {
+    if (nextValue === previousValue) return false;
+    previousValue = nextValue;
+    return true;
+  };
+}
+
 export function createSaveCoordinator({
   delayMs = 5000,
   mode: initialMode = 'manual',
@@ -39,7 +48,7 @@ export function createSaveCoordinator({
       mode,
       revision: entry.revision,
       savedRevision: entry.savedRevision,
-      pending: entry.revision > entry.savedRevision || Boolean(entry.timer) || Boolean(entry.inFlight),
+      pending: entry.revision > entry.savedRevision,
       ...details,
     });
   }
@@ -170,7 +179,7 @@ export function createSaveCoordinator({
   }
 
   function hasPending() {
-    return [...entries.values()].some((entry) => entry.revision > entry.savedRevision || entry.timer !== null || entry.inFlight);
+    return [...entries.values()].some((entry) => entry.revision > entry.savedRevision);
   }
 
   function getStatus(key) {

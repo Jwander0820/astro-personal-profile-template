@@ -16,7 +16,7 @@
         <span><strong>Profile Studio</strong><small>本機內容編輯台</small></span>
       </div>
       <div class="topbar-status">
-        <button class="topbar-save" id="save-all" type="button" disabled>儲存並更新</button>
+        <button class="topbar-save" id="save-all" type="button" aria-keyshortcuts="Control+S Meta+S" title="儲存並更新（Ctrl+S）" disabled>儲存並更新</button>
         <label class="save-mode"><span>儲存方式</span><select id="save-mode"><option value="manual">手動儲存</option><option value="auto">自動更新（5 秒）</option></select></label>
         <div class="save-status" id="save-status" data-status="clean" role="status" aria-live="polite">
           <span class="save-status__dot" aria-hidden="true"></span><span id="save-status-text">已儲存</span>
@@ -76,13 +76,11 @@
             </div>
             <p class="fieldset-note">字型選單只提供專案白名單。系統預設不會連線；其他選項會從 Google Fonts 載入 SIL OFL 開放授權字型。</p>
           </fieldset>
-          <div class="actions"><button class="primary-action" type="submit">儲存基本資料</button><span class="save-note">會更新 profile/main.md</span></div>
         </form>
 
         <section class="panel" id="order-panel" data-panel-name="order" role="tabpanel" aria-labelledby="order-tab" hidden>
           <div class="panel-intro"><h2>首頁板塊</h2><p>調整順序、開關顯示，並展開修改各板塊內容。個人封面與社群小圖示固定在最上方。</p></div>
           <ol class="order-board" id="order-list"></ol>
-          <div class="actions"><button class="primary-action" id="save-order" type="button">儲存板塊設定</button><span class="save-note">關閉只會隱藏，不會刪除 Markdown</span></div>
         </section>
 
         <section class="panel" id="images-panel" data-panel-name="images" role="tabpanel" aria-labelledby="images-tab" hidden>
@@ -116,7 +114,7 @@
         </section>
 
         <section class="panel" id="fortunes-panel" data-panel-name="fortunes" role="tabpanel" aria-labelledby="fortunes-tab" hidden>
-          <div class="panel-intro"><h2>籤桶管理</h2><p>搜尋與顯示排序不會改變檔案順序；使用上移／下移才會調整籤桶順序。所有修改會在按下儲存後一次寫入。</p></div>
+          <div class="panel-intro"><h2>籤桶管理</h2><p>搜尋與顯示排序不會改變檔案順序；使用上移／下移才會調整籤桶順序。所有修改會由上方「儲存並更新」一次寫入。</p></div>
           <div class="fortune-toolbar">
             <label><span>搜尋籤詩</span><input id="fortune-search" type="search" placeholder="訊息、備註或 ID" /></label>
             <label><span>顯示排序</span><select id="fortune-sort"><option value="source">籤桶順序</option><option value="grade">等級</option><option value="category">分類</option><option value="visible">啟用狀態</option></select></label>
@@ -128,16 +126,18 @@
             <button class="text-action" id="restore-fortunes" type="button">復原上一次籤桶</button>
           </div>
           <div class="fortune-editor-list" id="fortune-list"></div>
-          <div class="actions"><button class="primary-action" id="save-fortunes" type="button">儲存籤桶</button><span class="save-note">會驗證整份 fortunes.json 並建立本機備份</span></div>
         </section>
 
         <section class="panel" id="ai-panel" data-panel-name="ai" role="tabpanel" aria-labelledby="ai-tab" hidden>
           <div class="panel-intro"><h2>AI 協助產生自介</h2><p>請 AI 依 <code>docs/AI_PROFILE_SETUP.md</code> 訪談並產生 JSON。先驗證與查看影響摘要，確認後才會修改內容檔。</p></div>
           <div class="warning-card"><strong>隱私提醒</strong><p>地點、社群、email、播放清單與互動功能都是選填。不要貼上密碼、token、API key 或不願公開的個人資料。</p></div>
-          <label class="drop-zone" for="answers-file"><strong>選擇 profile.answers.json</strong><span>或直接貼上 JSON</span><input id="answers-file" type="file" accept="application/json,.json" /></label>
+          <div class="answers-file-options">
+            <button class="project-answers-button" id="load-project-answers" type="button"><strong>載入專案回答檔</strong><span>讀取專案根目錄的 profile.answers.json</span></button>
+            <label class="drop-zone" for="answers-file"><strong>選擇其他 JSON 檔</strong><span>或直接貼上 JSON</span><input id="answers-file" type="file" accept="application/json,.json" /></label>
+          </div>
           <label class="json-field"><span>回答內容</span><textarea id="answers-json" rows="16" spellcheck="false" placeholder='{ "version": 1, "identity": { … } }'></textarea></label>
           <div class="ai-summary" id="answers-summary" hidden></div>
-          <div class="actions">
+          <div class="actions ai-actions">
             <button class="primary-action" id="validate-answers" type="button">驗證回答</button>
             <button class="secondary-action" id="apply-answers" type="button" hidden>確認套用</button>
             <span class="save-note">格式範例：profile.answers.example.json</span>
