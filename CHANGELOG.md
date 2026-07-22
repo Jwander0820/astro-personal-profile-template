@@ -2,9 +2,11 @@
 
 本文件記錄 `astro-personal-profile-template` 的使用者可見變更。專案採用 [Semantic Versioning](https://semver.org/)。
 
-目前尚未建立正式 Git tag，`0.1.0` 是公開模板分流時的開發基線，而不是 `v1.0.0` 穩定承諾。
+`0.1.0` 是公開模板分流時的開發基線；`v1.0.0` 是第一個遵循穩定內容契約的正式版本。
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-07-23
 
 ### 安全性
 
@@ -40,13 +42,15 @@
 
 ### 建置與文件
 
-- 升級至 Astro 7.0.9 與安全版本的建置依賴，並明確要求 Node.js 22.12 以上；`npm audit` 回復為 0 vulnerabilities。
+- 升級至 Astro 7.1.3 與安全版本的建置依賴，並明確要求 Node.js 22.12 以上；`npm audit` 回復為 0 vulnerabilities。
 - Studio 預覽改由套件宣告的 CLI bin 啟動，不再依賴 Astro 5 的內部 `astro.js` 路徑。
 - 統一以 npm 管理依賴，改用 `package-lock.json` 提供可重現安裝。
 - 更新 GitHub Pages workflow，以 `npm ci` 與 `npm run build` 完成部署建置。
 - 同步更新 README、AI 設定流程與 Profile Studio 指引中的操作命令。
 - 補上 Codex／coding agent 的一站式提示詞與發布交接流程，涵蓋 JSON 自動套用、build、公開內容確認、remote 檢查、commit／push 及 GitHub Pages 結果回報。
-- 新增 Cloudflare Pages 部署、V1 升級、release notes 草稿與 RC 驗證清單。
+- 新增可直接複製的 AI 訪談提示詞、欄位參考與空白填寫模板，讓使用者可選擇逐步訪談或一次提供資料。
+- 將連結、自訂區塊、圖片板塊、Notion 與黑膠唱盤的詳細欄位移至獨立自訂指南，精簡 README 的快速使用流程。
+- 新增 Cloudflare Pages 部署與 V1 升級說明，並完成正式版本資料整理。
 - 完整 build 新增模板安全檢查，阻擋私人回答檔、常見憑證格式與個人化預設內容。
 
 ## [0.1.0] - 2026-07-15
@@ -70,5 +74,6 @@
 - Profile Studio 僅監聽本機介面，並驗證 Host、Origin、HTTP method 與 JSON content type。
 - AI 流程要求使用者確認個人事實與網址，不自動發布敏感資料。
 
-[Unreleased]: https://github.com/Jwander0820/astro-personal-profile-template/compare/2c716400a78b7e91afdb0fa67c91330188dfaf4b...HEAD
+[Unreleased]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Jwander0820/astro-personal-profile-template/compare/2c716400a78b7e91afdb0fa67c91330188dfaf4b...v1.0.0
 [0.1.0]: https://github.com/Jwander0820/astro-personal-profile-template/tree/2c716400a78b7e91afdb0fa67c91330188dfaf4b

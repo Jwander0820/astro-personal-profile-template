@@ -1,10 +1,10 @@
-# 從 0.1.0 升級到 V1.0.0
+# 從 0.1.0 升級到 v1.0.0
 
-這份文件說明公開模板從 `0.1.0` 開發基線升級到 V1.0.0 的內容相容性與建議步驟。V1 尚未正式建立 tag；目前內容是 release candidate 的 migration 草稿。
+這份文件說明公開模板從 `0.1.0` 開發基線升級到正式版 `v1.0.0` 的內容相容性、備份與驗證步驟。
 
 ## 相容性摘要
 
-- 建置基線升級為 Astro 7.0.9，需使用 Node.js 22.12 以上；部署平台也必須同步設定 Node 22。
+- 建置基線升級為 Astro 7.1.3，需使用 Node.js 22.12 以上；部署平台也必須同步設定 Node 22。
 - `src/content/` 仍是唯一資料來源。
 - 五個 `homeOrder` 值維持 `about`、`turntable`、`links`、`fortune`、`notion`，每個值必須出現一次。
 - 既有 profile、link、section、block 與 fortune 檔案不需要批次改寫。
@@ -17,7 +17,15 @@
 ## 升級步驟
 
 1. 先 commit 或另外備份個人站的 `src/content/` 與 `public/images/`。
-2. 依 [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) 的「個人站如何選擇性更新」建立獨立更新分支，合併固定的 V1 tag，不要直接追蹤模板 `main`。
+2. 取得固定的正式 tag，並在獨立更新分支合併，不要讓個人站直接追蹤模板 `main`：
+
+   ```powershell
+   git fetch upstream --tags
+   git switch main
+   git pull --ff-only origin main
+   git switch -c update/template-v1.0.0
+   git merge v1.0.0
+   ```
 3. 執行：
 
    ```powershell
@@ -41,6 +49,6 @@
 - AI 套用不符合預期：套用前摘要不會修改檔案；已套用則用 Git diff 檢查並還原對應的 `src/content/` 檔案。
 - V1 build 失敗：停止部署，保留錯誤輸出，修正 schema 或內容後重新跑完整 build。
 
-## V1 後的相容性承諾
+## v1.0.0 後的相容性承諾
 
-V1.0.0 後，主要 frontmatter、回答檔 version 1 schema 與五個首頁板塊值應維持向下相容。若未來無法避免破壞性變更，必須提高 major version，並提供 migration、備份與復原步驟。
+`v1.0.0` 後，主要 frontmatter、回答檔 version 1 schema 與五個首頁板塊值應維持向下相容。若未來無法避免破壞性變更，必須提高 major version，並提供 migration、備份與復原步驟。
