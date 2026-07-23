@@ -94,7 +94,15 @@
       "additionalProperties": false,
       "required": ["youtubePlaylistId"],
       "properties": {
-        "youtubePlaylistId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{10,}$" },
+        "youtubePlaylistId": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "YouTube 播放清單完整網址（可包含 si 等分享參數）或 playlist ID",
+          "anyOf": [
+            { "pattern": "^[A-Za-z0-9_-]{10,}$" },
+            { "pattern": "^https?://(?:(?:[a-z0-9-]+\\.)*(?:youtube\\.com|youtube-nocookie\\.com)|youtu\\.be)/[^\\s]*[?&]list=[A-Za-z0-9_-]{10,}(?:[&#][^\\s]*)?$" }
+          ]
+        },
         "title": { "type": "string", "maxLength": 80 },
         "description": { "type": "string", "maxLength": 500 }
       }

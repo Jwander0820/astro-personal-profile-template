@@ -2,6 +2,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { isSafeHttpUrl, isSafeImagePath, isSafeProfileUrl } from './content-safety.mjs';
 import { atomicWriteText, withFileWriteLock } from './file-writes.mjs';
+import { parseYoutubePlaylistId } from './youtube-playlist.mjs';
 
 const HOME_SECTIONS = ['about', 'turntable', 'links', 'fortune', 'notion'];
 const FONT_PRESETS = ['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc'];
@@ -159,12 +160,8 @@ function assertHttpUrl(value, label = '網址') {
 
 export function extractYoutubePlaylistId(value) {
   const source = assertText(value, 'YouTube 播放清單', { required: true, max: 500 });
-  if (/^[A-Za-z0-9_-]{10,}$/.test(source)) return source;
-  try {
-    const parsed = new URL(source);
-    const playlistId = parsed.searchParams.get('list') ?? '';
-    if (/^[A-Za-z0-9_-]{10,}$/.test(playlistId)) return playlistId;
-  } catch {}
+  const playlistId = parseYoutubePlaylistId(source);
+  if (playlistId) return playlistId;
   throw new Error('請貼上 YouTube 播放清單網址，或輸入有效的 playlist ID。');
 }
 
@@ -572,11 +569,10 @@ export function validateProfileAnswers(input) {
   if (input.playlist !== null && input.playlist !== undefined && !isObject(input.playlist)) throw new Error('playlist 格式不正確。');
   if (isObject(input.playlist)) assertAllowedKeys(input.playlist, ['youtubePlaylistId', 'title', 'description'], 'playlist');
   const playlist = input.playlist === null || input.playlist === undefined ? null : {
-    youtubePlaylistId: assertText(input.playlist.youtubePlaylistId, 'YouTube 播放清單 ID', { required: true, max: 100 }),
+    youtubePlaylistId: extractYoutubePlaylistId(input.playlist.youtubePlaylistId),
     title: assertProvidedText(input.playlist.title, '播放清單名稱', { max: 80 }) || 'PLAY！',
     description: assertProvidedText(input.playlist.description, '播放清單說明', { max: 500 }) || '按下唱針，隨機抽一首歌。',
   };
-  if (playlist && !/^[A-Za-z0-9_-]{10,}$/.test(playlist.youtubePlaylistId)) throw new Error('YouTube 播放清單 ID 格式不正確。');
   if (input.features !== undefined && !isObject(input.features)) throw new Error('features 格式不正確。');
   const features = input.features ?? {};
   assertAllowedKeys(features, ['fortune'], 'features');

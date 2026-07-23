@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cp, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, stat, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -22,6 +22,7 @@ import { FORTUNE_GRADES, FortuneConflictError, loadFortuneBucket, restoreFortune
 import { resolvePackageBin } from './package-bin.mjs';
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
 import { createSaveCoordinator, createValueChangeTracker } from '../studio/save-coordinator.js';
+import { atomicWriteText } from './file-writes.mjs';
 import {
   createContentSafetyMdastPlugin,
   enforceContentSafety,
@@ -50,6 +51,16 @@ try {
   const astroCli = await resolvePackageBin('astro');
   assert.match(astroCli, /[\\/]astro[\\/]bin[\\/]astro\.mjs$/);
   assert.match(await readFile(astroCli, 'utf8'), /astro/);
+
+  const unchangedWritePath = path.join(temporaryRoot, 'unchanged-write.txt');
+  assert.equal(await atomicWriteText(unchangedWritePath, 'same content'), true);
+  const fixedTimestamp = new Date('2001-01-01T00:00:00.000Z');
+  await utimes(unchangedWritePath, fixedTimestamp, fixedTimestamp);
+  const timestampBeforeNoOp = (await stat(unchangedWritePath)).mtimeMs;
+  assert.equal(await atomicWriteText(unchangedWritePath, 'same content'), false);
+  assert.equal((await stat(unchangedWritePath)).mtimeMs, timestampBeforeNoOp);
+  assert.equal(await atomicWriteText(unchangedWritePath, 'updated content'), true);
+  assert.equal(await readFile(unchangedWritePath, 'utf8'), 'updated content');
 
   await applyProfileAnswers(temporaryRoot, answers);
   await applyProfileAnswers(temporaryRoot, answersPreview.answers);
@@ -107,10 +118,15 @@ try {
   });
   const turntable = await saveStudioBlock(temporaryRoot, 'turntable', {
     title: 'Now playing',
-    playlist: 'https://www.youtube.com/playlist?list=PL1234567890abcdef',
+    playlist: 'https://youtube.com/playlist?list=PL1234567890abcdef&si=UHVN7ue5z4pT-Byi',
     continuousPlayback: false,
     body: 'Playlist description.',
   });
+  const unchangedTurntablePath = path.join(temporaryRoot, 'src', 'content', 'blocks', 'turntable.md');
+  await utimes(unchangedTurntablePath, fixedTimestamp, fixedTimestamp);
+  const turntableTimestampBeforeNoOp = (await stat(unchangedTurntablePath)).mtimeMs;
+  await saveHomeSettings(temporaryRoot, home);
+  assert.equal((await stat(unchangedTurntablePath)).mtimeMs, turntableTimestampBeforeNoOp);
   const about = await saveStudioSection(temporaryRoot, 'about', {
     title: 'About this person',
     slug: 'about',
@@ -213,6 +229,27 @@ try {
   assert.equal(turntable.data.continuousPlayback, false);
   assert.equal(about.body, 'Updated card.');
   assert.equal(extractYoutubePlaylistId('https://music.youtube.com/playlist?list=PLabcdefghij1234'), 'PLabcdefghij1234');
+  assert.equal(
+    extractYoutubePlaylistId('https://youtube.com/playlist?list=PLlaN88a7y2_oK0nKMjZSwdU_njxUYWykm&si=UHVN7ue5z4pT-Byi'),
+    'PLlaN88a7y2_oK0nKMjZSwdU_njxUYWykm',
+  );
+  assert.equal(
+    extractYoutubePlaylistId('https://youtu.be/abcdefghijk?si=share-token&list=PLabcdefghij1234'),
+    'PLabcdefghij1234',
+  );
+  assert.throws(
+    () => extractYoutubePlaylistId('https://example.com/playlist?list=PLabcdefghij1234'),
+    /請貼上 YouTube 播放清單網址/,
+  );
+  assert.equal(
+    validateProfileAnswers({
+      ...minimalAnswers,
+      playlist: {
+        youtubePlaylistId: 'https://www.youtube.com/playlist?list=PLabcdefghij1234&si=share-token',
+      },
+    }).playlist.youtubePlaylistId,
+    'PLabcdefghij1234',
+  );
   assert.equal(isSafeProfileUrl('https://example.com'), true);
   assert.equal(isSafeProfileUrl('mailto:hello@example.com'), true);
   assert.equal(isSafeProfileUrl('https://'), false);

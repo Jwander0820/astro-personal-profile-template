@@ -4,8 +4,12 @@ import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
 import { isSafeHttpUrl, isSafeImagePath, isSafeProfileUrl } from '../scripts/content-safety.mjs';
 import { FORTUNE_GRADES } from '../scripts/fortune-content.mjs';
+import { parseYoutubePlaylistId } from '../scripts/youtube-playlist.mjs';
 
 const imagePath = z.string().refine(isSafeImagePath, 'Images must use a safe path under /images/.');
+const youtubePlaylist = z.string()
+  .refine((value) => Boolean(parseYoutubePlaylistId(value)), 'Invalid YouTube playlist URL or ID.')
+  .transform((value) => parseYoutubePlaylistId(value) ?? value);
 
 const profile = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/profile' }),
@@ -75,7 +79,7 @@ const blocks = defineCollection({
     provider: z.enum(['notion', 'youtube']).optional(),
     url: z.string().refine(isSafeHttpUrl, 'Embed URL must use http(s).').optional(),
     embedMode: z.enum(['preview', 'inline']).default('preview'),
-    playlistId: z.string().regex(/^[A-Za-z0-9_-]{10,}$/, 'Invalid YouTube playlist ID.').optional(),
+    playlistId: youtubePlaylist.optional(),
     continuousPlayback: z.boolean().default(true),
     height: z.number().int().min(320).max(1200).default(600),
     image: imagePath.optional(),

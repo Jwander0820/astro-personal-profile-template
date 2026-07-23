@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-07-24
+
+### 修正
+
+- 唱盤在 Profile Studio、AI 回答檔與手動 Markdown 都可直接使用 YouTube 完整播放清單網址，並會自動解析 `list`、忽略 `si` 等分享參數。
+- Studio 寫入 Markdown 與 JSON 前會先比較內容，完全相同時不再重寫檔案，避免無意義的檔案時間、監聽通知與 Git 假異動。
+
 ### 改善
 
 - 將一句話身分與關鍵字改為選填；Profile Studio、AI 回答檔、內容 schema、首頁顯示與 SEO metadata 現在都能正確處理省略或留空的內容。

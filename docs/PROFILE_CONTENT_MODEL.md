@@ -41,7 +41,7 @@ Studio 的寫入 API 不會部署到 `dist`，GitHub Pages 上也不存在。圖
 
 籤桶管理採整份檔案儲存：搜尋與畫面排序不改變來源順序，只有上移／下移操作會改變草稿順序。儲存時若偵測到 `fortunes.json` 已被外部修改，Studio 會拒絕覆寫並要求重新載入。
 
-Studio 的唱盤欄位接受 YouTube 播放清單完整網址或 playlist ID，儲存時只保留 `list` ID。Notion 欄位接受已發布到網路的完整頁面網址；`preview` 產生簡化連結卡片，`inline` 則嘗試 iframe 內嵌，實際是否允許內嵌仍取決於 Notion 回應標頭。
+唱盤欄位在 Studio、AI 回答檔與手動 Markdown 三種入口都接受 YouTube 播放清單完整網址或 playlist ID；`si` 等分享參數可以保留，程式載入時會自動取出 `list` ID，Studio 儲存時則只保留 ID。Notion 欄位接受已發布到網路的完整頁面網址；`preview` 產生簡化連結卡片，`inline` 則嘗試 iframe 內嵌，實際是否允許內嵌仍取決於 Notion 回應標頭。
 
 ## 為什麼不直接做線上 CMS
 

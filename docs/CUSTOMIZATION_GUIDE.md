@@ -160,7 +160,7 @@ Notion 頁面必須可公開存取。inline 是否能正常顯示仍取決於 No
 
 ## 黑膠唱盤隨機播放器
 
-唱盤使用 YouTube 播放清單，不需要 API Key。可直接在 Profile Studio 貼上播放清單網址，或手動修改 `src/content/blocks/turntable.md`：
+唱盤使用 YouTube 播放清單，不需要 API Key。可直接貼上 YouTube 提供的完整分享網址（包含 `&si=` 也可以），程式會自動取出 `list`；Profile Studio、AI 回答檔與手動修改 `src/content/blocks/turntable.md` 都支援：
 
 ```md
 ---
@@ -170,7 +170,7 @@ order: 5
 visible: true
 layout: turntable
 provider: youtube
-playlistId: PLxxxxxxxxxxxxxxxx
+playlistId: https://youtube.com/playlist?list=PLxxxxxxxxxxxxxxxx&si=分享參數
 continuousPlayback: true
 tags: [Shuffle, YouTube]
 ---
@@ -178,7 +178,7 @@ tags: [Shuffle, YouTube]
 按下唱針，隨機播放清單中的一首歌。
 ```
 
-- `playlistId`：YouTube 網址中 `list=` 後方的 ID。
+- `playlistId`：可填完整 YouTube 播放清單網址或純 ID；載入時會自動解析 `list`，忽略 `si` 等其他參數。
 - `continuousPlayback`：`true` 會在歌曲結束後隨機接續，`false` 則停止。
 - 播放器會等訪客按下唱針後才載入 YouTube。
 - 私人播放清單、禁止嵌入或有地區限制的影片可能無法播放。
