@@ -129,6 +129,9 @@ try {
   assert.equal(answersPreview.summary.displayName, '你的名字');
   assert.equal(answersPreview.answers.version, 1);
   assert.equal(answersSchema.properties.identity.required.includes('bio'), false);
+  assert.equal(answersSchema.properties.identity.required.includes('title'), false);
+  assert.equal(answersSchema.properties.identity.required.includes('tagline'), false);
+  assert.equal('minLength' in answersSchema.properties.identity.properties.title, false);
   assert.equal('minLength' in answersSchema.properties.identity.properties.bio, false);
   assert.equal(answersPreview.summary.socialCount, 2);
   assert.equal(answersPreview.summary.sectionCount, 2);
@@ -137,6 +140,8 @@ try {
   assert.ok(answersPreview.warnings.some((warning) => warning.includes('location')));
   assert.equal(minimalPreview.summary.socialCount, 0);
   assert.equal(minimalPreview.summary.playlistEnabled, false);
+  assert.equal(minimalPreview.summary.title, '');
+  assert.equal(minimalPreview.summary.taglineCount, 0);
   assert.equal(sensitiveRefusalPreview.summary.hasLocation, false);
   assert.equal(sensitiveRefusalPreview.summary.fortuneEnabled, false);
   assert.equal(lunaPreview.summary.displayName, 'Luna（測試人格）');
@@ -162,6 +167,15 @@ try {
     identity: identityWithoutBio,
   });
   assert.equal(optionalBioResult.profile.bio, '');
+  const optionalIdentityRoot = path.join(temporaryRoot, 'optional-title-tagline');
+  await mkdir(path.join(optionalIdentityRoot, 'src'), { recursive: true });
+  await cp(path.join(projectRoot, 'src', 'content'), path.join(optionalIdentityRoot, 'src', 'content'), { recursive: true });
+  const optionalIdentityResult = await applyProfileAnswers(optionalIdentityRoot, minimalAnswers);
+  assert.equal(optionalIdentityResult.profile.title, undefined);
+  assert.equal(optionalIdentityResult.profile.tagline, undefined);
+  const optionalIdentityMarkdown = await readFile(path.join(optionalIdentityRoot, 'src', 'content', 'profile', 'main.md'), 'utf8');
+  assert.doesNotMatch(optionalIdentityMarkdown, /^title:/m);
+  assert.doesNotMatch(optionalIdentityMarkdown, /^tagline:/m);
   assert.throws(
     () => previewProfileAnswers({ ...lunaAnswers, socials: [{ service: 'github', title: 'GitHub', url: 'github.com/luna', icon: 'github' }] }),
     /社群網址必須是 http\(s\)、mailto 或頁面錨點/,

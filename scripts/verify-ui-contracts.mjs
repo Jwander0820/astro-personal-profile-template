@@ -72,6 +72,7 @@ const contracts = [
   ['section and card titles use the selectable display face', sectionHeadingRule.includes('font-family: var(--font-display)') && sectionCardTitleRule.includes('font-family: var(--font-display)') && embedCardTitleRule.includes('font-family: var(--font-display)')],
   ['theme toggle exposes and synchronizes pressed state', themeToggle.includes('aria-pressed="false"') && themeToggle.includes('syncToggleState')],
   ['Studio exposes the profile bio as optional', /自我介紹\s*<i>選填<\/i>/.test(studioIndex) && /<textarea name="bio"(?![^>]*\brequired\b)[^>]*>/.test(studioIndex)],
+  ['Studio exposes the short title and keywords as optional', /一句話身分\s*<i>選填<\/i>/.test(studioIndex) && /<input name="title"(?![^>]*\brequired\b)[^>]*>/.test(studioIndex) && /關鍵字\s*<i>選填<\/i>/.test(studioIndex) && /<input name="tagline"(?![^>]*\brequired\b)[^>]*>/.test(studioIndex)],
 ];
 
 const failures = contracts.filter(([, passed]) => !passed);

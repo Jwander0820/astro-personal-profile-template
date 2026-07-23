@@ -11,7 +11,7 @@ const profile = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/profile' }),
   schema: z.object({
     displayName: z.string(),
-    title: z.string(),
+    title: z.string().optional(),
     avatar: imagePath.optional(),
     background: imagePath.optional(),
     location: z.string().optional(),
@@ -31,7 +31,7 @@ const profile = defineCollection({
     displayFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default('system'),
     fontScale: z.number().min(0.9).max(1.2).default(1),
     smallTextScale: z.number().min(0.9).max(1.35).default(1),
-    tagline: z.union([z.string(), z.array(z.string()).min(1)]),
+    tagline: z.union([z.string(), z.array(z.string())]).optional(),
   }),
 });
 

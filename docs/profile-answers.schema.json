@@ -11,12 +11,12 @@
     "identity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["displayName", "title", "tagline"],
+      "required": ["displayName"],
       "properties": {
         "displayName": { "type": "string", "minLength": 1, "maxLength": 80 },
-        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "title": { "type": "string", "maxLength": 120 },
         "location": { "type": ["string", "null"], "maxLength": 100 },
-        "tagline": { "type": "array", "minItems": 1, "maxItems": 6, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 80 } },
+        "tagline": { "type": "array", "maxItems": 6, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 80 } },
         "bio": { "type": "string", "maxLength": 5000 }
       }
     },

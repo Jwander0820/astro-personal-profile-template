@@ -14,7 +14,7 @@
 
 ## 基本資料與外觀
 
-`src/content/profile/main.md` 包含姓名、頭銜、標籤、首頁順序與外觀設定。`location` 與 frontmatter 後方的自我介紹正文都是選填；不想公開時可以留空或移除。
+`src/content/profile/main.md` 包含姓名、頭銜、標籤、首頁順序與外觀設定。除顯示名稱外，一句話身分（`title`）、關鍵字（`tagline`）、`location` 與 frontmatter 後方的自我介紹正文都是選填；不想公開時可以留空或移除。
 
 ```yaml
 sectionsLayout: grid

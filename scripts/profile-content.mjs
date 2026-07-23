@@ -267,7 +267,7 @@ export async function saveStudioProfile(projectRoot, input) {
   const contentRoot = safeFile(projectRoot, 'src', 'content');
   const profilePath = safeFile(contentRoot, 'profile', 'main.md');
   return updateMarkdownFile(profilePath, async (current) => {
-    const tagline = assertStringArray(input.tagline, '關鍵字', { min: 1, max: 6 });
+    const tagline = assertStringArray(input.tagline ?? [], '關鍵字', { max: 6 });
     const fontScale = Number(input.fontScale ?? current.data.fontScale ?? 1);
     const smallTextScale = Number(input.smallTextScale ?? current.data.smallTextScale ?? 1);
     const bodyFont = FONT_PRESETS.includes(input.bodyFont) ? input.bodyFont : current.data.bodyFont ?? 'system';
@@ -278,7 +278,7 @@ export async function saveStudioProfile(projectRoot, input) {
     const next = {
       ...currentData,
       displayName: assertText(input.displayName, '顯示名稱', { required: true, max: 80 }),
-      title: assertText(input.title, '一句話身分', { required: true, max: 120 }),
+      title: assertText(input.title, '一句話身分', { max: 120 }) || undefined,
       location: assertText(input.location, '地點', { max: 100 }) || undefined,
       archiveLabel: assertText(input.archiveLabel, '封面標籤', { max: 100 }) || undefined,
       avatar: assertImagePath(input.avatar, '頭像') || undefined,
@@ -288,7 +288,7 @@ export async function saveStudioProfile(projectRoot, input) {
       displayFont,
       fontScale,
       smallTextScale,
-      tagline,
+      tagline: tagline.length > 0 ? tagline : undefined,
     };
     const body = assertProvidedText(input.bio, '自我介紹', { max: 5000 });
     return { data: next, body, result: { ...next, bio: body } };
@@ -488,11 +488,11 @@ export function validateProfileAnswers(input) {
   assertAllowedKeys(input, ['$schema', 'version', 'identity', 'socials', 'links', 'sections', 'imageBlocks', 'playlist', 'features', 'appearance'], '回答檔');
   if (input.$schema !== undefined && typeof input.$schema !== 'string') throw new Error('$schema 格式不正確。');
   assertAllowedKeys(input.identity, ['displayName', 'title', 'location', 'tagline', 'bio'], 'identity');
-  const tagline = assertStringArray(input.identity.tagline, '關鍵字', { min: 1, max: 6 });
+  const tagline = assertStringArray(input.identity.tagline ?? [], '關鍵字', { max: 6 });
   if (new Set(tagline).size !== tagline.length) throw new Error('關鍵字不可重複。');
   const identity = {
     displayName: assertText(input.identity.displayName, '顯示名稱', { required: true, max: 80 }),
-    title: assertText(input.identity.title, '一句話身分', { required: true, max: 120 }),
+    title: assertText(input.identity.title, '一句話身分', { max: 120 }),
     location: assertText(input.identity.location, '地點', { max: 100 }),
     tagline,
     bio: assertProvidedText(input.identity.bio, '自我介紹', { max: 5000 }),

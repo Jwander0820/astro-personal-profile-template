@@ -284,7 +284,7 @@ function populateProfile() {
   ['displayName', 'title', 'location', 'archiveLabel', 'avatar', 'background', 'sectionsLayout', 'bodyFont', 'displayFont', 'fontScale', 'smallTextScale', 'bio'].forEach((key) => {
     if (form.elements[key]) form.elements[key].value = profile[key] ?? '';
   });
-  form.elements.tagline.value = Array.isArray(profile.tagline) ? profile.tagline.join(', ') : profile.tagline;
+  form.elements.tagline.value = Array.isArray(profile.tagline) ? profile.tagline.join(', ') : profile.tagline ?? '';
   $('#font-output').value = profile.fontScale ?? 1;
   $('#small-font-output').value = profile.smallTextScale ?? 1;
   updateFontDescription('bodyFont');
@@ -1103,7 +1103,8 @@ function renderAnswerSummary(preview) {
   const list = (values) => values.length ? values.join('、') : '無';
   $('#answers-summary').innerHTML = `<h3>套用前摘要</h3><dl>
     <dt>顯示名稱</dt><dd>${escapeHtml(summary.displayName)}</dd>
-    <dt>一句話身分</dt><dd>${escapeHtml(summary.title)}</dd>
+    <dt>一句話身分</dt><dd>${escapeHtml(summary.title || '未提供')}</dd>
+    <dt>關鍵字</dt><dd>${summary.taglineCount} 個</dd>
     <dt>公開地點</dt><dd>${summary.hasLocation ? '有' : '無'}</dd>
     <dt>社群連結</dt><dd>${summary.socialCount} 個：${escapeHtml(list(summary.socialServices))}</dd>
     <dt>精選連結</dt><dd>${summary.linkCount} 個：${escapeHtml(list(summary.linkTitles))}</dd>

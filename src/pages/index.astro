@@ -31,11 +31,13 @@ const fallbackBlocks = remainingBlocks.filter((block) => (
 ));
 const taglineText = Array.isArray(profile.data.tagline)
   ? profile.data.tagline.join(', ')
-  : profile.data.tagline;
-const description = `${profile.data.displayName} — ${profile.data.title}。${taglineText}`;
+  : profile.data.tagline ?? '';
+const identityParts = [profile.data.displayName, profile.data.title].filter(Boolean);
+const description = [identityParts.join(' — '), taglineText].filter(Boolean).join('。');
+const pageTitle = identityParts.join(' · ');
 ---
 <BaseLayout
-  title={`${profile.data.displayName} · ${profile.data.title}`}
+  title={pageTitle}
   description={description}
   image={profile.data.background}
   fontScale={profile.data.fontScale}

@@ -46,10 +46,10 @@
         <form class="panel is-active" id="profile-panel" data-panel-name="profile" role="tabpanel" aria-labelledby="profile-tab" hidden>
           <div class="form-grid">
             <label><span>顯示名稱 <em>必填</em></span><input name="displayName" required maxlength="80" /></label>
-            <label><span>一句話身分 <em>必填</em></span><input name="title" required maxlength="120" placeholder="Python Engineer / Music Explorer" /></label>
+            <label><span>一句話身分 <i>選填</i></span><input name="title" maxlength="120" placeholder="Python Engineer / Music Explorer" /></label>
             <label><span>國家／地區 <i>選填</i></span><input name="location" maxlength="100" placeholder="Taiwan" /></label>
             <label><span>封面小標 <i>選填</i></span><input name="archiveLabel" maxlength="100" placeholder="PERSONAL ARCHIVE / SIDE A" /></label>
-            <label class="field-wide"><span>關鍵字 <em>必填</em></span><input name="tagline" required placeholder="Code, Music, Travel" /><small>用逗號分隔，最多 6 個</small></label>
+            <label class="field-wide"><span>關鍵字 <i>選填</i></span><input name="tagline" placeholder="Code, Music, Travel" /><small>用逗號分隔，最多 6 個；不需要時可留空</small></label>
             <label class="field-wide"><span>自我介紹 <i>選填</i></span><textarea name="bio" rows="6" maxlength="5000"></textarea><small>支援 Markdown，例如 **粗體** 或 [連結](https://…)</small></label>
           </div>
 
@@ -130,7 +130,7 @@
 
         <section class="panel" id="ai-panel" data-panel-name="ai" role="tabpanel" aria-labelledby="ai-tab" hidden>
           <div class="panel-intro"><h2>AI 協助產生自介</h2><p>請 AI 依 <code>docs/AI_PROFILE_SETUP.md</code> 訪談並產生 JSON。先驗證與查看影響摘要，確認後才會修改內容檔。</p></div>
-          <div class="warning-card"><strong>隱私提醒</strong><p>地點、社群、email、播放清單與互動功能都是選填。不要貼上密碼、token、API key 或不願公開的個人資料。</p></div>
+          <div class="warning-card"><strong>隱私提醒</strong><p>一句話身分、關鍵字、自我介紹、地點、社群、email、播放清單與互動功能都是選填。不要貼上密碼、token、API key 或不願公開的個人資料。</p></div>
           <div class="answers-file-options">
             <button class="project-answers-button" id="load-project-answers" type="button"><strong>載入專案回答檔</strong><span>讀取專案根目錄的 profile.answers.json</span></button>
             <label class="drop-zone" for="answers-file"><strong>選擇其他 JSON 檔</strong><span>或直接貼上 JSON</span><input id="answers-file" type="file" accept="application/json,.json" /></label>
