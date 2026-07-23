@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { FORTUNE_GRADES, validateFortuneBucket } from './fortune-content.mjs';
 
-const [css, indexPage, linkCard, themeToggle, turntablePlayer, fortuneDraw, contentConfig, fortuneContent, studioApp] = await Promise.all([
+const [css, indexPage, linkCard, themeToggle, turntablePlayer, fortuneDraw, contentConfig, fortuneContent, studioApp, studioIndex] = await Promise.all([
   readFile(new URL('../src/styles/global.css', import.meta.url), 'utf8'),
   readFile(new URL('../src/pages/index.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/LinkCard.astro', import.meta.url), 'utf8'),
@@ -11,6 +11,7 @@ const [css, indexPage, linkCard, themeToggle, turntablePlayer, fortuneDraw, cont
   readFile(new URL('../src/content.config.ts', import.meta.url), 'utf8'),
   readFile(new URL('../src/content/fortunes.json', import.meta.url), 'utf8'),
   readFile(new URL('../studio/app.js', import.meta.url), 'utf8'),
+  readFile(new URL('../studio/index.html', import.meta.url), 'utf8'),
 ]);
 
 const fortunes = JSON.parse(fortuneContent);
@@ -70,6 +71,7 @@ const contracts = [
   ['name uses the selectable display face', nameRule.includes('font-family: var(--font-display)')],
   ['section and card titles use the selectable display face', sectionHeadingRule.includes('font-family: var(--font-display)') && sectionCardTitleRule.includes('font-family: var(--font-display)') && embedCardTitleRule.includes('font-family: var(--font-display)')],
   ['theme toggle exposes and synchronizes pressed state', themeToggle.includes('aria-pressed="false"') && themeToggle.includes('syncToggleState')],
+  ['Studio exposes the profile bio as optional', /自我介紹\s*<i>選填<\/i>/.test(studioIndex) && /<textarea name="bio"(?![^>]*\brequired\b)[^>]*>/.test(studioIndex)],
 ];
 
 const failures = contracts.filter(([, passed]) => !passed);

@@ -8,7 +8,7 @@ Use the guided setup flow in `docs/AI_PROFILE_SETUP.md`.
 
 1. Read `docs/profile-answers.schema.json` and `profile.answers.example.json` before asking questions.
 2. Ask only for missing information. Start with identity, then offer optional social links, featured links, profile sections, playlist, and appearance choices.
-3. Explain that location, social links, playlist, and interactive features are optional. Never invent personal facts or URLs.
+3. Explain that the bio, location, social links, playlist, and interactive features are optional. Never invent personal facts or URLs.
 4. Convert confirmed answers to `profile.answers.json`. This file is gitignored because it can contain personal information.
 5. Run `npm run profile:apply -- profile.answers.json`.
 6. Run `npm run build`. Fix content validation errors, but do not redesign components unless the user explicitly requests a new visual feature.

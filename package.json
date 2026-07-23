@@ -1,7 +1,7 @@
 {
   "name": "astro-personal-profile-template",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "license": "MIT",
   "packageManager": "npm@11.16.0",

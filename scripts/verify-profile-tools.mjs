@@ -38,6 +38,7 @@ try {
   await mkdir(path.join(temporaryRoot, 'src'), { recursive: true });
   await cp(path.join(projectRoot, 'src', 'content'), path.join(temporaryRoot, 'src', 'content'), { recursive: true });
   const answers = JSON.parse(await readFile(path.join(projectRoot, 'profile.answers.example.json'), 'utf8'));
+  const answersSchema = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'profile-answers.schema.json'), 'utf8'));
   const minimalAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'minimal.json'), 'utf8'));
   const sensitiveRefusalAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'sensitive-data-refusal.json'), 'utf8'));
   const invalidUrlAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'invalid-url.json'), 'utf8'));
@@ -127,6 +128,8 @@ try {
   assert.equal(result.profile.displayName, '你的名字');
   assert.equal(answersPreview.summary.displayName, '你的名字');
   assert.equal(answersPreview.answers.version, 1);
+  assert.equal(answersSchema.properties.identity.required.includes('bio'), false);
+  assert.equal('minLength' in answersSchema.properties.identity.properties.bio, false);
   assert.equal(answersPreview.summary.socialCount, 2);
   assert.equal(answersPreview.summary.sectionCount, 2);
   assert.equal(answersPreview.summary.imageBlockCount, 1);
@@ -146,10 +149,19 @@ try {
   assert.equal(lunaPreview.summary.fortuneEnabled, true);
   assert.deepEqual(lunaPreview.warnings, []);
   assert.throws(() => previewProfileAnswers(invalidUrlAnswers), /社群網址必須是 http\(s\)、mailto 或頁面錨點/);
-  assert.throws(
-    () => previewProfileAnswers({ ...lunaAnswers, identity: { ...lunaAnswers.identity, bio: '' } }),
-    /自我介紹為必填欄位/,
+  assert.equal(
+    previewProfileAnswers({ ...lunaAnswers, identity: { ...lunaAnswers.identity, bio: '' } }).answers.identity.bio,
+    '',
   );
+  const { bio: _omittedBio, ...identityWithoutBio } = lunaAnswers.identity;
+  const optionalBioRoot = path.join(temporaryRoot, 'optional-bio');
+  await mkdir(path.join(optionalBioRoot, 'src'), { recursive: true });
+  await cp(path.join(projectRoot, 'src', 'content'), path.join(optionalBioRoot, 'src', 'content'), { recursive: true });
+  const optionalBioResult = await applyProfileAnswers(optionalBioRoot, {
+    ...lunaAnswers,
+    identity: identityWithoutBio,
+  });
+  assert.equal(optionalBioResult.profile.bio, '');
   assert.throws(
     () => previewProfileAnswers({ ...lunaAnswers, socials: [{ service: 'github', title: 'GitHub', url: 'github.com/luna', icon: 'github' }] }),
     /社群網址必須是 http\(s\)、mailto 或頁面錨點/,

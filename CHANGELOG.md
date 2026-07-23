@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-07-23
+
+### 修正
+
+- 將 `src/content/profile/main.md` 的自我介紹正文改為選填；Profile Studio 與 AI 回答檔現在都接受留空或省略 `bio`。
+- 同步更新回答檔 JSON Schema、AI 訪談提示詞與使用指南，避免仍把自我介紹誤標為必填。
+
 ## [1.0.0] - 2026-07-23
 
 ### 安全性
@@ -74,6 +81,7 @@
 - Profile Studio 僅監聽本機介面，並驗證 Host、Origin、HTTP method 與 JSON content type。
 - AI 流程要求使用者確認個人事實與網址，不自動發布敏感資料。
 
-[Unreleased]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Jwander0820/astro-personal-profile-template/compare/2c716400a78b7e91afdb0fa67c91330188dfaf4b...v1.0.0
 [0.1.0]: https://github.com/Jwander0820/astro-personal-profile-template/tree/2c716400a78b7e91afdb0fa67c91330188dfaf4b

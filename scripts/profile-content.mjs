@@ -290,7 +290,7 @@ export async function saveStudioProfile(projectRoot, input) {
       smallTextScale,
       tagline,
     };
-    const body = assertText(input.bio, '自我介紹', { required: true, max: 5000 });
+    const body = assertProvidedText(input.bio, '自我介紹', { max: 5000 });
     return { data: next, body, result: { ...next, bio: body } };
   });
 }
@@ -495,7 +495,7 @@ export function validateProfileAnswers(input) {
     title: assertText(input.identity.title, '一句話身分', { required: true, max: 120 }),
     location: assertText(input.identity.location, '地點', { max: 100 }),
     tagline,
-    bio: assertText(input.identity.bio, '自我介紹', { required: true, max: 5000 }),
+    bio: assertProvidedText(input.identity.bio, '自我介紹', { max: 5000 }),
   };
   const socialInput = input.socials === undefined ? [] : assertObjectArray(input.socials, '社群連結', 20);
   const socials = socialInput.map((item, index) => {
