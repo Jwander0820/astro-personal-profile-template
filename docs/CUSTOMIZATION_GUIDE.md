@@ -20,12 +20,14 @@
 sectionsLayout: grid
 bodyFont: noto-sans-tc
 displayFont: noto-serif-tc
+mainColor: "#7A58A6"
 fontScale: 1
 smallTextScale: 1.1
 ```
 
 - `sectionsLayout`：`grid` 或 `list`。
 - `bodyFont`、`displayFont`：`system`、`noto-sans-tc`、`noto-serif-tc`、`lxgw-wenkai-tc`。
+- `mainColor`：3 或 6 碼十六進位色碼。網站會以此自動產生亮／暗模式都清楚的按鈕、文字、柔和底色與背景漸層；也可在 Profile Studio 使用系統色盤、精選色盤，或由「抽一個吧！」從完整 RGB 空間（各通道 `0`～`255`）隨機產生。Studio 會在內容成功儲存後，將最近 8 個不重複主色保留於目前瀏覽器的「最近使用」，不會寫入公開內容。
 - `fontScale`：`0.9`～`1.2`，控制全站字級。
 - `smallTextScale`：`0.9`～`1.35`，額外調整說明、標籤與頁尾等小字。
 

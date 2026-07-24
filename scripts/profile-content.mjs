@@ -2,6 +2,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { isSafeHttpUrl, isSafeImagePath, isSafeProfileUrl } from './content-safety.mjs';
 import { atomicWriteText, withFileWriteLock } from './file-writes.mjs';
+import { assertThemeColor, DEFAULT_THEME_COLOR } from './theme-color.mjs';
 import { parseYoutubePlaylistId } from './youtube-playlist.mjs';
 
 const HOME_SECTIONS = ['about', 'turntable', 'links', 'fortune', 'notion'];
@@ -248,6 +249,7 @@ export async function loadStudioContent(projectRoot) {
       sectionsLayout: 'list',
       bodyFont: 'system',
       displayFont: 'system',
+      mainColor: DEFAULT_THEME_COLOR,
       fontScale: 1,
       smallTextScale: 1,
       ...profile.data,
@@ -269,6 +271,7 @@ export async function saveStudioProfile(projectRoot, input) {
     const smallTextScale = Number(input.smallTextScale ?? current.data.smallTextScale ?? 1);
     const bodyFont = FONT_PRESETS.includes(input.bodyFont) ? input.bodyFont : current.data.bodyFont ?? 'system';
     const displayFont = FONT_PRESETS.includes(input.displayFont) ? input.displayFont : current.data.displayFont ?? 'system';
+    const mainColor = assertThemeColor(input.mainColor ?? current.data.mainColor ?? DEFAULT_THEME_COLOR);
     if (fontScale < 0.9 || fontScale > 1.2) throw new Error('整體字級必須介於 0.9～1.2。');
     if (smallTextScale < 0.9 || smallTextScale > 1.35) throw new Error('小字比例必須介於 0.9～1.35。');
     const { name: _legacyName, ...currentData } = current.data;
@@ -283,6 +286,7 @@ export async function saveStudioProfile(projectRoot, input) {
       sectionsLayout: ['list', 'grid'].includes(input.sectionsLayout) ? input.sectionsLayout : 'grid',
       bodyFont,
       displayFont,
+      mainColor,
       fontScale,
       smallTextScale,
       tagline: tagline.length > 0 ? tagline : undefined,
@@ -558,10 +562,11 @@ export function validateProfileAnswers(input) {
   assertUnique(imageBlocks, 'id', '圖片板塊 ID');
   if (input.appearance !== undefined && !isObject(input.appearance)) throw new Error('appearance 格式不正確。');
   const appearance = input.appearance ?? {};
-  assertAllowedKeys(appearance, ['sectionsLayout', 'bodyFont', 'displayFont', 'homeOrder'], 'appearance');
+  assertAllowedKeys(appearance, ['sectionsLayout', 'bodyFont', 'displayFont', 'mainColor', 'homeOrder'], 'appearance');
   const sectionsLayout = assertOptionalEnum(appearance.sectionsLayout, ['grid', 'list'], 'sectionsLayout', 'grid');
   const bodyFont = assertOptionalEnum(appearance.bodyFont, FONT_PRESETS, 'bodyFont', 'system');
   const displayFont = assertOptionalEnum(appearance.displayFont, FONT_PRESETS, 'displayFont', 'system');
+  const mainColor = assertThemeColor(appearance.mainColor ?? DEFAULT_THEME_COLOR, 'appearance.mainColor');
   const homeOrder = appearance.homeOrder ?? HOME_SECTIONS;
   if (!Array.isArray(homeOrder) || homeOrder.length !== 5 || new Set(homeOrder).size !== 5 || homeOrder.some((item) => !HOME_SECTIONS.includes(item))) {
     throw new Error('appearance.homeOrder 必須包含五個首頁板塊。');
@@ -590,6 +595,7 @@ export function validateProfileAnswers(input) {
       homeOrder,
       bodyFont,
       displayFont,
+      mainColor,
     },
     features: { fortune: features.fortune !== false },
   };
@@ -693,6 +699,7 @@ export function previewProfileAnswers(rawInput) {
       playlistEnabled: Boolean(answers.playlist),
       fortuneEnabled: answers.features.fortune,
       homeOrder: answers.appearance.homeOrder,
+      mainColor: answers.appearance.mainColor,
     },
     warnings,
   };
@@ -711,6 +718,7 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
     sectionsLayout: input.appearance.sectionsLayout,
     bodyFont: input.appearance.bodyFont,
     displayFont: input.appearance.displayFont,
+    mainColor: input.appearance.mainColor,
   });
 
   for (const link of current.links.filter((item) => item.data.group === 'social')) {

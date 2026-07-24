@@ -65,16 +65,64 @@
             </div>
           </fieldset>
 
-          <fieldset>
-            <legend>閱讀與排版</legend>
-            <div class="form-grid form-grid--settings">
-              <label><span>About me 排版</span><select name="sectionsLayout"><option value="grid">兩欄卡片</option><option value="list">單欄列表</option></select></label>
-              <label><span>內文字型</span><select name="bodyFont"></select><small id="body-font-description"></small></label>
-              <label><span>標題／展示字型</span><select name="displayFont"></select><small id="display-font-description"></small></label>
-              <label><span>整體字級 <output id="font-output">1</output></span><input name="fontScale" type="range" min="0.9" max="1.2" step="0.05" /></label>
-              <label><span>小字比例 <output id="small-font-output">1</output></span><input name="smallTextScale" type="range" min="0.9" max="1.35" step="0.05" /></label>
+          <fieldset class="appearance-fieldset">
+            <legend>外觀與排版</legend>
+            <div class="appearance-grid">
+              <section class="appearance-group appearance-group--color" aria-labelledby="theme-color-heading">
+                <div class="appearance-group-heading">
+                  <h3 id="theme-color-heading">主色系</h3>
+                  <p>設定網站的強調色</p>
+                </div>
+                <div class="color-control">
+                  <label class="color-picker" for="main-color-picker">
+                    <span>開啟色盤</span>
+                    <span class="color-picker__well" id="main-color-preview" aria-hidden="true"></span>
+                    <input id="main-color-picker" type="color" value="#7A58A6" />
+                  </label>
+                  <label class="color-code">
+                    <span>色碼</span>
+                    <input name="mainColor" value="#7A58A6" maxlength="7" pattern="#?[0-9A-Fa-f]{6}" spellcheck="false" autocomplete="off" aria-describedby="main-color-help" />
+                  </label>
+                  <button class="random-color-action" id="random-main-color" type="button">
+                    <span aria-hidden="true">✦</span>
+                    <strong>無法決定嗎?</strong>
+                    <small>抽一個吧!</small>
+                  </button>
+                  <div class="color-presets" aria-label="精選主色">
+                    <span>精選色盤</span>
+                    <div>
+                      <button type="button" data-theme-color="#7A58A6" style="--swatch:#7A58A6" aria-label="紫藤紫 #7A58A6" title="紫藤紫"></button>
+                      <button type="button" data-theme-color="#B33F62" style="--swatch:#B33F62" aria-label="莓果紅 #B33F62" title="莓果紅"></button>
+                      <button type="button" data-theme-color="#C45D32" style="--swatch:#C45D32" aria-label="陶土橘 #C45D32" title="陶土橘"></button>
+                      <button type="button" data-theme-color="#A06A12" style="--swatch:#A06A12" aria-label="琥珀金 #A06A12" title="琥珀金"></button>
+                      <button type="button" data-theme-color="#3F7C6A" style="--swatch:#3F7C6A" aria-label="森林綠 #3F7C6A" title="森林綠"></button>
+                      <button type="button" data-theme-color="#137C8B" style="--swatch:#137C8B" aria-label="潮汐藍 #137C8B" title="潮汐藍"></button>
+                      <button type="button" data-theme-color="#3568A8" style="--swatch:#3568A8" aria-label="晴空藍 #3568A8" title="晴空藍"></button>
+                      <button type="button" data-theme-color="#555FB8" style="--swatch:#555FB8" aria-label="夜幕靛 #555FB8" title="夜幕靛"></button>
+                    </div>
+                  </div>
+                  <div class="color-history">
+                    <span>最近使用</span>
+                    <div class="color-history-list" id="color-history-list" aria-label="最近儲存的主色"></div>
+                  </div>
+                  <p class="color-help" id="main-color-help">輸入 6 碼 HEX；網站會自動配出適合亮／暗模式的色階。</p>
+                </div>
+              </section>
+              <section class="appearance-group" aria-labelledby="typography-heading">
+                <div class="appearance-group-heading">
+                  <h3 id="typography-heading">閱讀與排版</h3>
+                  <p>調整版型、字型與閱讀比例</p>
+                </div>
+                <div class="form-grid form-grid--appearance">
+                  <label class="field-wide"><span>About me 排版</span><select name="sectionsLayout"><option value="grid">兩欄卡片</option><option value="list">單欄列表</option></select></label>
+                  <label><span>內文字型</span><select name="bodyFont"></select><small id="body-font-description"></small></label>
+                  <label><span>標題／展示字型</span><select name="displayFont"></select><small id="display-font-description"></small></label>
+                  <label><span>整體字級 <output id="font-output">1</output></span><input name="fontScale" type="range" min="0.9" max="1.2" step="0.05" /></label>
+                  <label><span>小字比例 <output id="small-font-output">1</output></span><input name="smallTextScale" type="range" min="0.9" max="1.35" step="0.05" /></label>
+                </div>
+                <p class="fieldset-note">字型選單只提供專案白名單。系統預設不會連線；其他選項會從 Google Fonts 載入 SIL OFL 開放授權字型。</p>
+              </section>
             </div>
-            <p class="fieldset-note">字型選單只提供專案白名單。系統預設不會連線；其他選項會從 Google Fonts 載入 SIL OFL 開放授權字型。</p>
           </fieldset>
         </form>
 

@@ -1,4 +1,5 @@
 import { createSaveCoordinator, createValueChangeTracker } from './save-coordinator.js';
+import { randomRgbColor, updateColorHistory } from './theme-color-utils.js';
 
 const state = {
   content: null,
@@ -12,8 +13,10 @@ const state = {
   toastTimer: null,
   previewRequest: 0,
   previewPending: null,
+  colorHistory: [],
 };
 const saveTasks = new Map();
+const colorHistoryStorageKey = 'profile-studio-main-color-history';
 
 const fortuneGrades = ['大吉', '中吉', '小吉', '吉', '末吉', '凶', '大凶'];
 const fortuneGradeOrder = Object.fromEntries(fortuneGrades.map((grade, index) => [grade, index]));
@@ -276,17 +279,71 @@ function updateFontDescription(name) {
   target.textContent = font ? `${font.description}${font.license ? `｜${font.license}` : ''}` : '';
 }
 
+function normalizeThemeColor(value) {
+  const source = String(value ?? '').trim();
+  const short = source.match(/^#?([0-9a-f]{3})$/i);
+  if (short) return `#${[...short[1]].map((character) => character.repeat(2)).join('').toUpperCase()}`;
+  const full = source.match(/^#?([0-9a-f]{6})$/i);
+  return full ? `#${full[1].toUpperCase()}` : null;
+}
+
+function showThemeColor(value) {
+  const color = normalizeThemeColor(value);
+  if (!color) return false;
+  const form = $('#profile-panel');
+  form.elements.mainColor.value = color;
+  $('#main-color-picker').value = color;
+  $('#main-color-preview').style.setProperty('--selected-color', color);
+  $$('[data-theme-color], [data-history-color]').forEach((button) => {
+    button.setAttribute('aria-pressed', String((button.dataset.themeColor ?? button.dataset.historyColor) === color));
+  });
+  return true;
+}
+
+function chooseThemeColor(value) {
+  if (!showThemeColor(value)) return;
+  $('#profile-panel').elements.mainColor.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function renderColorHistory() {
+  const slots = [...state.colorHistory, ...Array(Math.max(0, 8 - state.colorHistory.length)).fill(null)];
+  $('#color-history-list').innerHTML = slots.map((color) => color
+    ? `<button class="color-history-button" type="button" data-history-color="${color}" style="--swatch:${color}" aria-label="套用最近使用的顏色 ${color}" title="${color}"></button>`
+    : '<span class="color-history-placeholder" aria-hidden="true"></span>').join('');
+  const current = normalizeThemeColor($('#profile-panel').elements.mainColor.value);
+  $$('[data-history-color]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.historyColor === current));
+  });
+}
+
+function loadColorHistory() {
+  let saved = [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(colorHistoryStorageKey) ?? '[]');
+    saved = Array.isArray(parsed) ? parsed : [];
+  } catch { /* 無效或無法讀取時顯示空白歷史。 */ }
+  state.colorHistory = updateColorHistory(saved, null);
+  renderColorHistory();
+}
+
+function recordSavedThemeColor(color) {
+  state.colorHistory = updateColorHistory(state.colorHistory, color);
+  try { localStorage.setItem(colorHistoryStorageKey, JSON.stringify(state.colorHistory)); } catch { /* 不阻擋內容儲存。 */ }
+  renderColorHistory();
+}
+
 function populateProfile() {
   const form = $('#profile-panel');
   const profile = state.content.profile;
   form.elements.bodyFont.innerHTML = fontOptionsMarkup(profile.bodyFont ?? 'system');
   form.elements.displayFont.innerHTML = fontOptionsMarkup(profile.displayFont ?? 'system');
-  ['displayName', 'title', 'location', 'archiveLabel', 'avatar', 'background', 'sectionsLayout', 'bodyFont', 'displayFont', 'fontScale', 'smallTextScale', 'bio'].forEach((key) => {
+  ['displayName', 'title', 'location', 'archiveLabel', 'avatar', 'background', 'sectionsLayout', 'bodyFont', 'displayFont', 'mainColor', 'fontScale', 'smallTextScale', 'bio'].forEach((key) => {
     if (form.elements[key]) form.elements[key].value = profile[key] ?? '';
   });
   form.elements.tagline.value = Array.isArray(profile.tagline) ? profile.tagline.join(', ') : profile.tagline ?? '';
   $('#font-output').value = profile.fontScale ?? 1;
   $('#small-font-output').value = profile.smallTextScale ?? 1;
+  showThemeColor(profile.mainColor ?? '#7A58A6');
   updateFontDescription('bodyFont');
   updateFontDescription('displayFont');
 }
@@ -1110,6 +1167,7 @@ function renderAnswerSummary(preview) {
     <dt>精選連結</dt><dd>${summary.linkCount} 個：${escapeHtml(list(summary.linkTitles))}</dd>
     <dt>自介卡片</dt><dd>${summary.sectionCount} 個：${escapeHtml(list(summary.sectionTitles))}</dd>
     <dt>圖片板塊</dt><dd>${summary.imageBlockCount} 個：${escapeHtml(list(summary.imageBlockTitles))}</dd>
+    <dt>主色</dt><dd>${escapeHtml(summary.mainColor)}</dd>
     <dt>播放清單</dt><dd>${summary.playlistEnabled ? '啟用' : '停用'}</dd>
     <dt>今日手氣</dt><dd>${summary.fortuneEnabled ? '啟用' : '停用'}</dd>
   </dl>${preview.warnings.length ? `<ul>${preview.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>` : ''}`;
@@ -1137,6 +1195,7 @@ async function uploadProfileImage(file, targetName) {
 }
 
 function bindEvents() {
+  loadColorHistory();
   const modeControl = $('#save-mode');
   let initialMode = 'manual';
   try { initialMode = localStorage.getItem('profile-studio-save-mode') === 'auto' ? 'auto' : 'manual'; } catch { /* 使用預設模式。 */ }
@@ -1200,10 +1259,12 @@ function bindEvents() {
     run: async () => {
       const values = Object.fromEntries(new FormData(form));
       values.tagline = values.tagline.split(/[,，]/).map((item) => item.trim()).filter(Boolean);
+      values.mainColor = normalizeThemeColor(values.mainColor) ?? values.mainColor;
       values.fontScale = Number(values.fontScale);
       values.smallTextScale = Number(values.smallTextScale);
       const result = await api('/api/profile', { method: 'PUT', body: JSON.stringify(values) });
       state.content.profile = result.profile;
+      recordSavedThemeColor(values.mainColor);
       return { result, message: '基本資料已儲存。' };
     },
   });
@@ -1217,6 +1278,31 @@ function bindEvents() {
   form.elements.smallTextScale.addEventListener('input', () => { $('#small-font-output').value = form.elements.smallTextScale.value; });
   form.elements.bodyFont.addEventListener('change', () => updateFontDescription('bodyFont'));
   form.elements.displayFont.addEventListener('change', () => updateFontDescription('displayFont'));
+  form.elements.mainColor.addEventListener('input', () => {
+    const color = normalizeThemeColor(form.elements.mainColor.value);
+    if (color) {
+      $('#main-color-picker').value = color;
+      $('#main-color-preview').style.setProperty('--selected-color', color);
+      $$('[data-theme-color], [data-history-color]').forEach((button) => {
+        button.setAttribute('aria-pressed', String((button.dataset.themeColor ?? button.dataset.historyColor) === color));
+      });
+    }
+  });
+  form.elements.mainColor.addEventListener('blur', () => showThemeColor(form.elements.mainColor.value));
+  $('#main-color-picker').addEventListener('input', (event) => chooseThemeColor(event.target.value));
+  $$('[data-theme-color]').forEach((button) => {
+    button.addEventListener('click', () => chooseThemeColor(button.dataset.themeColor));
+  });
+  $('#color-history-list').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-history-color]');
+    if (button) chooseThemeColor(button.dataset.historyColor);
+  });
+  $('#random-main-color').addEventListener('click', () => {
+    const current = normalizeThemeColor(form.elements.mainColor.value);
+    let next = randomRgbColor();
+    while (next === current) next = randomRgbColor();
+    chooseThemeColor(next);
+  });
   $('#avatar-upload').addEventListener('change', (event) => uploadProfileImage(event.target.files[0], 'avatar').catch((error) => toast(error.message, true)));
   $('#background-upload').addEventListener('change', (event) => uploadProfileImage(event.target.files[0], 'background').catch((error) => toast(error.message, true)));
   registerSaveTask('home', {

@@ -27,7 +27,7 @@
 Agent 應先取得網站最基本的顯示名稱，再讓使用者自行選擇是否補充其他內容：
 
 1. 必填：顯示名稱。
-2. 選填：一句話身分、1～6 個關鍵字、自我介紹、國家／地區、社群網站、精選連結、About me 卡片、圖片板塊、YouTube 播放清單、抽籤功能、字型與排版偏好。
+2. 選填：一句話身分、1～6 個關鍵字、自我介紹、國家／地區、社群網站、精選連結、About me 卡片、圖片板塊、YouTube 播放清單、抽籤功能、主色、字型與排版偏好。
 
 回答時可以很口語。Agent 的工作是整理語句、確認不確定的網址，最後產生符合 `docs/profile-answers.schema.json` 的 `profile.answers.json`。
 
@@ -64,9 +64,9 @@ Agent 應先取得網站最基本的顯示名稱，再讓使用者自行選擇�
 | 圖片板塊 | 標題、`/images/` 圖片路徑、替代文字、說明、顯示位置與版型 |
 | YouTube 播放清單 | 完整播放清單網址，或網址中 `list=` 後方的 ID |
 | 今日手氣 | 保留或關閉；不指定時使用預設值 |
-| 外觀 | 內文／標題字型、About me 格狀或列表排版，以及首頁板塊順序 |
+| 外觀 | 6 碼 HEX 主色、內文／標題字型、About me 格狀或列表排版，以及首頁板塊順序 |
 
-圖片板塊的位置可選 Links 前、Links 後或 About 後；版型可選滿版、圖片在左、圖片在右或海報。字型可選系統預設、Noto Sans TC、Noto Serif TC 或 LXGW WenKai TC。
+圖片板塊的位置可選 Links 前、Links 後或 About 後；版型可選滿版、圖片在左、圖片在右或海報。字型可選系統預設、Noto Sans TC、Noto Serif TC 或 LXGW WenKai TC。主色使用 `#7A58A6` 這類 6 碼 HEX 色碼；沒有偏好時可省略並保留預設紫色。
 
 任意自訂 Markdown 區塊、Notion 網址與唱盤連續播放設定目前不在 AI 回答檔格式內，請改用 Profile Studio 或參考 [`CUSTOMIZATION_GUIDE.md`](CUSTOMIZATION_GUIDE.md) 手動設定。
 

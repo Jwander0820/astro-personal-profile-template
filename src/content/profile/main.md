@@ -8,6 +8,7 @@ homeOrder: [about, links, turntable, fortune, notion]
 sectionsLayout: grid
 bodyFont: system
 displayFont: system
+mainColor: "#7A58A6"
 tagline: [作品, 興趣]
 fontScale: 1
 smallTextScale: 1

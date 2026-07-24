@@ -119,6 +119,7 @@
         "sectionsLayout": { "enum": ["grid", "list"], "default": "grid" },
         "bodyFont": { "enum": ["system", "noto-sans-tc", "noto-serif-tc", "lxgw-wenkai-tc"], "default": "system" },
         "displayFont": { "enum": ["system", "noto-sans-tc", "noto-serif-tc", "lxgw-wenkai-tc"], "default": "system" },
+        "mainColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "default": "#7A58A6" },
         "homeOrder": {
           "type": "array",
           "minItems": 5,

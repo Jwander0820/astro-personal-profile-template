@@ -22,7 +22,9 @@ import { FORTUNE_GRADES, FortuneConflictError, loadFortuneBucket, restoreFortune
 import { resolvePackageBin } from './package-bin.mjs';
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
 import { createSaveCoordinator, createValueChangeTracker } from '../studio/save-coordinator.js';
+import { randomRgbColor, updateColorHistory } from '../studio/theme-color-utils.js';
 import { atomicWriteText } from './file-writes.mjs';
+import { buildThemeCss, colorContrast, createThemePalette, normalizeThemeColor } from './theme-color.mjs';
 import {
   createContentSafetyMdastPlugin,
   enforceContentSafety,
@@ -51,6 +53,32 @@ try {
   const astroCli = await resolvePackageBin('astro');
   assert.match(astroCli, /[\\/]astro[\\/]bin[\\/]astro\.mjs$/);
   assert.match(await readFile(astroCli, 'utf8'), /astro/);
+  assert.equal(randomRgbColor({
+    getRandomValues(channels) {
+      channels.set([0, 127, 255]);
+      return channels;
+    },
+  }), '#007FFF');
+  assert.deepEqual(updateColorHistory([], '#fa416f'), ['#FA416F']);
+  const fullColorHistory = ['#111111', '#222222', '#333333', '#444444', '#555555', '#666666', '#777777', '#888888'];
+  assert.deepEqual(
+    updateColorHistory(fullColorHistory, '#999999'),
+    ['#222222', '#333333', '#444444', '#555555', '#666666', '#777777', '#888888', '#999999'],
+  );
+  assert.deepEqual(
+    updateColorHistory(['#111', 'not-a-color', '#222222', '#111111'], '#111111'),
+    ['#222222', '#111111'],
+  );
+  assert.equal(normalizeThemeColor('#7a58a6'), '#7A58A6');
+  assert.equal(normalizeThemeColor('abc'), '#AABBCC');
+  assert.equal(normalizeThemeColor('#12GG34'), null);
+  const brightPalette = createThemePalette('#FFFFFF');
+  assert.ok(colorContrast(brightPalette.light.accent, '#FFFFFF') >= 4.5);
+  assert.ok(colorContrast(brightPalette.dark.accent, '#15111B') >= 4.5);
+  const tealPalette = createThemePalette('#137C8B');
+  assert.match(tealPalette.light['turntable-record-label-bg'], /#137C8B/);
+  assert.match(tealPalette.dark['turntable-record-label-bg'], /^radial-gradient/);
+  assert.match(buildThemeCss('#3568A8'), /:root\[data-theme="dark"\]/);
 
   const unchangedWritePath = path.join(temporaryRoot, 'unchanged-write.txt');
   assert.equal(await atomicWriteText(unchangedWritePath, 'same content'), true);
@@ -147,6 +175,7 @@ try {
   assert.equal(answersSchema.properties.identity.required.includes('bio'), false);
   assert.equal(answersSchema.properties.identity.required.includes('title'), false);
   assert.equal(answersSchema.properties.identity.required.includes('tagline'), false);
+  assert.equal(answersSchema.properties.appearance.properties.mainColor.default, '#7A58A6');
   assert.equal('minLength' in answersSchema.properties.identity.properties.title, false);
   assert.equal('minLength' in answersSchema.properties.identity.properties.bio, false);
   assert.equal(answersPreview.summary.socialCount, 2);
@@ -201,6 +230,8 @@ try {
   assert.ok(Number.isFinite(result.profile.smallTextScale) && result.profile.smallTextScale >= 0.9 && result.profile.smallTextScale <= 1.35);
   assert.equal(result.profile.bodyFont, 'noto-sans-tc');
   assert.equal(result.profile.displayFont, 'noto-serif-tc');
+  assert.equal(result.profile.mainColor, '#7A58A6');
+  assert.equal(answersPreview.summary.mainColor, '#7A58A6');
   assert.deepEqual(result.profile.homeOrder, ['about', 'links', 'turntable', 'fortune', 'notion']);
   assert.equal(visibleSocials.length, 2);
   assert.deepEqual(visibleFeatured.filter((item) => item.id.startsWith('generated-')).map((item) => item.id), ['generated-link-projects']);
@@ -326,6 +357,10 @@ try {
   assert.throws(
     () => validateProfileAnswers({ ...answers, $schema: null }),
     /\$schema 格式不正確/,
+  );
+  assert.throws(
+    () => validateProfileAnswers({ ...answers, appearance: { ...answers.appearance, mainColor: 'purple' } }),
+    /appearance\.mainColor必須是 3 或 6 碼十六進位色碼/,
   );
 
   const concurrencyRoot = path.join(temporaryRoot, 'concurrency');

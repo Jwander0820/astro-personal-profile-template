@@ -4,12 +4,16 @@ import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
 import { isSafeHttpUrl, isSafeImagePath, isSafeProfileUrl } from '../scripts/content-safety.mjs';
 import { FORTUNE_GRADES } from '../scripts/fortune-content.mjs';
+import { normalizeThemeColor } from '../scripts/theme-color.mjs';
 import { parseYoutubePlaylistId } from '../scripts/youtube-playlist.mjs';
 
 const imagePath = z.string().refine(isSafeImagePath, 'Images must use a safe path under /images/.');
 const youtubePlaylist = z.string()
   .refine((value) => Boolean(parseYoutubePlaylistId(value)), 'Invalid YouTube playlist URL or ID.')
   .transform((value) => parseYoutubePlaylistId(value) ?? value);
+const themeColor = z.string()
+  .refine((value) => Boolean(normalizeThemeColor(value)), 'Main color must be a 3 or 6 digit hex color.')
+  .transform((value) => normalizeThemeColor(value) ?? value);
 
 const profile = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/profile' }),
@@ -33,6 +37,7 @@ const profile = defineCollection({
     sectionsLayout: z.enum(['list', 'grid']).default('list'),
     bodyFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default('system'),
     displayFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default('system'),
+    mainColor: themeColor.default('#7A58A6'),
     fontScale: z.number().min(0.9).max(1.2).default(1),
     smallTextScale: z.number().min(0.9).max(1.35).default(1),
     tagline: z.union([z.string(), z.array(z.string())]).optional(),

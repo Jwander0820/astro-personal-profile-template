@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import { withBase } from '../lib/paths';
 import { getFontPreset, getGoogleFontsUrl } from '../lib/font-presets';
+import { buildThemeCss, DEFAULT_THEME_COLOR } from '../../scripts/theme-color.mjs';
 import ThemeToggle from '../components/ThemeToggle.astro';
 interface Props {
   title: string;
@@ -12,6 +13,7 @@ interface Props {
   smallTextScale?: number;
   bodyFont?: string;
   displayFont?: string;
+  mainColor?: string;
 }
 const {
   title,
@@ -22,6 +24,7 @@ const {
   smallTextScale = 1,
   bodyFont = 'system',
   displayFont = 'system',
+  mainColor = DEFAULT_THEME_COLOR,
 } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const socialImage = image ? new URL(withBase(image) ?? '', Astro.site) : undefined;
@@ -35,6 +38,7 @@ const displayFontFamily = displayFont === 'system'
   ? '"Noto Serif TC", "Noto Serif JP", "Yu Mincho", "Songti TC", serif'
   : displayFontPreset.cssFamily;
 const googleFontsUrl = getGoogleFontsUrl(bodyFont, displayFont);
+const themeCss = buildThemeCss(mainColor);
 ---
 <!doctype html>
 <html
@@ -56,6 +60,7 @@ const googleFontsUrl = getGoogleFontsUrl(bodyFont, displayFont);
     </script>
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
+    <style is:inline set:html={themeCss}></style>
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href={favicon} />
     {googleFontsUrl && (

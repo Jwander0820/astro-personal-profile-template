@@ -6,6 +6,20 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-24
+
+### 新增
+
+- 新增可自訂的 `mainColor`，支援系統色盤、HEX 色碼、八組精選色與完整 RGB 空間隨機抽色，並同步納入內容 schema、AI 回答檔與 Profile Studio。
+- 依主色自動產生亮／暗模式的文字、按鈕、柔和底色及背景漸層，並加入對比保護，讓極亮或極暗色碼仍維持可讀性。
+- Profile Studio 新增僅保存在目前瀏覽器的「最近使用」，記錄最近八個成功儲存且不重複的主色；尚無紀錄時以虛線色槽呈現。
+
+### 改善
+
+- 將主色設定與閱讀排版整合為平衡的雙欄外觀工作區，縮短色碼欄與隨機按鈕，並將精選色與歷史色整理為水平色帶。
+- 黑膠唱盤中央標籤改為沿用目前主色衍生漸層，不再固定使用紫色。
+- 更新 Profile Studio、AI 訪談流程、自訂指南與回歸驗證，確保主色在手動編輯、回答檔套用及網站輸出間保持一致。
+
 ## [1.0.2] - 2026-07-24
 
 ### 修正
@@ -92,7 +106,9 @@
 - Profile Studio 僅監聽本機介面，並驗證 Host、Origin、HTTP method 與 JSON content type。
 - AI 流程要求使用者確認個人事實與網址，不自動發布敏感資料。
 
-[Unreleased]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.2...v1.1.0
+[1.0.2]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Jwander0820/astro-personal-profile-template/compare/2c716400a78b7e91afdb0fa67c91330188dfaf4b...v1.0.0
 [0.1.0]: https://github.com/Jwander0820/astro-personal-profile-template/tree/2c716400a78b7e91afdb0fa67c91330188dfaf4b

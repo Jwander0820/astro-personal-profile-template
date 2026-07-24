@@ -81,6 +81,7 @@
   --turntable-machine-highlight: rgba(255,255,255,.55);
   --turntable-machine-bg: linear-gradient(145deg, #cbc5d1, #eeeaf1 62%, #d7d1dd);
   --turntable-machine-shadow: rgba(87,75,101,.08);
+  --turntable-record-label-bg: radial-gradient(circle at 38% 30%, #a895d0, #705b98);
   --turntable-record-spindle: #d8d3dc;
   --turntable-record-pivot: #bbb5c0;
   --turntable-record-pivot-border: #716b77;
@@ -485,7 +486,7 @@ h1 { margin: 0; font-family: var(--font-display); font-size: clamp(1.9rem, 4vw, 
 .turntable-player__machine::after { content: "33⅓"; position: absolute; right: 13px; bottom: 10px; color: rgba(71,65,79,.65); font: 700 .75rem/1 system-ui, sans-serif; letter-spacing: .12em; }
 .turntable-player__platter { position: absolute; top: 50%; left: var(--record-left); width: var(--record-size); aspect-ratio: 1; padding: 6px; transform: translateY(-50%); border-radius: 50%; background: #9e98a4; box-shadow: 0 9px 17px rgba(42,36,48,.25), inset 0 0 0 2px rgba(255,255,255,.35); }
 .turntable-player__record { position: relative; width: 100%; height: 100%; border-radius: 50%; background: repeating-radial-gradient(circle, transparent 0 5px, rgba(255,255,255,.035) 6px, transparent 7px 10px), radial-gradient(circle, #201e24 0 9%, #302d34 9.5% 47%, #17161a 48% 100%); box-shadow: inset 0 0 0 1px #0d0c0f, inset 0 0 24px rgba(255,255,255,.035); }
-.turntable-player__record::after { content: ""; position: absolute; inset: 36%; border-radius: 50%; background: radial-gradient(circle at 38% 30%, #a895d0, #705b98); box-shadow: 0 0 0 1px rgba(255,255,255,.2); }
+.turntable-player__record::after { content: ""; position: absolute; inset: 36%; border-radius: 50%; background: var(--turntable-record-label-bg); box-shadow: 0 0 0 1px rgba(255,255,255,.2); }
 .turntable-player__spindle { position: absolute; z-index: 1; top: 50%; left: 50%; width: 6px; height: 6px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--turntable-record-spindle); box-shadow: 0 0 0 1px #7c7582; }
 .turntable-player__tonearm { position: absolute; z-index: 2; top: 18px; left: calc(var(--record-left) + var(--record-size) - 2px); width: 44px; height: calc(var(--tonearm-length) + 38px); transform: rotate(0deg); transform-origin: 50% 13px; outline: 0; cursor: grab; touch-action: none; user-select: none; transition: transform .7s cubic-bezier(.22,.8,.25,1); }
 .turntable-player__tonearm::before { content: ""; position: absolute; inset: 0; border-radius: 999px; }
