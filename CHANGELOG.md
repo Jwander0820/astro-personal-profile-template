@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-26
+
 ### 新增
 
 - 新增統一的 `/studio/` Profile Studio；公開模式可在手機編輯、以正式首頁即時預覽並下載設定包，本機模式則在同一頁直接儲存到專案。
@@ -131,7 +133,8 @@
 - Profile Studio 僅監聽本機介面，並驗證 Host、Origin、HTTP method 與 JSON content type。
 - AI 流程要求使用者確認個人事實與網址，不自動發布敏感資料。
 
-[Unreleased]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.0...v1.0.1

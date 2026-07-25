@@ -113,4 +113,4 @@ AI 問答、空白填寫模板與完整發布流程請見 [`docs/AI_PROFILE_SETU
 
 Cloudflare Pages 使用 `npm run build`、輸出目錄 `dist`，並建議固定使用 Node.js 22。完整設定、`SITE_URL` 與錯誤排除請見 [`docs/CLOUDFLARE_PAGES.md`](docs/CLOUDFLARE_PAGES.md)。
 
-從 `0.1.0` 開發基線升級到 V1 的相容性與復原方式，請見 [`docs/V1_UPGRADE.md`](docs/V1_UPGRADE.md)。
+從 `v1.1.x` 升級到 `v1.2.0` 請見 [`docs/V1_2_UPGRADE.md`](docs/V1_2_UPGRADE.md)；從 `0.1.0` 開發基線升級到 V1 的相容性與復原方式，請見 [`docs/V1_UPGRADE.md`](docs/V1_UPGRADE.md)。
