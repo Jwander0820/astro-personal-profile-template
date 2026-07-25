@@ -69,7 +69,11 @@ const fallbackBlocks = remainingBlocks.filter((block) => (
         turntableBlocks.map((block) => <CustomBlock block={block} />)
       ) : section === 'links' ? (
         (featuredLinks.length > 0 || studioEnabled) && (
-          <section class="content-section" aria-labelledby="links-heading">
+          <section
+            class="content-section"
+            aria-labelledby="links-heading"
+            data-studio-only-section={featuredLinks.length === 0 ? '' : undefined}
+          >
             <h2 id="links-heading">{profile.data.linksHeading}</h2>
             <div class="link-list">
               {featuredLinks.map((link) => <LinkCard link={link} />)}

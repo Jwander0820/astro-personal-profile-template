@@ -8,7 +8,7 @@ This repository is an Astro personal-profile template. Markdown and JSON under `
 - Port `4322` is an API adapter only. Do not restore or maintain a second Studio UI there.
 - Studio preview must load the formal `/` page in an iframe and reuse the production `ProfileRenderer`, CSS, SVG icon catalog, and interactive components. Do not create a separate simulated preview.
 - Formal Astro components and `src/scripts/profile-renderer.js` are two render entry points for the same visible document. When changing shared cards, copy, icons, or structure, update both paths and add or adjust a `check:ui` contract so they cannot drift again.
-- The Studio entry card is rendered by `StudioLinkCard.astro` on the formal page and `renderStudioLinkCard()` in the live renderer. Keep their title, description, icon, and lack of extra badges in sync.
+- The Studio entry card and footer link are platform navigation, not profile content. Keep their formal/live renderer implementations in sync, but omit both from the Studio iframe preview (`?studioPreview=1`) so users review only their own public profile content.
 - Dynamic preview features must rebind after `profile-renderer:updated`. When their underlying configuration is unchanged, preserve the existing player or draw node so editing unrelated fields does not interrupt playback or clear a fortune result.
 - Keep the six visible editor steps in this order: basic identity, public links, profile content, appearance, other features, and `06 完成設定`. ZIP/JSON export, import, AI JSON, reset, and local project save belong in the final step instead of the sticky header or unrelated panels.
 - Requested configuration must be visible in Studio and shared with the rendered site. Wire changes through the relevant Astro content schema, answer-file validation, project writer, JSON Schema, preview bridge, documentation, and regression checks; a Studio-only field is incomplete.
@@ -18,12 +18,14 @@ This repository is an Astro personal-profile template. Markdown and JSON under `
 - Browser-only drafts use `localStorage`; uploaded image blobs use IndexedDB. The public Studio must not write to GitHub, hold repository credentials, or silently upload drafts.
 - Image fields accept a safe `/images/` project path or a public HTTPS URL. Uploaded files belong in `public/images/`; external URLs remain URLs. Standalone JSON does not contain uploaded image binaries, while the ZIP settings package does.
 - Local project writes must remain explicit. No-op writes must preserve file mtime and avoid false Git or IDE changes.
-- `ONLINE_STUDIO_MODE=auto|public|off` controls production output. `auto` requires an exact repository or site allowlist match; local development always keeps Studio available. Treat this as a build rule, not authentication.
+- `ONLINE_STUDIO_MODE=auto|public|off` controls production output. `auto` requires an exact repository or site allowlist match, so an unconfigured fork must not emit Studio routes, the Links entry card, or the footer link. Local development always keeps Studio available. Treat this as a build rule, not authentication.
 - Do not expose the local adapter, tokens, secrets, or personal answer files in static output.
 
 ## When the user asks how to create or update their profile
 
 Use the guided setup flow in `docs/AI_PROFILE_SETUP.md`.
+
+For ordinary setup and troubleshooting questions, also consult `docs/FAQ.md`; keep its answers consistent with the current Studio labels and deployment behavior.
 
 1. Read `docs/profile-answers.schema.json` and `profile.answers.example.json` before asking questions.
 2. Ask only for missing information. Start with the display name, then offer the optional short title, keywords, bio, social links, featured links, profile sections, playlist, and appearance choices.

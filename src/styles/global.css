@@ -526,6 +526,12 @@ h1 { margin: 0; font-family: var(--font-display); font-size: clamp(1.9rem, 4vw, 
 footer { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 42px 4px 0; padding-top: 18px; color: var(--footer-color); border-top: 1px solid var(--footer-border); font-size: var(--text-xs); }
 .footer-studio-link { display: inline-flex; align-items: center; gap: 4px; color: var(--footer-color); font-weight: 700; text-decoration: none; }
 .footer-studio-link:hover { color: var(--accent); }
+
+html[data-studio-preview="true"] [data-studio-link-card],
+html[data-studio-preview="true"] [data-studio-only-section],
+html[data-studio-preview="true"] .footer-studio-link {
+  display: none;
+}
 a:focus-visible, button:focus-visible, [role="slider"]:focus-visible { outline: 3px solid var(--focus-outline); outline-offset: 3px; }
 
 /* Custom Scrollbar */

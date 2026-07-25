@@ -17,7 +17,7 @@ npm run dev
 
 ### 使用統一的 Profile Studio
 
-在允許公開 Studio 的 GitHub repository／網站部署後，首頁的 Links 會多一張「建立你的自介網站」卡片，頁尾也保留小型入口；兩者都會前往同站的 `/studio/`。這個版本可在手機或瀏覽器中：
+在允許公開 Studio 的 GitHub repository／網站部署後，正式首頁的 Links 會多一張「建立你的自介網站」卡片，頁尾也保留小型入口；兩者都會前往同站的 `/studio/`。這兩個入口屬於範本導覽，不是個人資料，因此 Studio 右側預覽會省略它們。這個版本可在手機或瀏覽器中：
 
 - 從目前網站內容開始修改顯示名稱、自介、公開連結、卡片、圖片板塊、播放清單與外觀。
 - 以正式首頁、同一套 CSS 與 SVG Icons 即時切換寬／窄版預覽。
@@ -49,7 +49,7 @@ Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，首次啟動時�
 
 前往 `http://localhost:4321/studio/`。畫面會自動偵測只綁定 loopback 的背景寫入服務，顯示「儲存到專案」；按下後才會更新 `src/content/**` 與 `public/images/`。`4322` 不再提供另一套 UI，只是 `/studio/` 在本機使用的背景 API。
 
-正式部署預設使用 `ONLINE_STUDIO_MODE=auto`：本機永遠可使用 Studio，線上則只有 `ONLINE_STUDIO_ALLOWED_REPOSITORIES` 或 `ONLINE_STUDIO_ALLOWED_SITES` 精確列出的目標會產生 `/studio/`、`/studio/fortune-poem/`、`/studio/icons/`、Links 卡片與頁尾入口。GitHub Actions 目前只預先允許 `Jwander0820/astro-personal-profile-template`，因此範例 GitHub Pages 會同步開放，fork 到其他帳號後則預設關閉。
+正式部署預設使用 `ONLINE_STUDIO_MODE=auto`：本機永遠可使用 Studio，線上則只有 `ONLINE_STUDIO_ALLOWED_REPOSITORIES` 或 `ONLINE_STUDIO_ALLOWED_SITES` 精確列出的目標會產生 `/studio/`、`/studio/fortune-poem/`、`/studio/icons/`、Links 卡片與頁尾入口。GitHub Actions 目前只預先允許 `Jwander0820/astro-personal-profile-template`；fork 後的 `owner/repository` 不相同，所以別人的正式網站預設不會出現 Studio 路由或入口。
 
 ```text
 ONLINE_STUDIO_MODE=auto
@@ -57,7 +57,7 @@ ONLINE_STUDIO_ALLOWED_REPOSITORIES=Jwander0820/astro-personal-profile-template
 ONLINE_STUDIO_ALLOWED_SITES=https://jwander0820.github.io/astro-personal-profile-template
 ```
 
-`public` 可讓任何部署保留 Studio；`off` 會從所有正式建置移除 Studio。這些值是公開的建置規則，不是密碼或登入保護。
+要在自己的 fork 主動開放，可在 repository 的 **Settings → Secrets and variables → Actions → Variables** 新增 `ONLINE_STUDIO_ALLOWED_REPOSITORIES=你的帳號/你的repository`；自訂網域則可改用 `ONLINE_STUDIO_ALLOWED_SITES`。`public` 可讓任何部署保留 Studio；`off` 會從所有正式建置移除 Studio。這些值是公開的建置規則，不是密碼或登入保護。
 
 
 ### 讓 AI 引導建立自介
@@ -77,6 +77,8 @@ ONLINE_STUDIO_ALLOWED_SITES=https://jwander0820.github.io/astro-personal-profile
 這個模式仍會在 push 前停下來確認即將公開的姓名、地點、email 與連結；第一次部署所需的 GitHub 設定請見下方部署說明。
 
 AI 問答、空白填寫模板與完整發布流程請見 [`docs/AI_PROFILE_SETUP.md`](docs/AI_PROFILE_SETUP.md)。只有一般聊天介面、不能存取 repository 的 AI，可使用 [provider-neutral 訪談提示詞](docs/ai/PROFILE_INTERVIEW_PROMPT.md) 產生 JSON，再貼到 Profile Studio。
+
+不確定 Studio、fork、JSON／ZIP、圖片、AI 或發布該怎麼操作時，先看 [`docs/FAQ.md`](docs/FAQ.md)。
 
 
 ## 修改內容

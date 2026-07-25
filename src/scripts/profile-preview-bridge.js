@@ -14,7 +14,8 @@ const FONT_FAMILIES = {
 if (window.parent !== window) {
   const rendererRoot = document.querySelector('main');
   const initialProfileRenderer = document.querySelector('[data-profile-renderer]');
-  const studioEnabled = initialProfileRenderer?.dataset.studioEnabled === 'true';
+  const studioEnabled = initialProfileRenderer?.dataset.studioEnabled === 'true'
+    && document.documentElement.dataset.studioPreview !== 'true';
   const studioHref = initialProfileRenderer?.dataset.studioHref || withBase('/studio/');
   const turntableTemplate = document.querySelector('#studio-turntable-template');
   const fortuneTemplate = document.querySelector('#studio-fortune-template');

@@ -35,7 +35,7 @@ Agent 應先取得網站最基本的顯示名稱，再讓使用者自行選擇�
 
 ## 沒有電腦時：使用線上 Studio
 
-允許公開 Studio 的部署會在首頁 Links 與頁尾提供 `/studio/` 入口。線上 Studio 不需要安裝 Node.js 或 npm，手機也能使用；它會從目前網站內容建立草稿，並支援 AI JSON 匯入、正式頁面即時預覽、圖片上傳或公開 HTTPS 圖片網址、唱盤試播、今日手氣標題／說明／籤桶編輯與試抽，以及下載包含 JSON 與圖片的 `profile-settings.zip`。頂端 route 可在同一分頁切換個人檔案、籤詩與 Icon 預覽。
+允許公開 Studio 的部署會在正式首頁 Links 與頁尾提供 `/studio/` 入口。線上 Studio 不需要安裝 Node.js 或 npm，手機也能使用；它會從目前網站內容建立草稿，並支援 AI JSON 匯入、正式頁面即時預覽、圖片上傳或公開 HTTPS 圖片網址、唱盤試播、今日手氣標題／說明／籤桶編輯與試抽，以及下載包含 JSON 與圖片的 `profile-settings.zip`。頂端 route 可在同一分頁切換個人檔案、籤詩與 Icon 預覽。
 
 線上版不具備 GitHub 寫入權限，也不會把草稿送到後端。下載後可先保留檔案，日後有本機專案時：
 
@@ -43,7 +43,7 @@ Agent 應先取得網站最基本的顯示名稱，再讓使用者自行選擇�
 2. 執行 `npm run studio` 後，同一頁會顯示「儲存到專案」；確認後才寫入 Markdown 與圖片。JSON 也可使用 `npm run profile:apply -- profile.answers.json`。
 3. 執行 `npm run build`，再依公開內容摘要確認是否發布。
 
-預覽直接嵌入正式首頁並使用正式 CSS、卡片結構與 SVG Icons；圖片使用瀏覽器 Blob URL 即時顯示。YouTube 實際播放、外部 iframe 能否載入，仍取決於瀏覽器與第三方服務。
+預覽直接嵌入正式首頁並使用正式 CSS、卡片結構與 SVG Icons；只會省略「建立你的自介網站」卡片與頁尾 Studio 連結，因為它們是範本導覽而非使用者內容。圖片使用瀏覽器 Blob URL 即時顯示。YouTube 實際播放、外部 iframe 能否載入，仍取決於瀏覽器與第三方服務。
 
 ## Coding agent 一站式流程
 
@@ -173,13 +173,15 @@ npm run build
 
 具備 Git 權限的 coding agent 可以在公開內容摘要得到確認後協助 commit／push。一般聊天型 AI 無法直接操作 repository。第一次部署通常仍需要 repository 擁有者在 GitHub 完成：
 
-1. Fork 專案，或建立自己的 repository。
+1. Fork 專案，或建立自己的 repository。fork 的正式部署預設不公開線上 Studio；需要時再設定 `ONLINE_STUDIO_ALLOWED_REPOSITORIES` 或 `ONLINE_STUDIO_ALLOWED_SITES`。
 2. 到 **Settings → Pages → Build and deployment**，將 Source 設為 **GitHub Actions**。
 3. 到 **Actions** 頁面啟用 fork 的 workflow（若 GitHub 顯示停用提示）。
 4. 確認 coding agent 使用的 `origin` 是自己的 repository，並已具備 push 權限。
 5. 將完成內容推送到 `main`。
 
 部署 workflow 會自動判斷使用者首頁 repository（`帳號.github.io`）與一般 project repository 的 base path。若 workflow 失敗，Agent 應回報失敗階段與可操作的修正方式，不應把本機 build 成功當成部署完成。
+
+Studio 與發布常見問題請見 [`FAQ.md`](FAQ.md)。
 
 ## 隱私與安全
 

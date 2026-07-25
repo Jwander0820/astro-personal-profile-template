@@ -327,6 +327,7 @@ export function mountFortuneStudio() {
   }
 
   async function detectLocalAdapter() {
+    if (!['localhost', '127.0.0.1'].includes(window.location.hostname)) return;
     try {
       const response = await fetch(`${bootstrap.localApiUrl}/api/fortunes`, { cache: 'no-store' });
       if (!response.ok) return;

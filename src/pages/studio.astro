@@ -12,17 +12,12 @@ const initialAnswers = createProfileAnswersFromStudioContent(content);
 const notionVisible = content.blocks.some((block: { id: string; data: { visible?: boolean } }) => block.id === 'notion-embed' && block.data.visible);
 const bootstrap = {
   initialAnswers,
-  basePath: withBase('/'),
-  siteHref: withBase('/'),
   localApiUrl: 'http://localhost:4322',
-  previewAssets: {
-    avatar: content.profile.avatar || '/images/avatar.svg',
-    background: content.profile.background || '/images/background.svg',
-  },
   notionVisible,
 };
 const bootstrapJson = JSON.stringify(bootstrap).replace(/</g, '\\u003c');
 const favicon = withBase('/favicon.svg');
+const previewHref = `${withBase('/')}?studioPreview=1`;
 ---
 <!doctype html>
 <html lang="zh-Hant">
@@ -344,12 +339,12 @@ const favicon = withBase('/favicon.svg');
             <iframe
               id="profile-preview"
               class="profile-preview"
-              src={withBase('/')}
+              src={previewHref}
               title="使用正式網站 renderer 的即時預覽"
             ></iframe>
           </div>
         </div>
-        <p class="preview-footnote">預覽直接載入正式網站與同一套 CSS、元件結構及 SVG Icons；編輯內容會即時送入這個正式頁面。</p>
+        <p class="preview-footnote">預覽直接載入正式網站與同一套 CSS、元件結構及 SVG Icons；只會省略 Studio 自己的入口卡片與頁尾連結。</p>
       </aside>
     </main>
 

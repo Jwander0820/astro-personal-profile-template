@@ -18,12 +18,15 @@
 ### 改善
 
 - 正式首頁改由 `ProfileRenderer` 統一組裝；Studio 預覽直接載入正式頁面、CSS 與 SVG Icon catalog，不再維護另一套模擬畫面。
+- Studio 預覽會省略範本自己的 Links 入口卡片與頁尾 Studio 連結，避免把平台導覽誤認為使用者無法刪除的個人內容。
+- 公開籤詩編輯器不再嘗試連線訪客電腦的 loopback adapter；本機寫入探測只在 `localhost` 或 `127.0.0.1` 執行。
 - 移除舊 4322 Studio UI；4322 僅保留 loopback 背景寫入 API，並加入 `ONLINE_STUDIO_MODE=auto|public|off`、repository 與網站 allowlist。
 - Studio 正式預覽中的唱盤可重新掛載 YouTube 播放器；編輯相同播放清單的文字時會保留目前播放器，不再只顯示不可操作的外觀。
 - Studio 正式預覽中的今日手氣可直接試抽，編輯其它欄位時也會保留目前籤紙結果；開場文案同步精簡以騰出編輯空間。
 - 首頁 Studio 入口卡片移除額外標籤，並讓正式 Astro 元件與即時預覽 renderer 維持相同文案與結構。
 - `profile.answers.json` 與 ZIP 設定包現在會匯出／匯入完整籤桶；舊版未含籤桶的回答檔仍保留相容性。
 - Icon 預覽移至受 Studio 開關保護的 `/studio/icons/`，複製按鈕只複製 `mail` 這類 Studio 可直接使用的代號。
+- 補上面向一般使用者的 FAQ，並修正 AI 訪談提示詞中貼上 JSON 的分頁名稱。
 
 ## [1.1.0] - 2026-07-24
 
