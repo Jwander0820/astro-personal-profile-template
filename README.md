@@ -21,12 +21,13 @@ npm run dev
 
 - 從目前網站內容開始修改顯示名稱、自介、公開連結、卡片、圖片板塊、播放清單與外觀。
 - 以正式首頁、同一套 CSS 與 SVG Icons 即時切換寬／窄版預覽。
-- 上傳頭像、封面及內容圖片，圖片草稿會連同文字保留在目前瀏覽器。
+- 上傳頭像、封面及內容圖片，或貼上公開 HTTPS 圖片網址；圖片草稿會連同文字保留在目前瀏覽器。
 - 直接操作正式唱盤播放器，確認播放清單與頁面上的實際效果。
+- 在正式預覽中直接試抽「今日手氣」，確認互動與實際網站一致。
 - 匯入既有 JSON、AI 討論產生的 `profile.answers.json`，或包含圖片的 Studio ZIP 設定包。
-- 下載包含 `profile.answers.json` 與自訂圖片的 `profile-settings.zip`。
+- 在「完成設定」下載完整 ZIP、下載／複製純 JSON、匯入設定或還原預設；本機模式也在同一處儲存到專案。
 
-公開網站上的 Studio 是純前端設定產生器，不會寫入 repository、修改 GitHub 或自動發布，也不會把草稿上傳到伺服器。若只有 JSON，仍可把 `profile.answers.json` 放到專案根目錄後執行：
+公開網站上的 Studio 是純前端設定產生器，不會寫入 repository、修改 GitHub 或自動發布，也不會把草稿上傳到伺服器。純 JSON 只包含文字、圖片路徑與圖片網址，不包含從裝置上傳的圖片檔；使用自訂上傳圖片時請下載完整 ZIP。若只有 JSON，仍可把 `profile.answers.json` 放到專案根目錄後執行：
 
 ```bash
 npm run profile:apply -- profile.answers.json
@@ -84,7 +85,7 @@ AI 問答、空白填寫模板與完整發布流程請見 [`docs/AI_PROFILE_SETU
 - 自訂區塊：`src/content/blocks/*.md`
 - 圖片：`public/images/`
 
-圖片放進 `public/images/`，並在 Markdown 中使用 `/images/檔名`。
+圖片可以放進 `public/images/` 並使用 `/images/檔名`，也可直接使用公開的 `https://` 圖片網址；外部網站需允許圖片外連。
 
 連結、自訂區塊、圖片板塊、Notion 與黑膠唱盤的欄位和範例，請見 [`docs/CUSTOMIZATION_GUIDE.md`](docs/CUSTOMIZATION_GUIDE.md)。
 

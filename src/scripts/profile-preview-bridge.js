@@ -1,7 +1,7 @@
 import { icons } from '../lib/icons';
 import { withBase } from '../lib/paths';
 import { buildThemeCss, normalizeThemeColor } from '../../scripts/theme-color.mjs';
-import { isSafeImagePath } from '../../scripts/content-safety.mjs';
+import { isSafeImageSource } from '../../scripts/content-safety.mjs';
 import { renderProfileDocument } from './profile-renderer.js';
 
 const FONT_FAMILIES = {
@@ -17,10 +17,12 @@ if (window.parent !== window) {
   const studioEnabled = initialProfileRenderer?.dataset.studioEnabled === 'true';
   const studioHref = initialProfileRenderer?.dataset.studioHref || withBase('/studio/');
   const turntableTemplate = document.querySelector('#studio-turntable-template');
+  const fortuneTemplate = document.querySelector('#studio-fortune-template');
   const templates = {
     turntable: turntableTemplate?.content?.firstElementChild?.cloneNode(true)
       || document.querySelector('.custom-block--turntable')?.cloneNode(true),
-    fortune: document.querySelector('.custom-block--fortune')?.cloneNode(true),
+    fortune: fortuneTemplate?.content?.firstElementChild?.cloneNode(true)
+      || document.querySelector('.custom-block--fortune')?.cloneNode(true),
     notion: document.querySelector('.custom-block--embed')?.cloneNode(true),
   };
 
@@ -40,7 +42,7 @@ if (window.parent !== window) {
       templates,
       studioEnabled,
       studioHref,
-      assetHref: (path) => isSafeImagePath(path) ? (assets.objectUrls?.[path] || withBase(path)) : '',
+      assetHref: (path) => isSafeImageSource(path) ? (assets.objectUrls?.[path] || withBase(path)) : '',
     });
     window.parent.postMessage({ type: 'profile-studio:rendered' }, event.origin);
   });

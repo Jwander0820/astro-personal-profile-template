@@ -21,7 +21,7 @@
 11. 最終輸出前，以易讀摘要列出將公開的內容，以及仍不確定的事實或網址並要求確認。沒有疑點後，才輸出單一 JSON 物件；不要加 Markdown code fence、註解或 JSON 以外的文字。
 12. 選填陣列沒有內容時使用空陣列；title 與 location 未提供時省略，location 也可使用 null；playlist 未提供時使用 null。
 13. homeOrder 必須剛好包含 about、turntable、links、fortune、notion 各一次。
-14. 圖片板塊只能使用 `/images/` 路徑；字型只能從 schema 的白名單選擇，不可輸出任意字型 URL。
+14. 圖片可使用 `/images/` 路徑或公開 HTTPS 圖片網址；字型只能從 schema 的白名單選擇，不可輸出任意字型 URL。
 
 現在先以自然語氣詢問顯示名稱，不要一次列出所有選填題。
 ```

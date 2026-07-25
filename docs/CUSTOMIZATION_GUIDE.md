@@ -10,7 +10,7 @@
 - 自訂區塊、圖片、Notion、唱盤與抽籤：`src/content/blocks/*.md`
 - 圖片檔案：`public/images/`
 
-圖片放進 `public/images/` 後，請使用 `/images/檔名` 引用。修改完成後執行 `npm run build`，確認欄位和值符合內容格式。
+圖片放進 `public/images/` 後，可使用 `/images/檔名` 引用；也可以直接填入公開的 `https://` 圖片網址。外部圖片能否顯示仍取決於來源網站是否允許外連。修改完成後執行 `npm run build`，確認欄位和值符合內容格式。
 
 ## 基本資料與外觀
 
@@ -64,7 +64,7 @@ tags: [Python, Notes]
 | `style` | `primary`、`normal`、`subtle` |
 | `order` | 同群組由小到大排序 |
 | `visible` | `true` 顯示，`false` 隱藏 |
-| `image` | 選填，自訂圖片的 `/images/` 路徑 |
+| `image` | 選填，自訂圖片的 `/images/` 路徑或公開 HTTPS 網址 |
 | `tags` | 選填，卡片標籤陣列 |
 
 `layout: icon` 適合頭像下方的社群快速連結；`layout: card` 搭配 `group: main` 或 `featured` 會顯示在 Links 板塊。
@@ -129,7 +129,7 @@ tags: [Travel]
 
 | 欄位 | 可用值 |
 |---|---|
-| `image` | 必填，`/images/` 下的圖片路徑 |
+| `image` | 必填，`/images/` 下的圖片路徑或公開 HTTPS 網址 |
 | `imageAlt` | 圖片替代文字，建議描述畫面內容 |
 | `imageLayout` | `full`、`split-left`、`split-right`、`poster` |
 | `imageAspect` | `auto`、`landscape`、`square`、`portrait` |

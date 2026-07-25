@@ -1,4 +1,4 @@
-import { isSafeImagePath, isSafeProfileUrl } from './content-safety.mjs';
+import { isSafeImageSource, isSafeProfileUrl } from './content-safety.mjs';
 import { assertThemeColor, DEFAULT_THEME_COLOR } from './theme-color.mjs';
 import { parseYoutubePlaylistId } from './youtube-playlist.mjs';
 
@@ -82,11 +82,13 @@ function assertUnique(items, key, label) {
   return items;
 }
 
-function assertImagePath(value, label, { required = false } = {}) {
-  const imagePath = assertText(value, label, { required, max: 300 });
-  if (!imagePath) return '';
-  if (!isSafeImagePath(imagePath)) throw new Error(`${label}必須是 /images/ 下的安全路徑。`);
-  return imagePath;
+function assertImageSource(value, label, { required = false } = {}) {
+  const imageSource = assertText(value, label, { required, max: 2048 });
+  if (!imageSource) return '';
+  if (!isSafeImageSource(imageSource)) {
+    throw new Error(`${label}必須是 /images/ 下的安全路徑或公開 HTTPS 圖片網址。`);
+  }
+  return imageSource;
 }
 
 export function extractYoutubePlaylistId(value) {
@@ -115,8 +117,8 @@ export function validateProfileAnswers(input) {
   const mediaInput = input.media ?? {};
   assertAllowedKeys(mediaInput, ['avatar', 'background'], 'media');
   const media = {
-    avatar: assertImagePath(mediaInput.avatar ?? '/images/avatar.svg', '頭像'),
-    background: assertImagePath(mediaInput.background ?? '/images/background.svg', '背景圖片'),
+    avatar: assertImageSource(mediaInput.avatar ?? '/images/avatar.svg', '頭像'),
+    background: assertImageSource(mediaInput.background ?? '/images/background.svg', '背景圖片'),
   };
 
   const socialInput = input.socials === undefined ? [] : assertObjectArray(input.socials, '社群連結', 20);
@@ -150,7 +152,7 @@ export function validateProfileAnswers(input) {
   const sections = sectionInput.map((item, index) => {
     if (!isObject(item)) throw new Error(`第 ${index + 1} 個自介區塊格式不正確。`);
     assertAllowedKeys(item, ['id', 'title', 'description', 'tags', 'image'], `第 ${index + 1} 個自介區塊`);
-    const image = item.image === undefined ? '' : assertImagePath(item.image, '圖片路徑', { required: true });
+    const image = item.image === undefined ? '' : assertImageSource(item.image, '圖片來源', { required: true });
     return {
       id: assertSlug(item.id, '自介區塊 ID'),
       title: assertText(item.title, '自介區塊名稱', { required: true, max: 80 }),
@@ -167,7 +169,7 @@ export function validateProfileAnswers(input) {
     return {
       id: assertSlug(item.id, '圖片板塊 ID'),
       title: assertText(item.title, '圖片板塊標題', { required: true, max: 80 }),
-      image: assertImagePath(item.image, '圖片板塊圖片', { required: true }),
+      image: assertImageSource(item.image, '圖片板塊圖片', { required: true }),
       imageAlt: assertProvidedText(item.imageAlt, '圖片替代文字', { max: 300 }),
       description: assertProvidedText(item.description, '圖片板塊文字', { max: 5000 }),
       placement: assertOptionalEnum(item.placement, IMAGE_BLOCK_PLACEMENTS, '圖片板塊位置', 'after-sections'),

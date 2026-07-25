@@ -1,6 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
-import { isSafeHttpUrl, isSafeImagePath, isSafeProfileUrl } from './content-safety.mjs';
+import { isSafeHttpUrl, isSafeImageSource, isSafeProfileUrl } from './content-safety.mjs';
 import { atomicWriteText, withFileWriteLock } from './file-writes.mjs';
 import { assertThemeColor, DEFAULT_THEME_COLOR } from './theme-color.mjs';
 import {
@@ -162,13 +162,13 @@ function assertUnique(items, key, label) {
   return items;
 }
 
-function assertImagePath(value, label, { required = false } = {}) {
-  const imagePath = assertText(value, label, { required, max: 300 });
-  if (!imagePath) return '';
-  if (!isSafeImagePath(imagePath)) {
-    throw new Error(`${label}必須是 /images/ 下的安全路徑。`);
+function assertImageSource(value, label, { required = false } = {}) {
+  const imageSource = assertText(value, label, { required, max: 2048 });
+  if (!imageSource) return '';
+  if (!isSafeImageSource(imageSource)) {
+    throw new Error(`${label}必須是 /images/ 下的安全路徑或公開 HTTPS 圖片網址。`);
   }
-  return imagePath;
+  return imageSource;
 }
 
 function safeFile(root, ...segments) {
@@ -248,8 +248,8 @@ export async function saveStudioProfile(projectRoot, input) {
       title: assertText(input.title, '一句話身分', { max: 120 }) || undefined,
       location: assertText(input.location, '地點', { max: 100 }) || undefined,
       archiveLabel: assertText(input.archiveLabel, '封面標籤', { max: 100 }) || undefined,
-      avatar: assertImagePath(input.avatar, '頭像') || undefined,
-      background: assertImagePath(input.background, '背景圖片') || undefined,
+      avatar: assertImageSource(input.avatar, '頭像') || undefined,
+      background: assertImageSource(input.background, '背景圖片') || undefined,
       sectionsLayout: ['list', 'grid'].includes(input.sectionsLayout) ? input.sectionsLayout : 'grid',
       bodyFont,
       displayFont,
@@ -362,7 +362,7 @@ export async function saveStudioSection(projectRoot, id, input) {
   return updateMarkdownFile(sectionPath, async (current) => {
     const order = Number(input.order ?? current.data.order ?? 100);
     if (!Number.isFinite(order) || order < 0 || order > 10000) throw new Error('卡片順序必須介於 0～10000。');
-    const image = assertImagePath(input.image ?? current.data.image, '卡片圖片');
+    const image = assertImageSource(input.image ?? current.data.image, '卡片圖片');
     const next = {
       ...current.data,
       title: assertText(input.title, '卡片標題', { required: true, max: 80 }),
@@ -401,7 +401,7 @@ export async function saveStudioLink(projectRoot, id, input) {
       : current.data.style ?? 'normal';
     const order = Number(input.order ?? current.data.order ?? 100);
     if (!Number.isFinite(order) || order < 0 || order > 10000) throw new Error('連結順序必須介於 0～10000。');
-    const image = assertImagePath(input.image, '自訂 Icon');
+    const image = assertImageSource(input.image, '自訂 Icon');
     const tags = assertStringArray(input.tags ?? current.data.tags ?? [], '連結標籤', { max: 8 });
     const body = input.body === undefined
       ? current.body
@@ -480,7 +480,7 @@ export async function saveStudioImageBlock(projectRoot, id, input) {
       order,
       visible: input.visible === undefined ? Boolean(current.data.visible ?? true) : Boolean(input.visible),
       layout: 'image',
-      image: assertImagePath(input.image ?? current.data.image, '圖片路徑'),
+      image: assertImageSource(input.image ?? current.data.image, '圖片來源'),
       imageAlt: assertText(input.imageAlt ?? current.data.imageAlt, '圖片替代文字', { max: 300 }),
       imageLayout: IMAGE_BLOCK_LAYOUTS.includes(input.imageLayout) ? input.imageLayout : current.data.imageLayout ?? 'full',
       imageAspect: IMAGE_BLOCK_ASPECTS.includes(input.imageAspect) ? input.imageAspect : current.data.imageAspect ?? 'landscape',

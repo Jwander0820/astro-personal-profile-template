@@ -2,6 +2,20 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/profile-answers.schema.json",
   "title": "Personal profile interview answers",
+  "$defs": {
+    "imageSource": {
+      "type": "string",
+      "maxLength": 2048,
+      "description": "專案 /images/ 路徑或公開 HTTPS 圖片網址",
+      "anyOf": [
+        {
+          "pattern": "^/images/[A-Za-z0-9._/-]+$",
+          "not": { "pattern": "\\.\\." }
+        },
+        { "format": "uri", "pattern": "^[Hh][Tt][Tt][Pp][Ss]://" }
+      ]
+    }
+  },
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "identity"],
@@ -24,8 +38,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "avatar": { "type": "string", "pattern": "^/images/[A-Za-z0-9._/-]+$" },
-        "background": { "type": "string", "pattern": "^/images/[A-Za-z0-9._/-]+$" }
+        "avatar": { "$ref": "#/$defs/imageSource" },
+        "background": { "$ref": "#/$defs/imageSource" }
       }
     },
     "socials": {
@@ -72,7 +86,7 @@
           "title": { "type": "string", "minLength": 1, "maxLength": 80 },
           "description": { "type": "string", "minLength": 1, "maxLength": 2000 },
           "tags": { "type": "array", "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 80 } },
-          "image": { "type": "string", "pattern": "^/images/[A-Za-z0-9._/-]+$" }
+          "image": { "$ref": "#/$defs/imageSource" }
         }
       }
     },
@@ -86,7 +100,7 @@
         "properties": {
           "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
           "title": { "type": "string", "minLength": 1, "maxLength": 80 },
-          "image": { "type": "string", "pattern": "^/images/[A-Za-z0-9._/-]+$" },
+          "image": { "$ref": "#/$defs/imageSource" },
           "imageAlt": { "type": "string", "maxLength": 300 },
           "description": { "type": "string", "maxLength": 5000 },
           "placement": { "enum": ["before-links", "between-links-sections", "after-sections"], "default": "after-sections" },

@@ -19,11 +19,13 @@ Windows 建議直接雙擊 `start-studio.cmd`，或執行：
 
 背景 API 不會部署到 `dist`，GitHub Pages 上也不存在。公開 `/studio/` 使用 `localStorage` 保存文字、IndexedDB 保存圖片 Blob，並以 ZIP 匯入／匯出；不會嘗試連線 GitHub。以 `npm run studio` 啟動時，同一頁會偵測背景 API，只有使用者按下「儲存到專案」才把通過檔頭驗證的 PNG、JPG、WebP 或 GIF（單檔上限 5 MB）寫入 `public/images/`，再套用內容。
 
-所有欄位都即時送入嵌入的正式首頁；首頁與 Studio 使用同一份正式 CSS、ProfileRenderer 結構及 Icon catalog。唱盤也會在 renderer 更新後重新掛載正式 YouTube Player；播放清單 ID 不變時會保留現有播放器，避免編輯其它文字便中斷。寫入仍保持明確按鈕，不會因輸入事件自動修改檔案。
+所有欄位都即時送入嵌入的正式首頁；首頁與 Studio 使用同一份正式 CSS、ProfileRenderer 結構及 Icon catalog。唱盤會在 renderer 更新後重新掛載正式 YouTube Player；今日手氣也會重新綁定抽籤事件。播放清單或籤筒仍顯示時會保留現有互動節點，避免編輯其它文字便中斷播放或清除已抽結果。寫入仍保持明確按鈕，不會因輸入事件自動修改檔案。
 
 連結管理分為個人資料下方的社群 Icons，以及首頁 Links 卡片。新增社群時先從內建服務與 Icon 選擇；「自訂網站」使用一般網站名稱、URL 與箭頭 Icon。若目前建置允許公開 Studio，Links 尾端會由程式加入「建立你的自介網站」入口；它不是使用者內容，不會寫進 `src/content/links` 或匯出的回答檔。
 
-圖片板塊是 `blocks/*.md` 中的 `layout: image`。Studio 可建立與維護滿版、左右分割、海報式版型，並設定比例、裁切焦點、替代文字、Markdown 附文及顯示錨點。`placement` 會實際錨定在 Links 前、Links 後或 About 後；若對應首頁板塊被隱藏，圖片板塊會移到主要內容尾端，避免內容消失。
+圖片板塊是 `blocks/*.md` 中的 `layout: image`。Studio 可上傳圖片、使用 `/images/` 專案路徑，或保留公開 HTTPS 圖片網址，並建立滿版、左右分割、海報式版型，設定比例、裁切焦點、替代文字、Markdown 附文及顯示錨點。`placement` 會實際錨定在 Links 前、Links 後或 About 後；若對應首頁板塊被隱藏，圖片板塊會移到主要內容尾端，避免內容消失。
+
+「完成設定」集中 ZIP、JSON、匯入、還原與本機儲存。完整 ZIP 會包含回答檔和瀏覽器中的上傳圖片；單獨 JSON 只保存文字、`/images/` 路徑與 HTTPS 網址，不包含圖片 Blob。
 
 字型使用 `src/data/font-presets.json` 白名單。`system` 不發出外部請求；其他選項由 Google Fonts 載入，且目前只收錄 SIL Open Font License 1.1 字型。內文與展示標題可分開設定。
 
@@ -35,7 +37,7 @@ Windows 建議直接雙擊 `start-studio.cmd`，或執行：
 | 首頁五大板塊順序、顯示與標題 | `profile/main.md` 的 `homeOrder`、`homeVisibility`、`aboutHeading`、`linksHeading` | 順序固定五個唯一值；顯示設定可為任意子集合 |
 | 社群連結 | `links/*.md` | URL protocol、content schema |
 | 自介卡片 | `sections/*.md` | `order`、`visible`、layout |
-| 圖片板塊 | `blocks/*.md` | 圖片路徑、區域、版型、比例、焦點與替代文字 |
+| 圖片板塊 | `blocks/*.md` | 圖片路徑或 HTTPS 網址、區域、版型、比例、焦點與替代文字 |
 | 播放清單／抽籤／Notion | `blocks/*.md` | 各 block 的條件驗證 |
 | 籤桶內容 | `fortunes.json` | 共用籤桶模組的 ID、等級、分類、訊息、啟用數與 revision 驗證 |
 

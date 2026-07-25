@@ -65,6 +65,21 @@ export function isSafeImagePath(value) {
   return /^\/images\/[A-Za-z0-9._/-]+$/.test(imagePath) && !imagePath.includes('..');
 }
 
+export function isSafeImageSource(value) {
+  if (isSafeImagePath(value)) return true;
+  const imageUrl = normalizedUrl(value);
+  if (!imageUrl || imageUrl.startsWith('//') || /['"()\\\s]/.test(imageUrl)) return false;
+  try {
+    const parsed = new URL(imageUrl);
+    return parsed.protocol.toLowerCase() === 'https:'
+      && Boolean(parsed.hostname)
+      && !parsed.username
+      && !parsed.password;
+  } catch {
+    return false;
+  }
+}
+
 function unsafeUrlError(url, source = '') {
   return new Error(`Markdown URL uses a blocked or invalid protocol: ${url}${source}`);
 }

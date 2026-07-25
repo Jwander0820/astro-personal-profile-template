@@ -10,6 +10,7 @@ const links = await getLinks();
 const sections = await getSections();
 const blocks = await getBlocks();
 const turntableTemplate = await getBlock('turntable');
+const fortuneTemplate = await getBlock('fortune');
 const fortunes = await getFortunes();
 const taglineText = Array.isArray(profile.data.tagline)
   ? profile.data.tagline.join(', ')
@@ -38,5 +39,5 @@ const studioEnabled = resolveOnlineStudioAccess({
   displayFont={profile.data.displayFont}
   mainColor={profile.data.mainColor}
 >
-  <ProfileRenderer {profile} {links} {sections} {blocks} {fortunes} {turntableTemplate} {studioEnabled} {studioHref} />
+  <ProfileRenderer {profile} {links} {sections} {blocks} {fortunes} {turntableTemplate} {fortuneTemplate} {studioEnabled} {studioHref} />
 </BaseLayout>

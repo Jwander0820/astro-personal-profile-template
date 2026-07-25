@@ -177,9 +177,6 @@ function renderStudioLinkCard(studioHref, icons) {
   const copy = node('span', 'link-copy');
   copy.append(node('strong', '', '建立你的自介網站'));
   copy.append(node('span', 'description', '開啟線上 Studio，邊修改邊預覽，再下載自己的設定檔。'));
-  const tags = node('span', 'tags');
-  tags.append(node('small', '', '免安裝'), node('small', '', '即時預覽'));
-  copy.append(tags);
   link.append(icon, copy, node('span', 'link-arrow', '›'));
   link.lastElementChild.setAttribute('aria-hidden', 'true');
   return link;
@@ -259,6 +256,12 @@ function configureTurntableFeature(feature, playlist) {
   return feature;
 }
 
+function configureFortuneFeature(feature) {
+  const draw = feature?.querySelector('[data-fortune-draw]');
+  if (draw) delete draw.dataset.fortuneBound;
+  return feature;
+}
+
 function renderPlacedImages(wrapper, answers, placement, assetHref) {
   (answers.imageBlocks || [])
     .filter((item) => item.placement === placement)
@@ -276,6 +279,7 @@ export function renderProfileDocument(root, answers, options) {
     studioHref = '/studio/',
   } = options;
   const retainedTurntable = root.querySelector('[data-turntable-player]');
+  const retainedFortune = root.querySelector('[data-fortune-draw]');
   const wrapper = node('div');
   wrapper.dataset.profileRenderer = '';
   wrapper.dataset.studioEnabled = String(studioEnabled);
@@ -317,7 +321,9 @@ export function renderProfileDocument(root, answers, options) {
       renderPlacedImages(wrapper, answers, 'between-links-sections', assetHref);
     }
     if (sectionId === 'fortune' && answers.features?.fortune) {
-      const feature = cloneFeature(templates.fortune, '今日手氣', '搖一搖，抽走今天的一點好運。');
+      const feature = configureFortuneFeature(
+        cloneFeature(templates.fortune, '今日手氣', '搖一搖，抽走今天的一點好運。'),
+      );
       if (feature) wrapper.append(feature);
     }
     if (sectionId === 'notion' && notionVisible) {
@@ -345,6 +351,11 @@ export function renderProfileDocument(root, answers, options) {
     && retainedTurntable.dataset.playlistId === nextTurntable.dataset.playlistId
   ) {
     nextTurntable.replaceWith(retainedTurntable);
+  }
+
+  const nextFortune = wrapper.querySelector('[data-fortune-draw]');
+  if (retainedFortune && nextFortune) {
+    nextFortune.replaceWith(retainedFortune);
   }
 
   root.replaceChildren(wrapper);

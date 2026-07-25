@@ -49,21 +49,13 @@ const favicon = withBase('/favicon.svg');
         <span class="browser-only-badge"><span aria-hidden="true">●</span> 只存在此瀏覽器</span>
         <span id="draft-status" role="status" aria-live="polite">正在準備編輯器…</span>
       </div>
-      <div class="topbar-actions">
-        <label class="button button--quiet" for="import-answers">匯入設定包</label>
-        <input id="import-answers" type="file" accept="application/json,.json,application/zip,.zip" hidden />
-        <button class="button button--quiet" id="copy-answers" type="button">複製 JSON</button>
-        <button class="button button--quiet" id="save-project" type="button" hidden>儲存到專案</button>
-        <button class="button button--primary" id="download-answers" type="button">下載設定包</button>
-      </div>
     </header>
 
     <main class="online-workbench">
       <section class="online-editor" id="online-editor" aria-labelledby="online-title">
         <div class="editor-intro">
-          <p class="eyebrow">NO INSTALLATION · PHONE FRIENDLY</p>
-          <h1 id="online-title">先在這裡，<br />試穿你的網站。</h1>
-          <p>邊修改、邊預覽。完成後下載 <code>profile.answers.json</code>，以後有電腦時可直接匯入本機 Studio。</p>
+          <h1 id="online-title">自訂你的自介。</h1>
+          <p>邊修改、邊預覽，完成後再選擇最適合你的保存方式。</p>
           <div class="privacy-note">
             <span aria-hidden="true">◌</span>
             <p><strong>這裡不會修改 GitHub。</strong>草稿只留在目前的瀏覽器；下載前也不會上傳任何內容。</p>
@@ -85,6 +77,9 @@ const favicon = withBase('/favicon.svg');
           </button>
           <button type="button" role="tab" aria-selected="false" aria-controls="panel-features" id="tab-features" data-tab="features" tabindex="-1">
             <span>05</span>其它功能
+          </button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="panel-finish" id="tab-finish" data-tab="finish" tabindex="-1">
+            <span>06</span>完成設定
           </button>
         </nav>
 
@@ -118,16 +113,30 @@ const favicon = withBase('/favicon.svg');
               </label>
             </div>
             <div class="media-grid">
-              <label class="media-picker">
-                <span><b>頭像</b><small>PNG、JPG、WebP 或 GIF，最多 5 MB</small></span>
-                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-image-target="media.avatar" />
-                <i data-image-name="media.avatar">使用目前圖片</i>
-              </label>
-              <label class="media-picker">
-                <span><b>封面背景</b><small>會立即顯示在右側正式預覽</small></span>
-                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-image-target="media.background" />
-                <i data-image-name="media.background">使用目前圖片</i>
-              </label>
+              <div class="media-source-card">
+                <label class="media-picker">
+                  <span><b>頭像</b><small>從裝置上傳，最多 5 MB</small></span>
+                  <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-image-target="media.avatar" />
+                  <i data-image-name="media.avatar">使用目前圖片</i>
+                </label>
+                <label class="field media-url-field">
+                  <span>或貼上公開圖片網址</span>
+                  <input type="text" inputmode="url" maxlength="2048" data-bind="media.avatar" placeholder="https://cdn.example.com/avatar.webp" />
+                  <small>支援公開 HTTPS 網址；對方網站需允許圖片外連。</small>
+                </label>
+              </div>
+              <div class="media-source-card">
+                <label class="media-picker">
+                  <span><b>封面背景</b><small>從裝置上傳，最多 5 MB</small></span>
+                  <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-image-target="media.background" />
+                  <i data-image-name="media.background">使用目前圖片</i>
+                </label>
+                <label class="field media-url-field">
+                  <span>或貼上公開圖片網址</span>
+                  <input type="text" inputmode="url" maxlength="2048" data-bind="media.background" placeholder="https://cdn.example.com/cover.webp" />
+                  <small>貼上後會立即顯示在右側正式預覽。</small>
+                </label>
+              </div>
             </div>
           </section>
 
@@ -157,7 +166,7 @@ const favicon = withBase('/favicon.svg');
             </div>
             <div class="collection-list" id="section-list"></div>
             <div class="collection-heading">
-              <div><h3>圖片板塊</h3><p>可選用範本既有的 <code>/images/</code> 圖片；自訂圖片之後可在本機補上。</p></div>
+              <div><h3>圖片板塊</h3><p>可上傳圖片、使用範本的 <code>/images/</code> 路徑，或貼上公開 HTTPS 圖片網址。</p></div>
               <button class="button button--small" type="button" data-add="imageBlocks">＋ 新增圖片板塊</button>
             </div>
             <div class="collection-list" id="image-block-list"></div>
@@ -215,17 +224,6 @@ const favicon = withBase('/favicon.svg');
               </div>
               <ol class="home-order" id="home-order"></ol>
             </div>
-
-            <div class="finish-card">
-              <p class="mini-label">READY WHEN YOU ARE</p>
-              <h3>線上下載，或直接存進本機專案</h3>
-              <p>線上模式會下載包含 JSON 與圖片的 ZIP 設定包；用 <code>npm run studio</code> 開啟時，則能直接儲存到專案。</p>
-              <div id="privacy-summary" class="privacy-summary" aria-live="polite"></div>
-              <div class="finish-actions">
-                <button class="button button--primary button--large" id="download-answers-bottom" type="button">下載設定包</button>
-                <button class="button button--quiet" id="reset-draft" type="button">還原成目前網站</button>
-              </div>
-            </div>
           </section>
 
           <section class="editor-panel" id="panel-features" role="tabpanel" aria-labelledby="tab-features" hidden>
@@ -250,6 +248,64 @@ const favicon = withBase('/favicon.svg');
                   <label class="switch"><input type="checkbox" data-bind="features.fortune" data-boolean /><span></span><b>啟用</b></label>
                 </div>
                 <p>設定檔只控制顯示／隱藏；籤詩內容可之後用本機 Studio 編輯。</p>
+              </section>
+            </div>
+          </section>
+
+          <section class="editor-panel" id="panel-finish" role="tabpanel" aria-labelledby="tab-finish" hidden>
+            <div class="panel-heading">
+              <div><p class="step-label">STEP 06</p><h2>完成並帶走你的設定</h2></div>
+            </div>
+
+            <section class="completion-lead">
+              <div>
+                <p class="mini-label">FULL SETTINGS PACKAGE</p>
+                <h3>下載完整設定包</h3>
+                <p>包含 <code>profile.answers.json</code> 與你從裝置上傳的圖片，是最完整、最適合備份與日後匯入的版本。</p>
+              </div>
+              <button class="button button--primary button--large" id="download-answers" type="button">下載設定包</button>
+            </section>
+
+            <div id="privacy-summary" class="privacy-summary" aria-live="polite"></div>
+
+            <div class="completion-grid">
+              <section class="completion-card">
+                <p class="mini-label">JSON ONLY</p>
+                <h3>純文字設定</h3>
+                <p>適合沒有上傳圖片的簡易設定。JSON 只保存圖片路徑或網址，不會包含你從裝置選取的圖片檔。</p>
+                <div class="completion-actions">
+                  <button class="button button--quiet" id="download-json" type="button">下載 JSON</button>
+                  <button class="button button--quiet" id="copy-answers" type="button">複製 JSON</button>
+                </div>
+              </section>
+
+              <section class="completion-card">
+                <p class="mini-label">IMPORT</p>
+                <h3>匯入既有設定</h3>
+                <p>支援完整 ZIP 設定包或單一 JSON；只會更新目前草稿與預覽。</p>
+                <div class="completion-actions">
+                  <label class="button button--quiet" for="import-answers">選擇設定檔</label>
+                  <input id="import-answers" type="file" accept="application/json,.json,application/zip,.zip" hidden />
+                </div>
+              </section>
+
+              <section class="completion-card">
+                <p class="mini-label">LOCAL PROJECT</p>
+                <h3>儲存到本機專案</h3>
+                <p>使用 <code>npm run studio</code> 開啟時，可直接同步更新本機的自介與圖片；線上模式不會寫入 GitHub。</p>
+                <div class="completion-actions">
+                  <button class="button button--quiet" id="save-project" type="button" hidden>儲存到專案</button>
+                  <span class="local-save-hint" id="local-save-hint">目前是線上模式</span>
+                </div>
+              </section>
+
+              <section class="completion-card">
+                <p class="mini-label">RESET</p>
+                <h3>重新開始</h3>
+                <p>捨棄這台裝置上的草稿，回到開啟 Studio 時載入的網站預設內容。</p>
+                <div class="completion-actions">
+                  <button class="button button--quiet" id="reset-draft" type="button">還原成預設</button>
+                </div>
               </section>
             </div>
 

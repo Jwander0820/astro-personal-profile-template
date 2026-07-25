@@ -2,12 +2,15 @@ import { defineCollection } from 'astro:content';
 import { file } from 'astro/loaders';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
-import { isSafeHttpUrl, isSafeImagePath, isSafeProfileUrl } from '../scripts/content-safety.mjs';
+import { isSafeHttpUrl, isSafeImageSource, isSafeProfileUrl } from '../scripts/content-safety.mjs';
 import { FORTUNE_GRADES } from '../scripts/fortune-content.mjs';
 import { normalizeThemeColor } from '../scripts/theme-color.mjs';
 import { parseYoutubePlaylistId } from '../scripts/youtube-playlist.mjs';
 
-const imagePath = z.string().refine(isSafeImagePath, 'Images must use a safe path under /images/.');
+const imageSource = z.string().refine(
+  isSafeImageSource,
+  'Images must use a safe path under /images/ or a public HTTPS URL.',
+);
 const youtubePlaylist = z.string()
   .refine((value) => Boolean(parseYoutubePlaylistId(value)), 'Invalid YouTube playlist URL or ID.')
   .transform((value) => parseYoutubePlaylistId(value) ?? value);
@@ -20,8 +23,8 @@ const profile = defineCollection({
   schema: z.object({
     displayName: z.string(),
     title: z.string().optional(),
-    avatar: imagePath.optional(),
-    background: imagePath.optional(),
+    avatar: imageSource.optional(),
+    background: imageSource.optional(),
     location: z.string().optional(),
     archiveLabel: z.string().optional(),
     homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))
@@ -55,7 +58,7 @@ const links = defineCollection({
     visible: z.boolean().default(true),
     layout: z.enum(['icon', 'card', 'compact']).default('card'),
     style: z.enum(['primary', 'normal', 'subtle']).default('normal'),
-    image: imagePath.optional(),
+    image: imageSource.optional(),
     tags: z.array(z.string()).optional(),
   }),
 });
@@ -65,7 +68,7 @@ const sections = defineCollection({
   schema: z.object({
     title: z.string(),
     slug: z.string(),
-    image: imagePath.optional(),
+    image: imageSource.optional(),
     order: z.number().default(100),
     visible: z.boolean().default(true),
     layout: z.enum(['card', 'compact']).default('card'),
@@ -87,7 +90,7 @@ const blocks = defineCollection({
     playlistId: youtubePlaylist.optional(),
     continuousPlayback: z.boolean().default(true),
     height: z.number().int().min(320).max(1200).default(600),
-    image: imagePath.optional(),
+    image: imageSource.optional(),
     imageAlt: z.string().max(300).default(''),
     imageLayout: z.enum(['full', 'split-left', 'split-right', 'poster']).default('full'),
     imageAspect: z.enum(['auto', 'landscape', 'square', 'portrait']).default('landscape'),

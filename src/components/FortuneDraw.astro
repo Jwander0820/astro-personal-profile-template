@@ -57,7 +57,8 @@ const fortuneJson = JSON.stringify(
     note?: string;
   };
 
-  document.querySelectorAll<HTMLElement>('[data-fortune-draw]').forEach((root) => {
+  function bindFortuneDraw(root: HTMLElement) {
+    if (root.dataset.fortuneBound === 'true') return;
     const source = root.querySelector<HTMLScriptElement>('[data-fortune-data]');
     const button = root.querySelector<HTMLButtonElement>('[data-fortune-button]');
     const buttonLabel = root.querySelector<HTMLElement>('[data-fortune-button-label]');
@@ -68,6 +69,7 @@ const fortuneJson = JSON.stringify(
     const stamp = root.querySelector<HTMLElement>('[data-fortune-stamp]');
 
     if (!source || !button || !buttonLabel || !grade || !message || !note || !status || !stamp) return;
+    root.dataset.fortuneBound = 'true';
 
     let fortunes: Fortune[] = [];
     let currentId: string | undefined;
@@ -123,5 +125,15 @@ const fortuneJson = JSON.stringify(
         drawing = false;
       }, reduceMotion ? 0 : 820);
     });
+  }
+
+  function bindFortuneDraws(scope: ParentNode = document) {
+    scope.querySelectorAll<HTMLElement>('[data-fortune-draw]').forEach(bindFortuneDraw);
+  }
+
+  bindFortuneDraws();
+  document.addEventListener('profile-renderer:updated', (event) => {
+    const rendererEvent = event as CustomEvent<{ root?: ParentNode }>;
+    bindFortuneDraws(rendererEvent.detail?.root ?? document);
   });
 </script>

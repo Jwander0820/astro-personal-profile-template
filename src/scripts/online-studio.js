@@ -66,7 +66,7 @@ const COLLECTIONS = {
       ['id', '卡片 ID', 'text', 'about-me', false],
       ['title', '標題', 'text', 'About', false],
       ['description', '內容', 'textarea', '分享一段關於你的內容。', true],
-      ['image', '圖片（選填）', 'image', '/images/about.svg', false],
+      ['image', '圖片（上傳或網址，選填）', 'image', 'https://cdn.example.com/about.webp', false],
       ['tags', '標籤', 'list', 'Developer, Learning', false],
     ],
   },
@@ -78,7 +78,7 @@ const COLLECTIONS = {
     fields: [
       ['id', '板塊 ID', 'text', 'featured-story', false],
       ['title', '標題', 'text', '最近的一段故事', false],
-      ['image', '圖片', 'image', '/images/projects.svg', false],
+      ['image', '圖片（上傳或網址）', 'image', 'https://cdn.example.com/story.webp', false],
       ['imageAlt', '圖片替代文字', 'text', '描述圖片中的內容', false],
       ['description', '說明', 'textarea', '補充這張圖片背後的故事。', true],
       ['placement', '顯示位置', 'select', [
@@ -317,6 +317,8 @@ export function mountOnlineStudio() {
       const group = element('div', 'image-input');
       const text = document.createElement('input');
       text.type = 'text';
+      text.inputMode = 'url';
+      text.maxLength = 2048;
       text.placeholder = placeholder;
       text.dataset.array = kind;
       text.dataset.index = String(index);
@@ -328,7 +330,8 @@ export function mountOnlineStudio() {
       file.dataset.imageArray = kind;
       file.dataset.index = String(index);
       file.dataset.field = fieldName;
-      group.append(text, file);
+      const hint = element('small', 'image-source-hint', '可貼上公開 HTTPS 網址、使用 /images/ 路徑，或從裝置上傳圖片。');
+      group.append(text, file, hint);
       return group;
     }
     let control;
@@ -495,6 +498,22 @@ export function mountOnlineStudio() {
     }
   }
 
+  function downloadJson() {
+    let exported;
+    try { exported = exportAnswers(); } catch { return; }
+    const blob = new Blob([exported.content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'profile.answers.json';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    status.textContent = 'JSON 已下載';
+    toast('JSON 已下載。從裝置上傳的圖片檔不包含在 JSON 中。');
+  }
+
   async function registerImage(file, assign) {
     if (!file.type.match(/^image\/(png|jpeg|webp|gif)$/)) throw new Error('僅支援 PNG、JPG、WebP 或 GIF。');
     if (file.size > 5 * 1024 * 1024) throw new Error('單張圖片不可超過 5 MB。');
@@ -600,6 +619,8 @@ export function mountOnlineStudio() {
       if (!response.ok) return;
       localMode = true;
       saveProjectButton.hidden = false;
+      const localSaveHint = document.querySelector('#local-save-hint');
+      if (localSaveHint) localSaveHint.textContent = '已連接本機專案';
       document.querySelector('.browser-only-badge').innerHTML = '<span aria-hidden="true">●</span> 本機專案模式';
       status.textContent = '可直接儲存到本機專案';
     } catch {
@@ -807,7 +828,7 @@ export function mountOnlineStudio() {
   });
 
   document.querySelector('#reset-draft').addEventListener('click', async () => {
-    if (!window.confirm('要捨棄這台裝置上的草稿，還原成目前網站的內容嗎？')) return;
+    if (!window.confirm('要捨棄這台裝置上的草稿，還原成預設內容嗎？')) return;
     localStorage.removeItem(STORAGE_KEY);
     state = clone(initialAnswers);
     imageFiles.clear();
@@ -815,12 +836,12 @@ export function mountOnlineStudio() {
     objectUrls.forEach((url) => URL.revokeObjectURL(url));
     objectUrls.clear();
     refreshAll();
-    toast('已還原成目前網站的內容。');
+    toast('已還原成預設內容。');
   });
 
   document.querySelector('#copy-answers').addEventListener('click', copyAnswers);
+  document.querySelector('#download-json').addEventListener('click', downloadJson);
   document.querySelector('#download-answers').addEventListener('click', downloadAnswers);
-  document.querySelector('#download-answers-bottom').addEventListener('click', downloadAnswers);
   saveProjectButton.addEventListener('click', saveToProject);
 
   renderSocialPicker();

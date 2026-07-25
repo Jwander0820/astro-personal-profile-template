@@ -33,6 +33,7 @@ import {
   enforceContentSafety,
   isSafeHttpUrl,
   isSafeImagePath,
+  isSafeImageSource,
   isSafeMarkdownUrl,
   isSafeProfileUrl,
 } from './content-safety.mjs';
@@ -235,6 +236,42 @@ try {
   const optionalIdentityMarkdown = await readFile(path.join(optionalIdentityRoot, 'src', 'content', 'profile', 'main.md'), 'utf8');
   assert.doesNotMatch(optionalIdentityMarkdown, /^title:/m);
   assert.doesNotMatch(optionalIdentityMarkdown, /^tagline:/m);
+  const remoteImageUrl = 'https://cdn.jwander.net/codexpet/Justaway/spritesheet.webp';
+  const remoteImageAnswers = {
+    ...minimalAnswers,
+    media: { avatar: remoteImageUrl, background: remoteImageUrl },
+    sections: [{
+      id: 'remote-image',
+      title: 'Remote image',
+      description: 'Public HTTPS image test.',
+      image: remoteImageUrl,
+      tags: [],
+    }],
+    imageBlocks: [{
+      id: 'remote-story',
+      title: 'Remote story',
+      image: remoteImageUrl,
+      imageAlt: 'Remote image test.',
+      description: '',
+      placement: 'after-sections',
+      imageLayout: 'full',
+      imageAspect: 'landscape',
+      imagePosition: 'center',
+      tags: [],
+    }],
+  };
+  const validatedRemoteImages = validateProfileAnswers(remoteImageAnswers);
+  assert.equal(validatedRemoteImages.media.avatar, remoteImageUrl);
+  assert.equal(validatedRemoteImages.sections[0].image, remoteImageUrl);
+  assert.equal(validatedRemoteImages.imageBlocks[0].image, remoteImageUrl);
+  const remoteImageRoot = path.join(temporaryRoot, 'remote-images');
+  await mkdir(path.join(remoteImageRoot, 'src'), { recursive: true });
+  await cp(path.join(projectRoot, 'src', 'content'), path.join(remoteImageRoot, 'src', 'content'), { recursive: true });
+  const remoteImageResult = await applyProfileAnswers(remoteImageRoot, remoteImageAnswers);
+  assert.equal(remoteImageResult.profile.avatar, remoteImageUrl);
+  assert.equal(remoteImageResult.profile.background, remoteImageUrl);
+  assert.equal(remoteImageResult.sections.find((item) => item.data.image === remoteImageUrl)?.data.image, remoteImageUrl);
+  assert.equal(remoteImageResult.blocks.find((item) => item.data.image === remoteImageUrl)?.data.image, remoteImageUrl);
   assert.throws(
     () => previewProfileAnswers({ ...lunaAnswers, socials: [{ service: 'github', title: 'GitHub', url: 'github.com/luna', icon: 'github' }] }),
     /社群網址必須是 http\(s\)、mailto 或頁面錨點/,
@@ -307,6 +344,12 @@ try {
   assert.equal(isSafeImagePath('/images/profile.svg'), true);
   assert.equal(isSafeImagePath('/images/../private.svg'), false);
   assert.equal(isSafeImagePath('https://tracker.example/pixel.png'), false);
+  assert.equal(isSafeImageSource('/images/profile.svg'), true);
+  assert.equal(isSafeImageSource('https://cdn.jwander.net/codexpet/Justaway/spritesheet.webp'), true);
+  assert.equal(isSafeImageSource('http://cdn.example.com/avatar.webp'), false);
+  assert.equal(isSafeImageSource('https://user:password@example.com/private.webp'), false);
+  assert.equal(isSafeImageSource("https://example.com/a');color:red;/*"), false);
+  assert.equal(isSafeImageSource('javascript:alert(1)'), false);
   assert.equal(isSafeMarkdownUrl('/notes/example'), true);
   assert.equal(isSafeMarkdownUrl('javascript:alert(1)'), false);
   const rawHtmlTree = { type: 'root', children: [{ type: 'html', value: '<script>alert(1)</script>' }] };
@@ -356,10 +399,10 @@ try {
         id: 'remote-image',
         title: 'Remote image',
         description: 'Example',
-        image: 'https://tracker.example/pixel.png',
+        image: 'http://tracker.example/pixel.png',
       }],
     }),
-    /圖片路徑必須是 \/images\//,
+    /圖片來源必須是 .*公開 HTTPS 圖片網址/,
   );
   assert.throws(
     () => validateProfileAnswers({

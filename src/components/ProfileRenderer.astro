@@ -15,6 +15,7 @@ interface Props {
   blocks: CollectionEntry<'blocks'>[];
   fortunes: CollectionEntry<'fortunes'>[];
   turntableTemplate?: CollectionEntry<'blocks'>;
+  fortuneTemplate?: CollectionEntry<'blocks'>;
   studioEnabled?: boolean;
   studioHref?: string;
 }
@@ -26,6 +27,7 @@ const {
   blocks,
   fortunes,
   turntableTemplate,
+  fortuneTemplate,
   studioEnabled = false,
   studioHref = '/studio/',
 } = Astro.props;
@@ -89,4 +91,7 @@ const fallbackBlocks = remainingBlocks.filter((block) => (
 </div>
 {studioEnabled && turntableTemplate && (
   <template id="studio-turntable-template"><CustomBlock block={turntableTemplate} /></template>
+)}
+{studioEnabled && fortuneTemplate && (
+  <template id="studio-fortune-template"><CustomBlock block={fortuneTemplate} fortunes={fortunes} /></template>
 )}
