@@ -1,6 +1,8 @@
 ---
 import { loadStudioContent } from '../../scripts/profile-content.mjs';
 import { createProfileAnswersFromStudioContent } from '../../scripts/profile-answers.mjs';
+import StudioExampleLink from '../components/StudioExampleLink.astro';
+import StudioRouteNav from '../components/StudioRouteNav.astro';
 import { withBase } from '../lib/paths';
 import '../styles/online-studio.css';
 
@@ -37,17 +39,11 @@ const favicon = withBase('/favicon.svg');
     <script is:inline id="online-studio-data" type="application/json" set:html={bootstrapJson}></script>
 
     <header class="online-topbar">
-      <div class="mode-route" aria-label="網站模式切換">
-        <span class="mode-route__label">PROFILE ROUTE</span>
-        <div class="mode-route__track">
-          <a href={withBase('/')} class="mode-route__stop">網站</a>
-          <span class="mode-route__line" aria-hidden="true"><span></span></span>
-          <span class="mode-route__stop is-current" aria-current="page">Studio</span>
-        </div>
-      </div>
+      <StudioRouteNav current="profile" />
       <div class="topbar-state">
         <span class="browser-only-badge"><span aria-hidden="true">●</span> 只存在此瀏覽器</span>
         <span id="draft-status" role="status" aria-live="polite">正在準備編輯器…</span>
+        <StudioExampleLink />
       </div>
     </header>
 
@@ -87,7 +83,6 @@ const favicon = withBase('/favicon.svg');
           <section class="editor-panel is-active" id="panel-identity" role="tabpanel" aria-labelledby="tab-identity">
             <div class="panel-heading">
               <div><p class="step-label">STEP 01</p><h2>讓訪客先認識你</h2></div>
-              <span class="required-legend">只有顯示名稱必填</span>
             </div>
             <div class="field-grid">
               <label class="field field--wide">
@@ -247,7 +242,11 @@ const favicon = withBase('/favicon.svg');
                   <div><p class="mini-label">FORTUNE</p><h3>今日手氣</h3></div>
                   <label class="switch"><input type="checkbox" data-bind="features.fortune" data-boolean /><span></span><b>啟用</b></label>
                 </div>
-                <p>設定檔只控制顯示／隱藏；籤詩內容可之後用本機 Studio 編輯。</p>
+                <div class="feature-fields">
+                  <label class="field"><span>標題</span><input type="text" maxlength="80" data-bind="fortune.title" /></label>
+                  <label class="field"><span>說明</span><textarea rows="3" maxlength="500" data-bind="fortune.description"></textarea></label>
+                </div>
+                <a class="button button--quiet feature-route-link" href={withBase('/studio/fortune-poem/')}>編輯籤詩內容 →</a>
               </section>
             </div>
           </section>

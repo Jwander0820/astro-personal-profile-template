@@ -74,6 +74,7 @@ const fortuneJson = JSON.stringify(
     let fortunes: Fortune[] = [];
     let currentId: string | undefined;
     let drawing = false;
+    let drawTimer: number | undefined;
 
     try {
       fortunes = JSON.parse(source.textContent ?? '[]') as Fortune[];
@@ -81,12 +82,39 @@ const fortuneJson = JSON.stringify(
       fortunes = [];
     }
 
-    if (fortunes.length === 0) {
-      button.disabled = true;
-      buttonLabel.textContent = '目前沒有籤紙';
-      status.textContent = '請先在 fortunes.json 加入至少一張啟用中的籤。';
-      return;
-    }
+    const resetResult = () => {
+      currentId = undefined;
+      drawing = false;
+      root.classList.remove('is-drawing', 'is-revealed', 'is-joke');
+      root.removeAttribute('aria-busy');
+      grade.textContent = '等待開籤';
+      message.textContent = '搖一搖籤筒，看看今天的手氣。';
+      note.textContent = '';
+      note.hidden = true;
+      stamp.textContent = '吉';
+      buttonLabel.textContent = fortunes.length > 0 ? '抽一支' : '目前沒有籤紙';
+      button.disabled = fortunes.length === 0;
+      status.textContent = fortunes.length > 0
+        ? '每次都能重新抽，不會留下紀錄。'
+        : '請先加入至少一張啟用中的籤。';
+    };
+
+    const revealFortune = (fortune: Fortune) => {
+      currentId = fortune.id;
+      grade.textContent = fortune.grade;
+      message.textContent = fortune.message;
+      note.textContent = fortune.note ?? '';
+      note.hidden = !fortune.note;
+      stamp.textContent = fortune.category === 'joke' ? '彩蛋' : fortune.grade;
+      root.classList.toggle('is-joke', fortune.category === 'joke');
+      root.classList.remove('is-drawing');
+      root.classList.add('is-revealed');
+      root.removeAttribute('aria-busy');
+      status.textContent = `${fortune.grade} · ${fortune.message}`;
+      buttonLabel.textContent = '再抽一次';
+      button.disabled = false;
+      drawing = false;
+    };
 
     const pickFortune = () => {
       const freshFortunes = fortunes.filter((fortune) => fortune.id !== currentId);
@@ -108,23 +136,39 @@ const fortuneJson = JSON.stringify(
       status.textContent = '籤筒搖動中，請稍候。';
 
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      window.setTimeout(() => {
-        currentId = nextFortune.id;
-        grade.textContent = nextFortune.grade;
-        message.textContent = nextFortune.message;
-        note.textContent = nextFortune.note ?? '';
-        note.hidden = !nextFortune.note;
-        stamp.textContent = nextFortune.category === 'joke' ? '彩蛋' : nextFortune.grade;
-        root.classList.toggle('is-joke', nextFortune.category === 'joke');
-        root.classList.remove('is-drawing');
-        root.classList.add('is-revealed');
-        root.removeAttribute('aria-busy');
-        status.textContent = `${nextFortune.grade} · ${nextFortune.message}`;
-        buttonLabel.textContent = '再抽一次';
-        button.disabled = false;
-        drawing = false;
+      drawTimer = window.setTimeout(() => {
+        drawTimer = undefined;
+        revealFortune(nextFortune);
       }, reduceMotion ? 0 : 820);
     });
+
+    root.addEventListener('fortune-draw:update', (event) => {
+      const detail = (event as CustomEvent<{ fortunes?: Fortune[] }>).detail;
+      if (!Array.isArray(detail?.fortunes)) return;
+      if (drawTimer !== undefined) {
+        window.clearTimeout(drawTimer);
+        drawTimer = undefined;
+      }
+      fortunes = detail.fortunes;
+      const currentFortune = fortunes.find((fortune) => fortune.id === currentId);
+      if (currentFortune) {
+        revealFortune(currentFortune);
+      } else {
+        resetResult();
+      }
+    });
+
+    root.addEventListener('fortune-draw:show', (event) => {
+      const fortune = (event as CustomEvent<{ fortune?: Fortune }>).detail?.fortune;
+      if (!fortune) return;
+      if (drawTimer !== undefined) {
+        window.clearTimeout(drawTimer);
+        drawTimer = undefined;
+      }
+      revealFortune(fortune);
+    });
+
+    resetResult();
   }
 
   function bindFortuneDraws(scope: ParentNode = document) {

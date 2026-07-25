@@ -157,11 +157,14 @@ function safeDraft(value) {
   return value && typeof value === 'object' && value.version === 1 && value.identity && value.appearance;
 }
 
-function normalizeDraft(value) {
+function normalizeDraft(value, fallback = {}) {
   const draft = clone(value);
   draft.media ||= { avatar: '/images/avatar.svg', background: '/images/background.svg' };
   draft.media.avatar ||= '/images/avatar.svg';
   draft.media.background ||= '/images/background.svg';
+  if ((!draft.fortune || !Array.isArray(draft.fortune.fortunes)) && fallback.fortune) {
+    draft.fortune = clone(fallback.fortune);
+  }
   return draft;
 }
 
@@ -261,7 +264,7 @@ export function mountOnlineStudio() {
   function loadStoredDraft(fallback) {
     try {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (safeDraft(stored)) return normalizeDraft(stored);
+      if (safeDraft(stored)) return normalizeDraft(stored, fallback);
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -537,7 +540,7 @@ export function mountOnlineStudio() {
 
   async function importJsonText(text) {
     const imported = validateProfileAnswers(JSON.parse(text));
-    state = normalizeDraft({ $schema: './docs/profile-answers.schema.json', ...imported });
+    state = normalizeDraft({ $schema: './docs/profile-answers.schema.json', ...imported }, initialAnswers);
     refreshAll();
   }
 

@@ -4,7 +4,9 @@
 
 ## 新增籤紙
 
-目前 Studio 的「其它功能」可控制今日手氣是否顯示；籤詩內容請依下列格式直接維護 `src/content/fortunes.json`。專案驗證會檢查 ID、等級、分類、訊息與至少一張啟用中的籤。
+Profile Studio 的「其它功能」可控制今日手氣是否顯示，並編輯標題與說明。前往 `/studio/fortune-poem/` 可新增、搜尋、排序、停用或刪除籤詩；右側只載入正式的今日手氣 block，可隨機試抽，也能從任一籤詩卡片指定該張結果來檢查文字排列。
+
+線上 Studio 會把籤桶保存在同一份瀏覽器草稿，並納入 JSON／ZIP 匯出匯入；它不會直接修改 GitHub。以 `npm run studio` 啟動時，籤詩頁才會顯示「儲存到本機專案」，明確寫回 `src/content/fortunes.json` 與 `src/content/blocks/fortune.md`。也可以依下列格式手動維護 JSON。
 
 在 JSON 陣列中加入一個物件：
 

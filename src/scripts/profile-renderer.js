@@ -256,8 +256,12 @@ function configureTurntableFeature(feature, playlist) {
   return feature;
 }
 
-function configureFortuneFeature(feature) {
+function configureFortuneFeature(feature, fortune) {
   const draw = feature?.querySelector('[data-fortune-draw]');
+  const source = draw?.querySelector('[data-fortune-data]');
+  if (source && Array.isArray(fortune?.fortunes)) {
+    source.textContent = JSON.stringify(fortune.fortunes.filter((item) => item.visible)).replaceAll('<', '\\u003c');
+  }
   if (draw) delete draw.dataset.fortuneBound;
   return feature;
 }
@@ -322,7 +326,12 @@ export function renderProfileDocument(root, answers, options) {
     }
     if (sectionId === 'fortune' && answers.features?.fortune) {
       const feature = configureFortuneFeature(
-        cloneFeature(templates.fortune, '今日手氣', '搖一搖，抽走今天的一點好運。'),
+        cloneFeature(
+          templates.fortune,
+          answers.fortune?.title || '今日手氣',
+          answers.fortune?.description || '搖一搖，抽走今天的一點好運。',
+        ),
+        answers.fortune,
       );
       if (feature) wrapper.append(feature);
     }
@@ -354,7 +363,9 @@ export function renderProfileDocument(root, answers, options) {
   }
 
   const nextFortune = wrapper.querySelector('[data-fortune-draw]');
-  if (retainedFortune && nextFortune) {
+  const retainedFortuneData = retainedFortune?.querySelector('[data-fortune-data]')?.textContent;
+  const nextFortuneData = nextFortune?.querySelector('[data-fortune-data]')?.textContent;
+  if (retainedFortune && nextFortune && retainedFortuneData === nextFortuneData) {
     nextFortune.replaceWith(retainedFortune);
   }
 

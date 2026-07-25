@@ -1,0 +1,102 @@
+---
+import CustomBlock from '../../../components/CustomBlock.astro';
+import { getBlock, getFortunes } from '../../../lib/content';
+import '../../../styles/global.css';
+
+const fortuneBlock = await getBlock('fortune');
+const fortunes = await getFortunes();
+
+if (!fortuneBlock) {
+  throw new Error('Missing src/content/blocks/fortune.md');
+}
+---
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>今日手氣測試</title>
+  </head>
+  <body class="fortune-preview-page">
+    <div class="fortune-preview-page__block" data-fortune-preview-root>
+      <CustomBlock block={fortuneBlock} fortunes={fortunes} />
+    </div>
+
+    <script>
+      type Fortune = {
+        id: string;
+        grade: '大吉' | '中吉' | '小吉' | '吉' | '末吉' | '凶' | '大凶';
+        category: 'blessing' | 'joke';
+        message: string;
+        note?: string;
+        visible?: boolean;
+      };
+
+      type PreviewPayload = {
+        title?: string;
+        description?: string;
+        fortunes?: Fortune[];
+        selectedFortune?: Fortune;
+      };
+
+      const previewRoot = document.querySelector<HTMLElement>('[data-fortune-preview-root]');
+      const drawRoot = previewRoot?.querySelector<HTMLElement>('[data-fortune-draw]');
+      const heading = previewRoot?.querySelector<HTMLElement>('.custom-block > h2');
+      const content = previewRoot?.querySelector<HTMLElement>('.custom-block__content');
+
+      window.addEventListener('message', (event) => {
+        if (event.origin !== window.location.origin || event.source !== window.parent) return;
+        if (event.data?.type !== 'fortune-studio:render') return;
+
+        const payload = (event.data.payload ?? {}) as PreviewPayload;
+        if (heading && typeof payload.title === 'string') heading.textContent = payload.title;
+        if (content && typeof payload.description === 'string') {
+          const paragraph = document.createElement('p');
+          paragraph.textContent = payload.description;
+          content.replaceChildren(paragraph);
+        }
+        if (drawRoot && Array.isArray(payload.fortunes)) {
+          drawRoot.dispatchEvent(new CustomEvent('fortune-draw:update', {
+            detail: { fortunes: payload.fortunes.filter((fortune) => fortune.visible !== false) },
+          }));
+        }
+        if (drawRoot && payload.selectedFortune) {
+          drawRoot.dispatchEvent(new CustomEvent('fortune-draw:show', {
+            detail: { fortune: payload.selectedFortune },
+          }));
+        }
+      });
+
+      window.parent.postMessage({ type: 'fortune-studio:preview-ready' }, window.location.origin);
+    </script>
+  </body>
+</html>
+
+<style>
+  :global(html) {
+    min-width: 0;
+    background: transparent;
+  }
+
+  :global(body.fortune-preview-page) {
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: clamp(.75rem, 2.2vw, 1.5rem);
+    background: transparent;
+  }
+
+  .fortune-preview-page__block {
+    width: min(100%, 880px);
+    margin-inline: auto;
+  }
+
+  :global(.fortune-preview-page .content-section) {
+    margin: 0;
+  }
+
+  :global(.fortune-preview-page .custom-block__content p) {
+    white-space: pre-line;
+  }
+</style>

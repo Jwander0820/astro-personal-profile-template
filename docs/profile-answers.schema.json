@@ -129,6 +129,32 @@
         "description": { "type": "string", "maxLength": 500 }
       }
     },
+    "fortune": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fortunes"],
+      "properties": {
+        "title": { "type": "string", "maxLength": 80, "default": "今日手氣" },
+        "description": { "type": "string", "maxLength": 500, "default": "搖一搖，抽走今天的一點好運。" },
+        "fortunes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "grade", "category", "message", "visible"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+              "grade": { "enum": ["大吉", "中吉", "小吉", "吉", "末吉", "凶", "大凶"] },
+              "category": { "enum": ["blessing", "joke"] },
+              "message": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "note": { "type": "string", "maxLength": 300 },
+              "visible": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
     "features": {
       "type": "object",
       "additionalProperties": false,

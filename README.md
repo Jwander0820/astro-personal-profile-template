@@ -24,6 +24,8 @@ npm run dev
 - 上傳頭像、封面及內容圖片，或貼上公開 HTTPS 圖片網址；圖片草稿會連同文字保留在目前瀏覽器。
 - 直接操作正式唱盤播放器，確認播放清單與頁面上的實際效果。
 - 在正式預覽中直接試抽「今日手氣」，確認互動與實際網站一致。
+- 透過頂端 route 在個人檔案、籤詩編輯器與 Icon 預覽之間切換，不會另開分頁。
+- 編輯今日手氣標題、說明與完整籤桶；內容會納入 JSON／ZIP 匯出匯入。
 - 匯入既有 JSON、AI 討論產生的 `profile.answers.json`，或包含圖片的 Studio ZIP 設定包。
 - 在「完成設定」下載完整 ZIP、下載／複製純 JSON、匯入設定或還原預設；本機模式也在同一處儲存到專案。
 
@@ -47,7 +49,7 @@ Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，首次啟動時�
 
 前往 `http://localhost:4321/studio/`。畫面會自動偵測只綁定 loopback 的背景寫入服務，顯示「儲存到專案」；按下後才會更新 `src/content/**` 與 `public/images/`。`4322` 不再提供另一套 UI，只是 `/studio/` 在本機使用的背景 API。
 
-正式部署預設使用 `ONLINE_STUDIO_MODE=auto`：本機永遠可使用 Studio，線上則只有 `ONLINE_STUDIO_ALLOWED_REPOSITORIES` 或 `ONLINE_STUDIO_ALLOWED_SITES` 精確列出的目標會產生 `/studio/`、Links 卡片與頁尾入口。GitHub Actions 目前只預先允許 `Jwander0820/astro-personal-profile-template`，因此 fork 到其他帳號後預設關閉。
+正式部署預設使用 `ONLINE_STUDIO_MODE=auto`：本機永遠可使用 Studio，線上則只有 `ONLINE_STUDIO_ALLOWED_REPOSITORIES` 或 `ONLINE_STUDIO_ALLOWED_SITES` 精確列出的目標會產生 `/studio/`、`/studio/fortune-poem/`、`/studio/icons/`、Links 卡片與頁尾入口。GitHub Actions 目前只預先允許 `Jwander0820/astro-personal-profile-template`，因此範例 GitHub Pages 會同步開放，fork 到其他帳號後則預設關閉。
 
 ```text
 ONLINE_STUDIO_MODE=auto

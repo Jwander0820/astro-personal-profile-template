@@ -9,7 +9,7 @@
 - 五個 `homeOrder` 值維持 `about`、`turntable`、`links`、`fortune`、`notion`，每個值必須出現一次。
 - 既有 profile、link、section、block 與 fortune 檔案不需要批次改寫。
 - 統一 Studio 會即時更新正式預覽，但只有按下「儲存到專案」才寫入檔案。
-- 籤桶仍直接維護既有 `src/content/fortunes.json`，不建立第二份資料庫。
+- 籤桶仍以既有 `src/content/fortunes.json` 為網站來源，不建立第二份資料庫；可由 `/studio/fortune-poem/` 編輯，回答檔則保存可攜式副本。
 - AI 回答可在「其它功能」驗證並載入草稿；既有 `profile.answers.json` 仍沿用 version 1 schema。
 
 本次沒有強制內容 migration。若內容原本不符合 schema，新的集中驗證可能會更早拒絕寫入；請依錯誤訊息修正原始 Markdown 或 JSON，不要停用驗證。

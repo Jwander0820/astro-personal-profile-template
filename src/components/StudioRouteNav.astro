@@ -1,0 +1,24 @@
+---
+import { withBase } from '../lib/paths';
+
+interface Props {
+  current: 'profile' | 'fortune' | 'icons';
+}
+
+const { current } = Astro.props;
+const routes = [
+  { id: 'profile', label: '個人檔案', href: withBase('/studio/') },
+  { id: 'fortune', label: '籤詩', href: withBase('/studio/fortune-poem/') },
+  { id: 'icons', label: 'Icons', href: withBase('/studio/icons/') },
+];
+---
+<nav class="mode-route" aria-label="Studio 功能">
+  <span class="mode-route__label">STUDIO</span>
+  <div class="mode-route__track">
+    {routes.map((route) => route.id === current ? (
+      <span class="mode-route__stop is-current" aria-current="page">{route.label}</span>
+    ) : (
+      <a class="mode-route__stop" href={route.href}>{route.label}</a>
+    ))}
+  </div>
+</nav>

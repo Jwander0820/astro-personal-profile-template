@@ -1,0 +1,119 @@
+---
+import { loadStudioContent } from '../../../scripts/profile-content.mjs';
+import { createProfileAnswersFromStudioContent } from '../../../scripts/profile-answers.mjs';
+import StudioExampleLink from '../../components/StudioExampleLink.astro';
+import StudioRouteNav from '../../components/StudioRouteNav.astro';
+import { withBase } from '../../lib/paths';
+import '../../styles/online-studio.css';
+import '../../styles/fortune-studio.css';
+
+const runtime = globalThis as typeof globalThis & { process: { cwd(): string } };
+const content = await loadStudioContent(runtime.process.cwd());
+const bootstrap = {
+  initialAnswers: createProfileAnswersFromStudioContent(content),
+  fortuneRevision: content.fortuneRevision,
+  localApiUrl: 'http://localhost:4322',
+};
+const bootstrapJson = JSON.stringify(bootstrap).replace(/</g, '\\u003c');
+const favicon = withBase('/favicon.svg');
+---
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="編輯、排序並預覽 Profile Studio 的今日手氣籤詩。" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href={favicon} />
+    <title>籤詩編輯 · Profile Studio</title>
+  </head>
+  <body>
+    <a class="online-skip-link" href="#fortune-editor">跳到籤詩編輯區</a>
+    <script is:inline id="fortune-studio-data" type="application/json" set:html={bootstrapJson}></script>
+
+    <header class="online-topbar">
+      <StudioRouteNav current="fortune" />
+      <div class="topbar-state">
+        <span class="browser-only-badge" id="fortune-mode-badge"><span aria-hidden="true">●</span> 瀏覽器草稿</span>
+        <span id="fortune-status" role="status" aria-live="polite">正在準備籤桶…</span>
+        <StudioExampleLink />
+      </div>
+    </header>
+
+    <main class="fortune-workbench">
+      <section class="fortune-editor" id="fortune-editor" aria-labelledby="fortune-title">
+        <div class="fortune-intro">
+          <p class="mini-label">FORTUNE POEM WORKSHOP</p>
+          <h1 id="fortune-title">整理你的籤桶。</h1>
+          <p>調整標題、籤文與順序，右側會使用正式的今日手氣 block 同步測試。</p>
+          <div class="privacy-note">
+            <span aria-hidden="true">◌</span>
+            <p><strong>線上也能編輯與預覽。</strong>內容會留在同一份 Studio 瀏覽器草稿；直接寫回 <code>src/content/</code> 僅限 <code>npm run studio</code>。</p>
+          </div>
+        </div>
+
+        <section class="fortune-copy-card" aria-labelledby="fortune-copy-heading">
+          <div class="panel-heading">
+            <div><p class="step-label">DISPLAY COPY</p><h2 id="fortune-copy-heading">今日手氣標題與說明</h2></div>
+          </div>
+          <div class="field-grid">
+            <label class="field">
+              <span>標題</span>
+              <input id="fortune-heading-input" type="text" maxlength="80" />
+            </label>
+            <label class="field field--wide">
+              <span>說明</span>
+              <textarea id="fortune-description-input" rows="3" maxlength="500"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="fortune-bucket" aria-labelledby="fortune-list-heading">
+          <div class="fortune-bucket__heading">
+            <div>
+              <p class="step-label">FORTUNE BUCKET</p>
+              <h2 id="fortune-list-heading">籤詩內容</h2>
+              <p id="fortune-summary">正在統計籤詩…</p>
+            </div>
+            <button class="button button--primary" id="add-fortune" type="button">＋ 新增籤詩</button>
+          </div>
+          <label class="field fortune-search">
+            <span>搜尋籤詩</span>
+            <input id="fortune-search" type="search" placeholder="輸入 ID、等級、籤文或備註" />
+          </label>
+          <div class="fortune-list" id="fortune-list"></div>
+        </section>
+
+        <div class="fortune-actions">
+          <button class="button button--primary button--large" id="save-fortune-project" type="button" hidden>儲存到本機專案</button>
+          <a class="button button--quiet button--large" href={withBase('/studio/')}>回個人檔案匯出 JSON</a>
+        </div>
+      </section>
+
+      <aside class="fortune-preview" aria-labelledby="fortune-preview-heading">
+        <div class="fortune-preview__heading">
+          <div>
+            <p class="mini-label">FORTUNE BLOCK TEST</p>
+            <h2 id="fortune-preview-heading">抽籤測試</h2>
+            <p>直接隨機抽籤，或從左側指定一張檢查籤文排列。</p>
+          </div>
+        </div>
+        <div class="fortune-preview__stage">
+          <iframe
+            id="fortune-preview-frame"
+            title="今日手氣籤詩測試"
+            src={withBase('/studio/fortune-poem/preview/')}
+          ></iframe>
+        </div>
+        <p class="fortune-preview__footnote">這裡只載入正式籤詩 block，不會顯示完整自介首頁。</p>
+      </aside>
+    </main>
+
+    <div class="online-toast" id="fortune-toast" role="status" aria-live="polite"></div>
+
+    <script>
+      import { mountFortuneStudio } from '../../scripts/fortune-studio.js';
+      mountFortuneStudio();
+    </script>
+  </body>
+</html>

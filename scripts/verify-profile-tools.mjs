@@ -77,6 +77,9 @@ try {
   assert.ok(exportedCurrentAnswers.socials.some((social) => social.service === 'github'));
   assert.ok(exportedCurrentAnswers.links.some((link) => link.id === 'projects'));
   assert.ok(exportedCurrentAnswers.sections.some((section) => section.id === 'about'));
+  assert.ok(exportedCurrentAnswers.fortune.fortunes.length > 0);
+  assert.equal(answersPreview.summary.fortuneCount, 2);
+  assert.equal('fortune' in minimalPreview.answers, false, '舊版回答檔未提供 fortune 時必須保持向下相容');
   assert.doesNotThrow(() => validateProfileAnswers(exportedCurrentAnswers));
   const serializedCurrentAnswers = serializeProfileAnswers(exportedCurrentAnswers);
   assert.match(serializedCurrentAnswers, /^\{\n  "\$schema": "\.\/docs\/profile-answers\.schema\.json"/);
@@ -108,6 +111,8 @@ try {
   await applyProfileAnswers(temporaryRoot, answers);
   await applyProfileAnswers(temporaryRoot, answersPreview.answers);
   const result = await applyProfileAnswers(temporaryRoot, answers);
+  assert.equal(result.blocks.find((block) => block.id === 'fortune')?.data.title, answers.fortune.title);
+  assert.equal(result.fortunes.length, answers.fortune.fortunes.length);
   const social = await saveStudioLink(temporaryRoot, 'studio-social-instagram', {
     title: 'Instagram',
     url: 'https://www.instagram.com/example',
@@ -522,12 +527,19 @@ try {
     (error) => error instanceof StudioRequestError && error.status === 403,
   );
 
-  const [onlineStudioPage, onlineStudioApp, renderer, previewBridge, studioServerSource] = await Promise.all([
+  const [onlineStudioPage, onlineStudioApp, renderer, previewBridge, studioServerSource, fortuneStudioPage, fortuneStudioPreviewPage, fortuneStudioApp, iconStudioPage, studioRouteNav, studioExampleLink, fortuneDraw] = await Promise.all([
     readFile(path.join(projectRoot, 'src', 'pages', 'studio.astro'), 'utf8'),
     readFile(path.join(projectRoot, 'src', 'scripts', 'online-studio.js'), 'utf8'),
     readFile(path.join(projectRoot, 'src', 'scripts', 'profile-renderer.js'), 'utf8'),
     readFile(path.join(projectRoot, 'src', 'scripts', 'profile-preview-bridge.js'), 'utf8'),
     readFile(path.join(projectRoot, 'scripts', 'studio-server.mjs'), 'utf8'),
+    readFile(path.join(projectRoot, 'src', 'pages', 'studio', 'fortune-poem.astro'), 'utf8'),
+    readFile(path.join(projectRoot, 'src', 'pages', 'studio', 'fortune-poem', 'preview.astro'), 'utf8'),
+    readFile(path.join(projectRoot, 'src', 'scripts', 'fortune-studio.js'), 'utf8'),
+    readFile(path.join(projectRoot, 'src', 'pages', 'studio', 'icons.astro'), 'utf8'),
+    readFile(path.join(projectRoot, 'src', 'components', 'StudioRouteNav.astro'), 'utf8'),
+    readFile(path.join(projectRoot, 'src', 'components', 'StudioExampleLink.astro'), 'utf8'),
+    readFile(path.join(projectRoot, 'src', 'components', 'FortuneDraw.astro'), 'utf8'),
   ]);
   assert.match(onlineStudioPage, /<iframe[\s\S]*id="profile-preview"/);
   assert.match(onlineStudioPage, /id="tab-features"[\s\S]*其它功能/);
@@ -543,6 +555,25 @@ try {
   assert.ok(previewBridge.includes("event.data?.type !== 'profile-studio:render'"));
   assert.ok(studioServerSource.includes("'Access-Control-Allow-Origin'"));
   assert.ok(studioServerSource.includes("Location: `http://localhost:${previewPort}/studio/`"));
+  assert.ok(fortuneStudioPage.includes('/studio/fortune-poem/preview/'));
+  assert.ok(fortuneStudioPreviewPage.includes('<CustomBlock'));
+  assert.ok(fortuneStudioApp.includes('抽到這張了'));
+  assert.ok(fortuneStudioApp.includes('selectedFortune'));
+  assert.ok(fortuneStudioApp.includes('if (frameReady || !frame.contentWindow) return;'));
+  assert.ok(fortuneDraw.includes("'fortune-draw:show'"));
+  assert.ok(fortuneStudioApp.includes("localStorage.setItem(STORAGE_KEY"));
+  assert.ok(fortuneStudioApp.includes('/api/fortunes'));
+  assert.ok(fortuneStudioApp.includes('/api/blocks/fortune'));
+  assert.ok(iconStudioPage.includes('data-copy={name}'));
+  assert.ok(!iconStudioPage.includes('data-copy={`icon:'));
+  assert.ok(iconStudioPage.includes('按下「複製」會取得該代號'));
+  assert.ok(!onlineStudioPage.includes('只有顯示名稱必填'));
+  assert.ok(studioExampleLink.includes('class="studio-example-link"'));
+  assert.ok(studioExampleLink.includes('範例網頁'));
+  assert.ok(!studioRouteNav.includes('原網站'));
+  assert.ok(onlineStudioPage.indexOf('id="draft-status"') < onlineStudioPage.indexOf('<StudioExampleLink'));
+  assert.ok(studioRouteNav.includes('/studio/fortune-poem/'));
+  assert.ok(studioRouteNav.includes('/studio/icons/'));
 
   // Kept as an opt-in migration audit for downstream forks that still carry
   // the pre-unification Studio assets. The main template no longer runs it.

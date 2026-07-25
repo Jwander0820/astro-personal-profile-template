@@ -1,0 +1,84 @@
+---
+import Icon from '../../components/Icon.astro';
+import StudioExampleLink from '../../components/StudioExampleLink.astro';
+import StudioRouteNav from '../../components/StudioRouteNav.astro';
+import { iconGroups } from '../../lib/icons';
+import { withBase } from '../../lib/paths';
+import '../../styles/online-studio.css';
+import '../../styles/studio-icons.css';
+
+const iconCount = iconGroups.reduce((total, group) => total + group.names.length, 0);
+const favicon = withBase('/favicon.svg');
+---
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="查看並複製 Profile Studio 可用的 SVG icon 代號。" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href={favicon} />
+    <title>Icon 預覽 · Profile Studio</title>
+  </head>
+  <body>
+    <a class="online-skip-link" href="#icon-catalog">跳到 Icon 清單</a>
+    <header class="online-topbar">
+      <StudioRouteNav current="icons" />
+      <div class="topbar-state">
+        <span class="browser-only-badge"><span aria-hidden="true">●</span> {iconCount} 個代號</span>
+        <span id="copy-status" role="status" aria-live="polite">按下複製即可貼入 Studio</span>
+        <StudioExampleLink />
+      </div>
+    </header>
+
+    <main class="icon-preview-main" id="icon-catalog">
+      <header class="icon-preview-header">
+        <p class="mini-label">ICON CATALOG · {iconCount}</p>
+        <h1>挑一個剛好的圖示。</h1>
+        <p>Studio 的 Icon 欄位只需要代號。按下「複製」會取得該代號</p>
+      </header>
+
+      {iconGroups.map((group) => (
+        <section class="icon-preview-group" aria-labelledby={`group-${group.label}`}>
+          <div class="icon-group-heading">
+            <h2 id={`group-${group.label}`}>{group.label}</h2>
+            <span>{group.names.length}</span>
+          </div>
+          <div class="icon-grid">
+            {group.names.map((name) => (
+              <article class="icon-swatch">
+                <div class="icon-tile"><Icon name={name} size={30} /></div>
+                <div class="icon-meta">
+                  <strong>{name}</strong>
+                  <code>{name}</code>
+                </div>
+                <button class="copy-button" type="button" data-copy={name} aria-label={`複製 ${name} 代號`}>複製</button>
+              </article>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      <p class="icon-preview-note"><code>twitter</code> 與 <code>x</code>、<code>podcasts</code> 與 <code>applepodcasts</code> 分別是相同圖示的別名。</p>
+    </main>
+
+    <script>
+      const status = document.querySelector('#copy-status');
+      document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const value = button.dataset.copy;
+          if (!value) return;
+          try {
+            await navigator.clipboard.writeText(value);
+            button.textContent = '已複製';
+            if (status) status.textContent = `已複製 ${value}`;
+            window.setTimeout(() => { button.textContent = '複製'; }, 1200);
+          } catch {
+            button.textContent = '請手動複製';
+            if (status) status.textContent = `請手動複製 ${value}`;
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

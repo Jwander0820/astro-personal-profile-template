@@ -55,6 +55,27 @@
     }
   ],
   "playlist": null,
+  "fortune": {
+    "title": "今日手氣",
+    "description": "搖一搖，抽走今天的一點好運。",
+    "fortunes": [
+      {
+        "id": "smooth-start",
+        "grade": "大吉",
+        "category": "blessing",
+        "message": "今天會比想像中更順利。",
+        "note": "放心往前走，好事正在靠近。",
+        "visible": true
+      },
+      {
+        "id": "tiny-detour",
+        "grade": "小吉",
+        "category": "joke",
+        "message": "今天的捷徑可能只是風景比較多的遠路。",
+        "visible": true
+      }
+    ]
+  },
   "features": { "fortune": true },
   "appearance": {
     "sectionsLayout": "grid",

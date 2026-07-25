@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { FORTUNE_GRADES, validateFortuneBucket } from './fortune-content.mjs';
+import { FORTUNE_GRADES, validateFortuneBucket } from './fortune-schema.mjs';
 
 const [
   css,
@@ -21,6 +21,12 @@ const [
   answersModule,
   astroConfig,
   studioAccess,
+  studioRouteNav,
+  studioExampleLink,
+  fortuneStudioPage,
+  fortuneStudioPreviewPage,
+  fortuneStudioApp,
+  iconStudioPage,
 ] = await Promise.all([
   readFile(new URL('../src/styles/global.css', import.meta.url), 'utf8'),
   readFile(new URL('../src/pages/index.astro', import.meta.url), 'utf8'),
@@ -41,6 +47,12 @@ const [
   readFile(new URL('./profile-answers.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../astro.config.mjs', import.meta.url), 'utf8'),
   readFile(new URL('./studio-access.mjs', import.meta.url), 'utf8'),
+  readFile(new URL('../src/components/StudioRouteNav.astro', import.meta.url), 'utf8'),
+  readFile(new URL('../src/components/StudioExampleLink.astro', import.meta.url), 'utf8'),
+  readFile(new URL('../src/pages/studio/fortune-poem.astro', import.meta.url), 'utf8'),
+  readFile(new URL('../src/pages/studio/fortune-poem/preview.astro', import.meta.url), 'utf8'),
+  readFile(new URL('../src/scripts/fortune-studio.js', import.meta.url), 'utf8'),
+  readFile(new URL('../src/pages/studio/icons.astro', import.meta.url), 'utf8'),
 ]);
 
 const fortunes = JSON.parse(fortuneContent);
@@ -74,6 +86,7 @@ const contracts = [
   ['Studio sends validated documents into the formal page', previewBridge.includes("profile-studio:render") && previewBridge.includes('renderProfileDocument')],
   ['simulated icon-name preview is gone', !onlineStudioApp.includes('sim-social') && !onlineStudioApp.includes('LIVE SIMULATION')],
   ['Studio exposes six sequential editor areas with a final settings step', (onlineStudioPage.match(/role="tab"/g) ?? []).length === 6 && onlineStudioPage.includes('其它功能') && onlineStudioPage.includes('完成設定') && onlineStudioPage.includes('panel-finish')],
+  ['basic identity omits the redundant required-field legend', !onlineStudioPage.includes('只有顯示名稱必填')],
   ['playlist and fortune live under other features', onlineStudioPage.indexOf('panel-features') < onlineStudioPage.indexOf('id="playlist-enabled"') && onlineStudioPage.indexOf('panel-features') < onlineStudioPage.indexOf('features.fortune')],
   ['Studio intro is concise and removes the decorative installation label', onlineStudioPage.includes('自訂你的自介。') && !onlineStudioPage.includes('先在這裡') && !onlineStudioPage.includes('NO INSTALLATION')],
   ['final step integrates full package, JSON, import, local save, and reset actions', onlineStudioPage.includes('id="download-answers"') && onlineStudioPage.includes('id="download-json"') && onlineStudioPage.includes('id="copy-answers"') && onlineStudioPage.includes('id="import-answers"') && onlineStudioPage.includes('id="save-project"') && onlineStudioPage.includes('>還原成預設</button>')],
@@ -85,7 +98,14 @@ const contracts = [
   ['AI-generated JSON remains importable', onlineStudioPage.includes('ai-answers-json') && onlineStudioApp.includes('importJsonText')],
   ['local mode exposes explicit save-to-project without leaking its hidden online action', onlineStudioPage.includes('id="save-project"') && onlineStudioApp.includes('/api/answers/apply') && onlineStudioApp.includes('/api/images') && onlineStudioStyle.includes('[hidden] { display: none !important; }')],
   ['answer contract carries avatar and background', answersModule.includes("assertAllowedKeys(mediaInput, ['avatar', 'background']") && answersModule.includes('media: {')],
-  ['Studio production allowlist removes route and navigation together', astroConfig.includes('resolveOnlineStudioAccess') && astroConfig.includes("new URL('studio/', dir)") && studioAccess.includes("VALID_STUDIO_MODES = new Set(['auto', 'public', 'off'])") && footer.includes('studioEnabled')],
+  ['answer contract carries fortune copy and the editable bucket', answersModule.includes("assertAllowedKeys(input.fortune, ['title', 'description', 'fortunes']") && answersModule.includes('validateFortuneBucket(input.fortune.fortunes)') && liveRenderer.includes('answers.fortune?.title')],
+  ['fortune title and description are editable from the main Studio', onlineStudioPage.includes('data-bind="fortune.title"') && onlineStudioPage.includes('data-bind="fortune.description"') && onlineStudioPage.includes('/studio/fortune-poem/')],
+  ['fortune route edits the shared draft through an isolated formal fortune block', fortuneStudioPage.includes('/studio/fortune-poem/preview/') && fortuneStudioPage.includes('npm run studio') && fortuneStudioPreviewPage.includes('<CustomBlock') && fortuneStudioApp.includes(`const STORAGE_KEY = 'profile-online-studio-draft-v2'`) && fortuneStudioApp.includes("type: 'fortune-studio:render'") && fortuneStudioApp.includes('if (frameReady || !frame.contentWindow) return;')],
+  ['fortune cards can force the formal draw component to show one result', fortuneStudioApp.includes('抽到這張了') && fortuneStudioApp.includes('selectedFortune') && fortuneStudioPreviewPage.includes("'fortune-draw:show'") && fortuneDraw.includes("'fortune-draw:show'") && fortuneDraw.includes("'fortune-draw:update'")],
+  ['fortune route keeps direct project writes local and explicit', fortuneStudioPage.includes('id="save-fortune-project"') && fortuneStudioPage.includes('hidden') && fortuneStudioApp.includes('/api/fortunes') && fortuneStudioApp.includes('/api/blocks/fortune')],
+  ['Icon copy returns the Studio token with concise instructions', iconStudioPage.includes('data-copy={name}') && !iconStudioPage.includes('data-copy={`icon:') && iconStudioPage.includes('Studio 的 Icon 欄位只需要代號。按下「複製」會取得該代號') && !iconStudioPage.includes('不會再附加')],
+  ['Studio tools share one same-tab navigation with a rightmost example-page button', studioExampleLink.includes('class="studio-example-link"') && studioExampleLink.includes('範例網頁') && !studioExampleLink.includes('target="_blank"') && studioRouteNav.includes('/studio/fortune-poem/') && studioRouteNav.includes('/studio/icons/') && !studioRouteNav.includes('原網站') && onlineStudioPage.indexOf('id="draft-status"') < onlineStudioPage.indexOf('<StudioExampleLink') && fortuneStudioPage.indexOf('id="fortune-status"') < fortuneStudioPage.indexOf('<StudioExampleLink') && iconStudioPage.indexOf('id="copy-status"') < iconStudioPage.indexOf('<StudioExampleLink')],
+  ['Studio production allowlist removes all Studio routes and navigation together', astroConfig.includes('resolveOnlineStudioAccess') && astroConfig.includes("new URL('studio/', dir)") && studioAccess.includes("VALID_STUDIO_MODES = new Set(['auto', 'public', 'off'])") && footer.includes('studioEnabled')],
   ['Studio remains responsive and motion-aware', onlineStudioStyle.includes('@media (max-width: 720px)') && onlineStudioStyle.includes('@media (prefers-reduced-motion: reduce)')],
   ['keyboard tab navigation remains cyclic', onlineStudioApp.includes("['ArrowLeft', 'ArrowRight']") && onlineStudioApp.includes('% tabs.length')],
 ];

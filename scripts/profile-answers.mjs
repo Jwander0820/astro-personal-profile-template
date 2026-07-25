@@ -1,4 +1,5 @@
 import { isSafeImageSource, isSafeProfileUrl } from './content-safety.mjs';
+import { validateFortuneBucket } from './fortune-schema.mjs';
 import { assertThemeColor, DEFAULT_THEME_COLOR } from './theme-color.mjs';
 import { parseYoutubePlaylistId } from './youtube-playlist.mjs';
 
@@ -101,7 +102,7 @@ export function extractYoutubePlaylistId(value) {
 export function validateProfileAnswers(input) {
   if (!isObject(input) || input.version !== 1) throw new Error('回答檔 version 必須為 1。');
   if (!isObject(input.identity)) throw new Error('回答檔缺少 identity。');
-  assertAllowedKeys(input, ['$schema', 'version', 'identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'playlist', 'features', 'appearance'], '回答檔');
+  assertAllowedKeys(input, ['$schema', 'version', 'identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'playlist', 'fortune', 'features', 'appearance'], '回答檔');
   if (input.$schema !== undefined && typeof input.$schema !== 'string') throw new Error('$schema 格式不正確。');
   assertAllowedKeys(input.identity, ['displayName', 'title', 'location', 'tagline', 'bio'], 'identity');
   const tagline = assertStringArray(input.identity.tagline ?? [], '關鍵字', { max: 6 });
@@ -205,6 +206,17 @@ export function validateProfileAnswers(input) {
     description: assertProvidedText(input.playlist.description, '播放清單說明', { max: 500 }) || '按下唱針，隨機抽一首歌。',
   };
 
+  if (input.fortune !== undefined && !isObject(input.fortune)) throw new Error('fortune 格式不正確。');
+  let fortune;
+  if (isObject(input.fortune)) {
+    assertAllowedKeys(input.fortune, ['title', 'description', 'fortunes'], 'fortune');
+    fortune = {
+      title: assertProvidedText(input.fortune.title, '今日手氣標題', { max: 80 }) || '今日手氣',
+      description: assertProvidedText(input.fortune.description, '今日手氣說明', { max: 500 }) || '搖一搖，抽走今天的一點好運。',
+      fortunes: validateFortuneBucket(input.fortune.fortunes),
+    };
+  }
+
   if (input.features !== undefined && !isObject(input.features)) throw new Error('features 格式不正確。');
   const features = input.features ?? {};
   assertAllowedKeys(features, ['fortune'], 'features');
@@ -219,6 +231,7 @@ export function validateProfileAnswers(input) {
     sections,
     imageBlocks,
     playlist,
+    ...(fortune ? { fortune } : {}),
     appearance: { sectionsLayout, homeOrder, bodyFont, displayFont, mainColor },
     features: { fortune: features.fortune !== false },
   };
@@ -246,6 +259,7 @@ export function previewProfileAnswers(rawInput) {
       imageBlockTitles: answers.imageBlocks.map((block) => block.title),
       playlistEnabled: Boolean(answers.playlist),
       fortuneEnabled: answers.features.fortune,
+      fortuneCount: answers.fortune?.fortunes.length ?? 0,
       homeOrder: answers.appearance.homeOrder,
       mainColor: answers.appearance.mainColor,
     },
@@ -341,6 +355,11 @@ export function createProfileAnswersFromStudioContent(content) {
       title: turntable.data.title ?? 'PLAY！',
       description: turntable.body ?? '',
     } : null,
+    fortune: {
+      title: fortune?.data?.title ?? '今日手氣',
+      description: fortune?.body ?? '搖一搖，抽走今天的一點好運。',
+      fortunes: Array.isArray(content.fortunes) ? content.fortunes : [],
+    },
     features: { fortune: fortune?.data?.visible !== false },
     appearance: {
       sectionsLayout: content.profile.sectionsLayout ?? 'grid',

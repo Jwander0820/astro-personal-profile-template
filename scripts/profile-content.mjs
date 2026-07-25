@@ -2,6 +2,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { isSafeHttpUrl, isSafeImageSource, isSafeProfileUrl } from './content-safety.mjs';
 import { atomicWriteText, withFileWriteLock } from './file-writes.mjs';
+import { loadFortuneBucket, replaceFortuneBucket } from './fortune-content.mjs';
 import { assertThemeColor, DEFAULT_THEME_COLOR } from './theme-color.mjs';
 import {
   extractYoutubePlaylistId,
@@ -196,11 +197,12 @@ async function readCollection(contentRoot, collection) {
 export async function loadStudioContent(projectRoot) {
   const contentRoot = safeFile(projectRoot, 'src', 'content');
   const profilePath = safeFile(contentRoot, 'profile', 'main.md');
-  const [profile, links, sections, blocks] = await Promise.all([
+  const [profile, links, sections, blocks, fortuneBucket] = await Promise.all([
     readMarkdownFile(profilePath),
     readCollection(contentRoot, 'links'),
     readCollection(contentRoot, 'sections'),
     readCollection(contentRoot, 'blocks'),
+    loadFortuneBucket(projectRoot),
   ]);
   const defaultVisibility = HOME_SECTIONS.filter((id) => {
     const blockId = id === 'notion' ? 'notion-embed' : id;
@@ -225,6 +227,9 @@ export async function loadStudioContent(projectRoot) {
     links,
     sections,
     blocks,
+    fortunes: fortuneBucket.fortunes,
+    fortuneRevision: fortuneBucket.revision,
+    fortuneSummary: fortuneBucket.summary,
   };
 }
 
@@ -630,7 +635,19 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
   } else {
     await setVisible(projectRoot, 'blocks', 'turntable', false);
   }
-  await setVisible(projectRoot, 'blocks', 'fortune', input.features.fortune);
+  if (input.fortune) {
+    await upsertMarkdown(projectRoot, 'blocks', 'fortune', {
+      title: input.fortune.title,
+      placement: 'after-sections',
+      order: 10,
+      visible: input.features.fortune,
+      layout: 'fortune',
+      tags: [],
+    }, input.fortune.description);
+    await replaceFortuneBucket(projectRoot, input.fortune.fortunes);
+  } else {
+    await setVisible(projectRoot, 'blocks', 'fortune', input.features.fortune);
+  }
   const nextContent = await loadStudioContent(projectRoot);
   const homeVisibility = [];
   if (nextContent.sections.some((section) => section.data.visible)) homeVisibility.push('about');

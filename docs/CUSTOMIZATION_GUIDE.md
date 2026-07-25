@@ -75,7 +75,7 @@ tags: [Python, Notes]
 - 音訊：`spotify`、`youtubemusic`、`applemusic`、`podcasts`、`applepodcasts`、`kkbox`、`tidal`
 - 其他：`notion`、`mail`、`music`、`code`、`live`、`arrow`
 
-啟動網站後可前往 `http://localhost:4321/icons/` 查看實際預覽與完整名稱。Icon 來源與授權記錄於 `THIRD_PARTY_NOTICES.md`。
+啟動 Studio 後可前往 `http://localhost:4321/studio/icons/` 查看實際預覽與完整名稱；複製按鈕只會複製 `mail` 這類可直接貼入 Studio 的代號。此路由與 Studio 使用相同的正式部署開關。Icon 來源與授權記錄於 `THIRD_PARTY_NOTICES.md`。
 
 ## 新增自訂區塊
 
@@ -187,7 +187,7 @@ tags: [Shuffle, YouTube]
 
 ## 今日手氣
 
-抽籤板塊與籤桶格式請見 [`fortune-block.md`](fortune-block.md)。Studio 可切換今日手氣顯示；籤詩內容目前直接維護 `src/content/fortunes.json`。
+抽籤板塊與籤桶格式請見 [`fortune-block.md`](fortune-block.md)。Studio 可切換今日手氣、編輯標題與說明；`/studio/fortune-poem/` 可管理完整籤桶，手動維護時仍以 `src/content/fortunes.json` 為來源。
 
 ## 驗證修改
 
