@@ -8,6 +8,10 @@
     "tagline": ["Code", "Music", "Learning"],
     "bio": "喜歡把想法做成小工具，也用音樂記錄生活。"
   },
+  "media": {
+    "avatar": "/images/avatar.svg",
+    "background": "/images/background.svg"
+  },
   "socials": [
     { "service": "github", "url": "https://github.com/yourname" },
     { "service": "email", "url": "mailto:hello@example.com" }

@@ -1,6 +1,6 @@
 # Profile Studio 內容模型
 
-Profile Studio、AI 回答檔與手動 Markdown 編輯共用同一份內容。`src/content` 是唯一來源，Studio 不是另一個資料庫。
+公開模式、本機模式、AI 回答檔與手動 Markdown 編輯共用同一份內容契約。`src/content` 是網站唯一來源；Studio 的瀏覽器草稿不是另一個公開資料庫。
 
 ## 本機 Studio
 
@@ -14,14 +14,14 @@ Windows 建議直接雙擊 `start-studio.cmd`，或執行：
 
 此命令同時啟動：
 
-- `http://localhost:4322`：只綁定本機 loopback 的內容編輯台。
-- `http://localhost:4321`：Astro 即時預覽；使用 localhost 可避免 YouTube 嵌入來源辨識問題。
+- `http://localhost:4321/studio/`：唯一的 Profile Studio 使用者介面與正式頁面預覽。
+- `http://localhost:4322`：只綁定 loopback、沒有獨立 UI 的背景寫入 API。
 
-Studio 的寫入 API 不會部署到 `dist`，GitHub Pages 上也不存在。圖片上傳僅接受經檔頭驗證的 PNG、JPG、WebP、GIF，單檔上限 5 MB，並寫入 `public/images/`。範本內建的 SVG 仍可作為受信任的靜態資產使用，但 Studio 不接受未清理的 SVG 上傳。
+背景 API 不會部署到 `dist`，GitHub Pages 上也不存在。公開 `/studio/` 使用 `localStorage` 保存文字、IndexedDB 保存圖片 Blob，並以 ZIP 匯入／匯出；不會嘗試連線 GitHub。以 `npm run studio` 啟動時，同一頁會偵測背景 API，只有使用者按下「儲存到專案」才把通過檔頭驗證的 PNG、JPG、WebP 或 GIF（單檔上限 5 MB）寫入 `public/images/`，再套用內容。
 
-預覽同步預設採用明確儲存；也可切換成 5 秒 debounce 的自動更新。每個表單都有獨立 revision，同一表單同時只會送出一個寫入；同一檔案的讀取、合併與寫入也會依序執行，避免平行請求互相覆蓋。舊回應不會清除較新的修改。新增項目若需要重繪仍有未儲存的相關表單，Studio 會先阻止操作並提示儲存，避免草稿消失。Markdown 通過驗證並寫入後，Studio 才以內容 revision 重新載入右側 iframe，並分開顯示寫入失敗與預覽載入失敗。輸入到一半的無效內容不會排入背景寫入。
+所有欄位都即時送入嵌入的正式首頁；首頁與 Studio 使用同一份正式 CSS、ProfileRenderer 結構及 Icon catalog。寫入仍保持明確按鈕，不會因輸入事件自動修改檔案。
 
-連結管理分為個人資料下方的社群 Icons，以及首頁 Links 卡片。社群服務目錄會顯示尚未建立的項目；首次儲存時才建立對應 Markdown。兩種連結都能選擇 `src/lib/icons.ts` 的內建 Icon，或將自訂圖檔上傳到 `public/images/` 並寫入 `image` 欄位。
+連結管理分為個人資料下方的社群 Icons，以及首頁 Links 卡片。新增社群時先從內建服務與 Icon 選擇；「自訂網站」使用一般網站名稱、URL 與箭頭 Icon。
 
 圖片板塊是 `blocks/*.md` 中的 `layout: image`。Studio 可建立與維護滿版、左右分割、海報式版型，並設定比例、裁切焦點、替代文字、Markdown 附文及顯示錨點。`placement` 會實際錨定在 Links 前、Links 後或 About 後；若對應首頁板塊被隱藏，圖片板塊會移到主要內容尾端，避免內容消失。
 
@@ -43,9 +43,9 @@ Studio 的寫入 API 不會部署到 `dist`，GitHub Pages 上也不存在。圖
 
 唱盤欄位在 Studio、AI 回答檔與手動 Markdown 三種入口都接受 YouTube 播放清單完整網址或 playlist ID；`si` 等分享參數可以保留，程式載入時會自動取出 `list` ID，Studio 儲存時則只保留 ID。Notion 欄位接受已發布到網路的完整頁面網址；`preview` 產生簡化連結卡片，`inline` 則嘗試 iframe 內嵌，實際是否允許內嵌仍取決於 Notion 回應標頭。
 
-## 為什麼不直接做線上 CMS
+## 為什麼線上 Studio 不直接發布
 
-GitHub Pages 是靜態主機，無法安全地在公開頁面直接改 repository 檔案。若做線上 CMS，就需要 OAuth、後端、權限與 token 保存。這個版本將編輯能力限制在本機，保留 Git review、無後端成本，也不會讓管理介面被部署。
+GitHub Pages 是靜態主機，無法安全地在公開頁面直接改 repository 檔案。若做可發布的線上 CMS，就需要 OAuth、後端、權限與 token 保存。這個版本允許任何訪客在 `/studio/` 編輯、正式預覽與下載設定包，但不持有 repository 權限；真正寫檔仍在本機進行，因此保留 Git review、沒有後端成本，也不會把 token 放進瀏覽器。
 
 未來若需要真正的非開發者線上發佈，可在不改內容模型的前提下增加 GitHub App/OAuth 後端；後端只要產生同一套 Markdown 即可。
 

@@ -1,6 +1,6 @@
 # 自訂內容指南
 
-本指南提供手動修改 Markdown 時需要的欄位與範例。若不想直接編輯檔案，可執行 `start-studio.cmd`，透過 Profile Studio 完成多數設定。
+本指南提供手動修改 Markdown 時需要的欄位與範例。若沒有電腦或不想安裝工具，可從已部署網站頁尾開啟 `/studio/`，使用正式頁面即時預覽並下載包含 JSON 與圖片的 ZIP 設定包；執行 `start-studio.cmd` 後仍使用同一頁，並會多出「儲存到專案」。
 
 網站內容都位於 `src/content/`：
 
@@ -187,7 +187,7 @@ tags: [Shuffle, YouTube]
 
 ## 今日手氣
 
-抽籤板塊與籤桶格式請見 [`fortune-block.md`](fortune-block.md)。Profile Studio 也提供籤詩的新增、編輯、排序、停用與復原功能。
+抽籤板塊與籤桶格式請見 [`fortune-block.md`](fortune-block.md)。Studio 可切換今日手氣顯示；籤詩內容目前直接維護 `src/content/fortunes.json`。
 
 ## 驗證修改
 

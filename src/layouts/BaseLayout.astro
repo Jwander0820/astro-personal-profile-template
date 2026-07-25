@@ -60,7 +60,7 @@ const themeCss = buildThemeCss(mainColor);
     </script>
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
-    <style is:inline set:html={themeCss}></style>
+    <style is:inline id="profile-theme-css" set:html={themeCss}></style>
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href={favicon} />
     {googleFontsUrl && (
@@ -82,5 +82,8 @@ const themeCss = buildThemeCss(mainColor);
     <a class="skip-link" href="#main-content">跳到主要內容</a>
     <ThemeToggle />
     <main id="main-content" tabindex="-1"><slot /></main>
+    <script>
+      import '../scripts/profile-preview-bridge.js';
+    </script>
   </body>
 </html>

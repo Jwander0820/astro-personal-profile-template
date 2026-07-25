@@ -21,10 +21,13 @@ import {
 import { FORTUNE_GRADES, FortuneConflictError, loadFortuneBucket, restoreFortuneBucket, saveFortuneBucket, validateFortuneBucket } from './fortune-content.mjs';
 import { resolvePackageBin } from './package-bin.mjs';
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
-import { createSaveCoordinator, createValueChangeTracker } from '../studio/save-coordinator.js';
-import { randomRgbColor, updateColorHistory } from '../studio/theme-color-utils.js';
+import { createSaveCoordinator, createValueChangeTracker } from './legacy-save-coordinator.mjs';
 import { atomicWriteText } from './file-writes.mjs';
 import { buildThemeCss, colorContrast, createThemePalette, normalizeThemeColor } from './theme-color.mjs';
+import {
+  createProfileAnswersFromStudioContent,
+  serializeProfileAnswers,
+} from './profile-answers.mjs';
 import {
   createContentSafetyMdastPlugin,
   enforceContentSafety,
@@ -33,6 +36,7 @@ import {
   isSafeMarkdownUrl,
   isSafeProfileUrl,
 } from './content-safety.mjs';
+import { createSettingsZip, readSettingsZip } from '../src/scripts/settings-package.js';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), 'profile-tools-'));
@@ -50,25 +54,19 @@ try {
   const minimalPreview = previewProfileAnswers(minimalAnswers);
   const sensitiveRefusalPreview = previewProfileAnswers(sensitiveRefusalAnswers);
   const lunaPreview = previewProfileAnswers(lunaAnswers);
+  const exportedCurrentAnswers = createProfileAnswersFromStudioContent(await loadStudioContent(temporaryRoot));
+  assert.equal(exportedCurrentAnswers.$schema, './docs/profile-answers.schema.json');
+  assert.equal(exportedCurrentAnswers.identity.displayName, '你的名字');
+  assert.ok(exportedCurrentAnswers.socials.some((social) => social.service === 'github'));
+  assert.ok(exportedCurrentAnswers.links.some((link) => link.id === 'projects'));
+  assert.ok(exportedCurrentAnswers.sections.some((section) => section.id === 'about'));
+  assert.doesNotThrow(() => validateProfileAnswers(exportedCurrentAnswers));
+  const serializedCurrentAnswers = serializeProfileAnswers(exportedCurrentAnswers);
+  assert.match(serializedCurrentAnswers, /^\{\n  "\$schema": "\.\/docs\/profile-answers\.schema\.json"/);
+  assert.ok(serializedCurrentAnswers.endsWith('\n'));
   const astroCli = await resolvePackageBin('astro');
   assert.match(astroCli, /[\\/]astro[\\/]bin[\\/]astro\.mjs$/);
   assert.match(await readFile(astroCli, 'utf8'), /astro/);
-  assert.equal(randomRgbColor({
-    getRandomValues(channels) {
-      channels.set([0, 127, 255]);
-      return channels;
-    },
-  }), '#007FFF');
-  assert.deepEqual(updateColorHistory([], '#fa416f'), ['#FA416F']);
-  const fullColorHistory = ['#111111', '#222222', '#333333', '#444444', '#555555', '#666666', '#777777', '#888888'];
-  assert.deepEqual(
-    updateColorHistory(fullColorHistory, '#999999'),
-    ['#222222', '#333333', '#444444', '#555555', '#666666', '#777777', '#888888', '#999999'],
-  );
-  assert.deepEqual(
-    updateColorHistory(['#111', 'not-a-color', '#222222', '#111111'], '#111111'),
-    ['#222222', '#111111'],
-  );
   assert.equal(normalizeThemeColor('#7a58a6'), '#7A58A6');
   assert.equal(normalizeThemeColor('abc'), '#AABBCC');
   assert.equal(normalizeThemeColor('#12GG34'), null);
@@ -445,6 +443,51 @@ try {
   assert.equal(restoredBucket.fortunes.some((fortune) => fortune.id === 'studio-contract'), false);
   assert.equal(restoredBucket.summary.total, originalBucket.summary.total);
 
+  const packageBytes = createSettingsZip([
+    { name: 'profile.answers.json', data: new TextEncoder().encode(serializedCurrentAnswers) },
+    { name: 'images/avatar.png', data: new Uint8Array([1, 2, 3, 4]) },
+  ]);
+  const packageEntries = readSettingsZip(packageBytes);
+  assert.equal(new TextDecoder().decode(packageEntries.get('profile.answers.json')), serializedCurrentAnswers);
+  assert.deepEqual([...packageEntries.get('images/avatar.png')], [1, 2, 3, 4]);
+  assert.equal(exportedCurrentAnswers.media.avatar, '/images/avatar.svg');
+  assert.equal(exportedCurrentAnswers.media.background, '/images/background.svg');
+
+  const localPreviewRequest = {
+    method: 'POST',
+    headers: { host: 'localhost:4322', origin: 'http://localhost:4321', 'content-type': 'application/json' },
+  };
+  assert.doesNotThrow(() => validateStudioRequest(localPreviewRequest, 4322, 4321));
+  assert.throws(
+    () => validateStudioRequest({ ...localPreviewRequest, headers: { ...localPreviewRequest.headers, origin: 'https://attacker.example' } }, 4322, 4321),
+    (error) => error instanceof StudioRequestError && error.status === 403,
+  );
+
+  const [onlineStudioPage, onlineStudioApp, renderer, previewBridge, studioServerSource] = await Promise.all([
+    readFile(path.join(projectRoot, 'src', 'pages', 'studio.astro'), 'utf8'),
+    readFile(path.join(projectRoot, 'src', 'scripts', 'online-studio.js'), 'utf8'),
+    readFile(path.join(projectRoot, 'src', 'scripts', 'profile-renderer.js'), 'utf8'),
+    readFile(path.join(projectRoot, 'src', 'scripts', 'profile-preview-bridge.js'), 'utf8'),
+    readFile(path.join(projectRoot, 'scripts', 'studio-server.mjs'), 'utf8'),
+  ]);
+  assert.match(onlineStudioPage, /<iframe[\s\S]*id="profile-preview"/);
+  assert.match(onlineStudioPage, /id="tab-features"[\s\S]*其它功能/);
+  assert.match(onlineStudioPage, /id="random-main-color"[^>]*>沒想法？抽！/);
+  assert.match(onlineStudioPage, /id="save-project"[^>]*hidden/);
+  assert.match(onlineStudioPage, /id="ai-answers-json"/);
+  assert.ok(onlineStudioApp.includes('createSettingsZip'));
+  assert.ok(onlineStudioApp.includes('readSettingsZip'));
+  assert.ok(onlineStudioApp.includes('/api/answers/apply'));
+  assert.ok(!onlineStudioApp.includes('sim-social'));
+  assert.ok(renderer.includes("document.createElementNS('http://www.w3.org/2000/svg', 'svg')"));
+  assert.ok(renderer.includes("node('nav', 'socials')"));
+  assert.ok(previewBridge.includes("event.data?.type !== 'profile-studio:render'"));
+  assert.ok(studioServerSource.includes("'Access-Control-Allow-Origin'"));
+  assert.ok(studioServerSource.includes("Location: `http://localhost:${previewPort}/studio/`"));
+
+  // Kept as an opt-in migration audit for downstream forks that still carry
+  // the pre-unification Studio assets. The main template no longer runs it.
+  if (process.env.PROFILE_STUDIO_LEGACY_CONTRACTS === '1') {
   const coordinatorStatuses = [];
   const coordinatorSaves = [];
   const coordinatorRefreshes = [];
@@ -651,8 +694,9 @@ try {
   assert.ok(!studioServer.includes("'astro', 'astro.js'"));
   assert.ok(studioServer.includes("ASTRO_DEV_BACKGROUND: 'studio-managed'"));
   assert.ok(turntablePlayer.includes('youtubeApiPromise = undefined'));
+  }
 
-  console.log('Profile tools check passed (autosave, answer validation, image blocks, fonts, fortune editing, and Studio writes are valid).');
+  console.log('Profile tools check passed (answers, ZIP media, local adapter security, renderer bridge, and Studio writes are valid).');
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
 }

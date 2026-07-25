@@ -1,3 +1,5 @@
+// Compatibility helper retained for older downstream imports. The legacy
+// Studio user interface has been removed; the active UI lives under /studio/.
 export function createValueChangeTracker(initialValue) {
   let previousValue = initialValue;
   return (nextValue) => {

@@ -33,6 +33,18 @@ Agent 應先取得網站最基本的顯示名稱，再讓使用者自行選擇�
 
 若使用不能存取 repository 的一般 AI 對話介面，它只能完成訪談與 JSON 產出，不能直接修改 content、commit 或部署。任意能依提示詞輸出 JSON 的 AI 工具都可使用，本流程不要求特定品牌或模型。此時可使用 [`ai/PROFILE_INTERVIEW_PROMPT.md`](ai/PROFILE_INTERVIEW_PROMPT.md)，再將 JSON 貼到 Profile Studio。
 
+## 沒有電腦時：使用線上 Studio
+
+部署後的網站頁尾可切換到 `/studio/`。線上 Studio 不需要安裝 Node.js 或 npm，手機也能使用；它會從目前網站內容建立草稿，並支援 AI JSON 匯入、正式頁面即時預覽、圖片暫存、複製 JSON，以及下載包含 JSON 與圖片的 `profile-settings.zip`。
+
+線上版不具備 GitHub 寫入權限，也不會把草稿送到後端。下載後可先保留檔案，日後有本機專案時：
+
+1. 之後在 `/studio/` 匯入 ZIP 設定包；若只有 JSON，也可直接匯入。
+2. 執行 `npm run studio` 後，同一頁會顯示「儲存到專案」；確認後才寫入 Markdown 與圖片。JSON 也可使用 `npm run profile:apply -- profile.answers.json`。
+3. 執行 `npm run build`，再依公開內容摘要確認是否發布。
+
+預覽直接嵌入正式首頁並使用正式 CSS、卡片結構與 SVG Icons；圖片使用瀏覽器 Blob URL 即時顯示。YouTube 實際播放、外部 iframe 能否載入，仍取決於瀏覽器與第三方服務。
+
 ## Coding agent 一站式流程
 
 1. 讀取 schema 與範例，只詢問尚未提供的資料。
@@ -134,7 +146,7 @@ About me 排版：
 
 ## 套用與檢查
 
-Profile Studio 的「AI 協助產生自介」會先驗證 JSON 並顯示個人資料、連結、卡片與功能開關摘要，不會在第一次點擊時寫檔。確認摘要後再按「確認套用」；server 會重新驗證後才修改內容。若 Studio 仍有其他尚未儲存的修改，需先處理完再套用，避免互相覆蓋。
+在 Profile Studio 的「其它功能」貼上 AI 產生的 JSON，再按「驗證並載入草稿」。通過共用 schema 後只會更新瀏覽器草稿與正式預覽；公開模式下載設定包，本機模式仍需明確按下「儲存到專案」才會寫檔。
 
 Agent 或開發者可執行：
 

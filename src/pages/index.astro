@@ -1,11 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import ProfileHeader from '../components/ProfileHeader.astro';
-import SocialIcons from '../components/SocialIcons.astro';
-import LinkCard from '../components/LinkCard.astro';
-import SectionCard from '../components/SectionCard.astro';
-import Footer from '../components/Footer.astro';
-import CustomBlock from '../components/CustomBlock.astro';
+import ProfileRenderer from '../components/ProfileRenderer.astro';
 import { getBlocks, getFortunes, getLinks, getProfile, getSections } from '../lib/content';
 
 const profile = await getProfile();
@@ -13,22 +8,6 @@ const links = await getLinks();
 const sections = await getSections();
 const blocks = await getBlocks();
 const fortunes = await getFortunes();
-const iconLinks = links.filter((link) => link.data.group !== 'footer' && link.data.layout === 'icon');
-const featuredLinks = links.filter((link) => ['main', 'featured'].includes(link.data.group) && link.data.layout === 'card');
-const turntableBlocks = blocks.filter((block) => block.data.layout === 'turntable');
-const fortuneBlocks = blocks.filter((block) => block.data.layout === 'fortune');
-const notionBlocks = blocks.filter((block) => block.data.layout === 'embed' && block.data.provider === 'notion');
-const orderedBlockIds = new Set([...turntableBlocks, ...fortuneBlocks, ...notionBlocks].map((block) => block.id));
-const remainingBlocks = blocks.filter((block) => !orderedBlockIds.has(block.id));
-const blocksBeforeLinks = remainingBlocks.filter((block) => block.data.placement === 'before-links');
-const blocksAfterLinks = remainingBlocks.filter((block) => block.data.placement === 'between-links-sections');
-const blocksAfterAbout = remainingBlocks.filter((block) => block.data.placement === 'after-sections');
-const visibleHomeSections = profile.data.homeOrder.filter((section) => profile.data.homeVisibility.includes(section));
-const fallbackBlocks = remainingBlocks.filter((block) => (
-  (block.data.placement === 'before-links' || block.data.placement === 'between-links-sections')
-    ? !visibleHomeSections.includes('links')
-    : !visibleHomeSections.includes('about')
-));
 const taglineText = Array.isArray(profile.data.tagline)
   ? profile.data.tagline.join(', ')
   : profile.data.tagline ?? '';
@@ -46,36 +25,5 @@ const pageTitle = identityParts.join(' · ');
   displayFont={profile.data.displayFont}
   mainColor={profile.data.mainColor}
 >
-  <ProfileHeader profile={profile} />
-  <SocialIcons links={iconLinks} />
-  {visibleHomeSections.map((section) => (
-    <>
-      {section === 'links' && blocksBeforeLinks.map((block) => <CustomBlock block={block} />)}
-      {section === 'about' ? sections.length > 0 && (
-        <section class="content-section" aria-labelledby="about-heading">
-          <h2 id="about-heading">{profile.data.aboutHeading}</h2>
-          <div class:list={['section-list', `section-list--${profile.data.sectionsLayout}`]}>
-            {sections.map((item) => <SectionCard section={item} />)}
-          </div>
-        </section>
-      ) : section === 'turntable' ? (
-        turntableBlocks.map((block) => <CustomBlock block={block} />)
-      ) : section === 'links' ? (
-        featuredLinks.length > 0 && (
-          <section class="content-section" aria-labelledby="links-heading">
-            <h2 id="links-heading">{profile.data.linksHeading}</h2>
-            <div class="link-list">{featuredLinks.map((link) => <LinkCard link={link} />)}</div>
-          </section>
-        )
-      ) : section === 'fortune' ? (
-        fortuneBlocks.map((block) => <CustomBlock block={block} fortunes={fortunes} />)
-      ) : (
-        notionBlocks.map((block) => <CustomBlock block={block} />)
-      )}
-      {section === 'links' && blocksAfterLinks.map((block) => <CustomBlock block={block} />)}
-      {section === 'about' && blocksAfterAbout.map((block) => <CustomBlock block={block} />)}
-    </>
-  ))}
-  {fallbackBlocks.map((block) => <CustomBlock block={block} />)}
-  <Footer name={profile.data.displayName} />
+  <ProfileRenderer {profile} {links} {sections} {blocks} {fortunes} />
 </BaseLayout>

@@ -24,7 +24,6 @@ import { resolvePackageBin } from './package-bin.mjs';
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const studioRoot = path.join(projectRoot, 'studio');
 const studioPort = Number(process.env.STUDIO_PORT || 4322);
 const previewPort = Number(process.env.PORT || 4321);
 const MAX_BODY_SIZE = 7 * 1024 * 1024;
@@ -32,23 +31,30 @@ let iconCatalogPromise;
 let fontOptionsPromise;
 let contentRevision = 0;
 
-const contentTypes = {
-  '.css': 'text/css; charset=utf-8',
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-};
+function corsHeaders(request) {
+  const origin = String(request.headers.origin || '').toLowerCase();
+  const allowed = new Set([`http://localhost:${previewPort}`, `http://127.0.0.1:${previewPort}`]);
+  return allowed.has(origin) ? {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    Vary: 'Origin',
+  } : {};
+}
 
-function sendJson(response, status, body) {
-  response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+function sendJson(request, response, status, body) {
+  response.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    ...corsHeaders(request),
+  });
   response.end(JSON.stringify(body));
 }
 
-async function sendMutation(response, status, mutation) {
+async function sendMutation(request, response, status, mutation) {
   const body = await mutation;
   contentRevision += 1;
-  sendJson(response, status, { ...body, contentRevision });
+  sendJson(request, response, status, { ...body, contentRevision });
 }
 
 async function loadIconCatalog() {
@@ -73,8 +79,8 @@ async function loadFontOptions() {
   return fontOptionsPromise;
 }
 
-function sendSvg(response, body) {
-  response.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'no-store' });
+function sendSvg(request, response, body) {
+  response.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'no-store', ...corsHeaders(request) });
   response.end(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" color="#574967" fill="currentColor">${body}</svg>`);
 }
 
@@ -114,39 +120,29 @@ async function saveImage(input) {
   return `/images/${fileName}`;
 }
 
-async function serveStatic(pathname, response) {
-  const relative = pathname === '/' ? 'index.html' : pathname.slice(1);
-  const resolved = path.resolve(studioRoot, relative);
-  if (resolved !== studioRoot && !resolved.startsWith(`${studioRoot}${path.sep}`)) {
-    sendJson(response, 403, { error: '拒絕存取。' });
-    return;
-  }
-  try {
-    const content = await readFile(resolved);
-    response.writeHead(200, {
-      'Content-Type': contentTypes[path.extname(resolved)] || 'application/octet-stream',
-      'Cache-Control': 'no-store',
-    });
-    response.end(content);
-  } catch (error) {
-    if (error.code === 'ENOENT') sendJson(response, 404, { error: '找不到頁面。' });
-    else throw error;
-  }
-}
-
 const server = createServer(async (request, response) => {
   try {
-    validateStudioRequest(request, studioPort);
+    validateStudioRequest(request, studioPort, previewPort);
     const url = new URL(request.url || '/', `http://${request.headers.host}`);
+    if (request.method === 'OPTIONS') {
+      response.writeHead(204, corsHeaders(request));
+      response.end();
+      return;
+    }
+    if (request.method === 'GET' && url.pathname === '/') {
+      response.writeHead(302, { Location: `http://localhost:${previewPort}/studio/`, 'Cache-Control': 'no-store' });
+      response.end();
+      return;
+    }
     if (request.method === 'GET' && url.pathname === '/api/content') {
       const [content, icons, fontOptions] = await Promise.all([loadStudioContent(projectRoot), loadIconCatalog(), loadFontOptions()]);
-      sendJson(response, 200, { ...content, icons: Object.keys(icons), fontOptions, previewUrl: `http://localhost:${previewPort}/`, contentRevision });
+      sendJson(request, response, 200, { ...content, icons: Object.keys(icons), fontOptions, previewUrl: `http://localhost:${previewPort}/`, contentRevision });
       return;
     }
     if (request.method === 'GET' && url.pathname === '/api/answers/project-file') {
       try {
         const content = await readFile(path.join(projectRoot, 'profile.answers.json'), 'utf8');
-        sendJson(response, 200, { content, file: 'profile.answers.json' });
+        sendJson(request, response, 200, { content, file: 'profile.answers.json' });
       } catch (error) {
         if (error.code === 'ENOENT') throw new StudioRequestError(404, '專案根目錄找不到 profile.answers.json；可以改用右側選檔或直接貼上 JSON。');
         throw error;
@@ -157,89 +153,89 @@ const server = createServer(async (request, response) => {
     if (request.method === 'GET' && iconMatch) {
       const icon = (await loadIconCatalog())[iconMatch[1]];
       if (!icon) {
-        sendJson(response, 404, { error: '找不到 Icon。' });
+        sendJson(request, response, 404, { error: '找不到 Icon。' });
         return;
       }
-      sendSvg(response, icon);
+      sendSvg(request, response, icon);
       return;
     }
     if (request.method === 'GET' && url.pathname === '/api/fortunes') {
-      sendJson(response, 200, await loadFortuneBucket(projectRoot));
+      sendJson(request, response, 200, await loadFortuneBucket(projectRoot));
       return;
     }
     if (request.method === 'PUT' && url.pathname === '/api/fortunes') {
-      await sendMutation(response, 200, saveFortuneBucket(projectRoot, await readJson(request)));
+      await sendMutation(request, response, 200, saveFortuneBucket(projectRoot, await readJson(request)));
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/fortunes/restore') {
-      await sendMutation(response, 200, restoreFortuneBucket(projectRoot, await readJson(request)));
+      await sendMutation(request, response, 200, restoreFortuneBucket(projectRoot, await readJson(request)));
       return;
     }
     if (request.method === 'PUT' && url.pathname === '/api/profile') {
-      await sendMutation(response, 200, saveStudioProfile(projectRoot, await readJson(request)).then((profile) => ({ profile })));
+      await sendMutation(request, response, 200, saveStudioProfile(projectRoot, await readJson(request)).then((profile) => ({ profile })));
       return;
     }
     if (request.method === 'PUT' && url.pathname === '/api/home') {
-      await sendMutation(response, 200, saveHomeSettings(projectRoot, await readJson(request)).then((home) => ({ home })));
+      await sendMutation(request, response, 200, saveHomeSettings(projectRoot, await readJson(request)).then((home) => ({ home })));
       return;
     }
     const blockMatch = url.pathname.match(/^\/api\/blocks\/([a-z0-9-]+)$/);
     if (request.method === 'PUT' && blockMatch) {
-      await sendMutation(response, 200, saveStudioBlock(projectRoot, blockMatch[1], await readJson(request)).then((block) => ({ block })));
+      await sendMutation(request, response, 200, saveStudioBlock(projectRoot, blockMatch[1], await readJson(request)).then((block) => ({ block })));
       return;
     }
     const imageBlockMatch = url.pathname.match(/^\/api\/image-blocks\/([a-z0-9-]+)$/);
     if (request.method === 'PUT' && imageBlockMatch) {
-      await sendMutation(response, 200, saveStudioImageBlock(projectRoot, imageBlockMatch[1], await readJson(request)).then((block) => ({ block })));
+      await sendMutation(request, response, 200, saveStudioImageBlock(projectRoot, imageBlockMatch[1], await readJson(request)).then((block) => ({ block })));
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/image-blocks') {
-      await sendMutation(response, 201, createStudioImageBlock(projectRoot, await readJson(request)).then((block) => ({ block })));
+      await sendMutation(request, response, 201, createStudioImageBlock(projectRoot, await readJson(request)).then((block) => ({ block })));
       return;
     }
     const sectionMatch = url.pathname.match(/^\/api\/sections\/([a-z0-9-]+)$/);
     if (request.method === 'PUT' && sectionMatch) {
-      await sendMutation(response, 200, saveStudioSection(projectRoot, sectionMatch[1], await readJson(request)).then((section) => ({ section })));
+      await sendMutation(request, response, 200, saveStudioSection(projectRoot, sectionMatch[1], await readJson(request)).then((section) => ({ section })));
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/sections') {
-      await sendMutation(response, 201, createStudioSection(projectRoot, await readJson(request)).then((section) => ({ section })));
+      await sendMutation(request, response, 201, createStudioSection(projectRoot, await readJson(request)).then((section) => ({ section })));
       return;
     }
     const linkMatch = url.pathname.match(/^\/api\/links\/([a-z0-9-]+)$/);
     if (request.method === 'PUT' && linkMatch) {
-      await sendMutation(response, 200, saveStudioLink(projectRoot, linkMatch[1], await readJson(request)).then((link) => ({ link })));
+      await sendMutation(request, response, 200, saveStudioLink(projectRoot, linkMatch[1], await readJson(request)).then((link) => ({ link })));
       return;
     }
     if (request.method === 'PUT' && url.pathname === '/api/social-order') {
-      await sendMutation(response, 200, saveStudioSocialOrder(projectRoot, await readJson(request)).then((links) => ({ links })));
+      await sendMutation(request, response, 200, saveStudioSocialOrder(projectRoot, await readJson(request)).then((links) => ({ links })));
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/links') {
-      await sendMutation(response, 201, createStudioLink(projectRoot, await readJson(request)).then((link) => ({ link })));
+      await sendMutation(request, response, 201, createStudioLink(projectRoot, await readJson(request)).then((link) => ({ link })));
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/images') {
-      sendJson(response, 201, { path: await saveImage(await readJson(request)) });
+      sendJson(request, response, 201, { path: await saveImage(await readJson(request)) });
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/answers/validate') {
-      sendJson(response, 200, previewProfileAnswers(await readJson(request)));
+      sendJson(request, response, 200, previewProfileAnswers(await readJson(request)));
       return;
     }
     if (request.method === 'POST' && (url.pathname === '/api/answers/apply' || url.pathname === '/api/apply')) {
-      await sendMutation(response, 200, applyProfileAnswers(projectRoot, await readJson(request)));
+      await sendMutation(request, response, 200, applyProfileAnswers(projectRoot, await readJson(request)));
       return;
     }
     if (request.method !== 'GET') {
-      sendJson(response, 404, { error: '找不到操作。' });
+      sendJson(request, response, 404, { error: '找不到操作。' });
       return;
     }
-    await serveStatic(url.pathname, response);
+    sendJson(request, response, 404, { error: '找不到操作。請開啟 /studio/。' });
   } catch (error) {
     if (!(error instanceof StudioRequestError)) console.error(error);
     const status = error instanceof StudioRequestError || error instanceof FortuneConflictError ? error.status : 400;
-    sendJson(response, status, { error: error.message || '操作失敗。' });
+    sendJson(request, response, status, { error: error.message || '操作失敗。' });
   }
 });
 
@@ -258,8 +254,8 @@ astro.on('exit', (code) => {
 
 server.listen(studioPort, '127.0.0.1', () => {
   console.log('');
-  console.log(`Profile Studio：http://localhost:${studioPort}`);
-  console.log(`網站預覽：http://localhost:${previewPort}`);
+  console.log(`Profile Studio：http://localhost:${previewPort}/studio/`);
+  console.log(`本機寫入服務：http://localhost:${studioPort}（背景使用）`);
   console.log('按 Ctrl+C 停止兩個服務。');
 });
 

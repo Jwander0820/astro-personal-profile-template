@@ -1,0 +1,317 @@
+---
+import { loadStudioContent } from '../../scripts/profile-content.mjs';
+import { createProfileAnswersFromStudioContent } from '../../scripts/profile-answers.mjs';
+import { withBase } from '../lib/paths';
+import '../styles/online-studio.css';
+
+const runtime = globalThis as typeof globalThis & { process: { cwd(): string } };
+const content = await loadStudioContent(runtime.process.cwd());
+const initialAnswers = createProfileAnswersFromStudioContent(content);
+const notionVisible = content.blocks.some((block: { id: string; data: { visible?: boolean } }) => block.id === 'notion-embed' && block.data.visible);
+const bootstrap = {
+  initialAnswers,
+  basePath: withBase('/'),
+  siteHref: withBase('/'),
+  localApiUrl: 'http://localhost:4322',
+  previewAssets: {
+    avatar: content.profile.avatar || '/images/avatar.svg',
+    background: content.profile.background || '/images/background.svg',
+  },
+  notionVisible,
+};
+const bootstrapJson = JSON.stringify(bootstrap).replace(/</g, '\\u003c');
+const favicon = withBase('/favicon.svg');
+---
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="不用安裝工具也能編輯、預覽並下載個人自介網站設定檔。" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href={favicon} />
+    <title>線上 Profile Studio</title>
+  </head>
+  <body>
+    <a class="online-skip-link" href="#online-editor">跳到編輯區</a>
+    <script is:inline id="online-studio-data" type="application/json" set:html={bootstrapJson}></script>
+
+    <header class="online-topbar">
+      <div class="mode-route" aria-label="網站模式切換">
+        <span class="mode-route__label">PROFILE ROUTE</span>
+        <div class="mode-route__track">
+          <a href={withBase('/')} class="mode-route__stop">網站</a>
+          <span class="mode-route__line" aria-hidden="true"><span></span></span>
+          <span class="mode-route__stop is-current" aria-current="page">Studio</span>
+        </div>
+      </div>
+      <div class="topbar-state">
+        <span class="browser-only-badge"><span aria-hidden="true">●</span> 只存在此瀏覽器</span>
+        <span id="draft-status" role="status" aria-live="polite">正在準備編輯器…</span>
+      </div>
+      <div class="topbar-actions">
+        <label class="button button--quiet" for="import-answers">匯入設定包</label>
+        <input id="import-answers" type="file" accept="application/json,.json,application/zip,.zip" hidden />
+        <button class="button button--quiet" id="copy-answers" type="button">複製 JSON</button>
+        <button class="button button--quiet" id="save-project" type="button" hidden>儲存到專案</button>
+        <button class="button button--primary" id="download-answers" type="button">下載設定包</button>
+      </div>
+    </header>
+
+    <main class="online-workbench">
+      <section class="online-editor" id="online-editor" aria-labelledby="online-title">
+        <div class="editor-intro">
+          <p class="eyebrow">NO INSTALLATION · PHONE FRIENDLY</p>
+          <h1 id="online-title">先在這裡，<br />試穿你的網站。</h1>
+          <p>邊修改、邊預覽。完成後下載 <code>profile.answers.json</code>，以後有電腦時可直接匯入本機 Studio。</p>
+          <div class="privacy-note">
+            <span aria-hidden="true">◌</span>
+            <p><strong>這裡不會修改 GitHub。</strong>草稿只留在目前的瀏覽器；下載前也不會上傳任何內容。</p>
+          </div>
+        </div>
+
+        <nav class="editor-tabs" aria-label="設定分類" role="tablist">
+          <button type="button" class="is-active" role="tab" aria-selected="true" aria-controls="panel-identity" id="tab-identity" data-tab="identity">
+            <span>01</span>基本資料
+          </button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="panel-links" id="tab-links" data-tab="links" tabindex="-1">
+            <span>02</span>公開連結
+          </button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="panel-sections" id="tab-sections" data-tab="sections" tabindex="-1">
+            <span>03</span>自介內容
+          </button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="panel-appearance" id="tab-appearance" data-tab="appearance" tabindex="-1">
+            <span>04</span>外觀
+          </button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="panel-features" id="tab-features" data-tab="features" tabindex="-1">
+            <span>05</span>其它功能
+          </button>
+        </nav>
+
+        <div class="editor-panels">
+          <section class="editor-panel is-active" id="panel-identity" role="tabpanel" aria-labelledby="tab-identity">
+            <div class="panel-heading">
+              <div><p class="step-label">STEP 01</p><h2>讓訪客先認識你</h2></div>
+              <span class="required-legend">只有顯示名稱必填</span>
+            </div>
+            <div class="field-grid">
+              <label class="field field--wide">
+                <span>顯示名稱 <em>必填</em></span>
+                <input type="text" maxlength="80" required data-bind="identity.displayName" autocomplete="name" />
+              </label>
+              <label class="field">
+                <span>一句話身分</span>
+                <input type="text" maxlength="120" data-bind="identity.title" placeholder="例如：Developer / Music Explorer" />
+              </label>
+              <label class="field">
+                <span>公開地區</span>
+                <input type="text" maxlength="100" data-bind="identity.location" placeholder="只填願意公開的範圍" autocomplete="country-name" />
+              </label>
+              <label class="field field--wide">
+                <span>關鍵字</span>
+                <input type="text" data-bind="identity.tagline" data-list maxlength="480" placeholder="用逗號分隔，最多 6 個" />
+                <small>例如：Code, Music, Learning</small>
+              </label>
+              <label class="field field--wide">
+                <span>自我介紹</span>
+                <textarea rows="7" maxlength="5000" data-bind="identity.bio" placeholder="用自己的語氣寫幾句就好。"></textarea>
+              </label>
+            </div>
+            <div class="media-grid">
+              <label class="media-picker">
+                <span><b>頭像</b><small>PNG、JPG、WebP 或 GIF，最多 5 MB</small></span>
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-image-target="media.avatar" />
+                <i data-image-name="media.avatar">使用目前圖片</i>
+              </label>
+              <label class="media-picker">
+                <span><b>封面背景</b><small>會立即顯示在右側正式預覽</small></span>
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-image-target="media.background" />
+                <i data-image-name="media.background">使用目前圖片</i>
+              </label>
+            </div>
+          </section>
+
+          <section class="editor-panel" id="panel-links" role="tabpanel" aria-labelledby="tab-links" hidden>
+            <div class="panel-heading">
+              <div><p class="step-label">STEP 02</p><h2>放上你願意公開的入口</h2></div>
+            </div>
+            <div class="collection-heading">
+              <div><h3>社群 Icons</h3><p>GitHub、Instagram、Email 等小圖示連結。</p></div>
+              <button class="button button--small" type="button" data-add="socials">＋ 新增社群</button>
+            </div>
+            <div class="collection-list" id="social-list"></div>
+            <div class="collection-heading">
+              <div><h3>Links 卡片</h3><p>作品集、專案、文章或任何想特別推薦的頁面。</p></div>
+              <button class="button button--small" type="button" data-add="links">＋ 新增 Link</button>
+            </div>
+            <div class="collection-list" id="featured-link-list"></div>
+          </section>
+
+          <section class="editor-panel" id="panel-sections" role="tabpanel" aria-labelledby="tab-sections" hidden>
+            <div class="panel-heading">
+              <div><p class="step-label">STEP 03</p><h2>用卡片補上你的故事</h2></div>
+            </div>
+            <div class="collection-heading">
+              <div><h3>About me 卡片</h3><p>興趣、技能、近況或想讓人記住的主題。</p></div>
+              <button class="button button--small" type="button" data-add="sections">＋ 新增卡片</button>
+            </div>
+            <div class="collection-list" id="section-list"></div>
+            <div class="collection-heading">
+              <div><h3>圖片板塊</h3><p>可選用範本既有的 <code>/images/</code> 圖片；自訂圖片之後可在本機補上。</p></div>
+              <button class="button button--small" type="button" data-add="imageBlocks">＋ 新增圖片板塊</button>
+            </div>
+            <div class="collection-list" id="image-block-list"></div>
+          </section>
+
+          <section class="editor-panel" id="panel-appearance" role="tabpanel" aria-labelledby="tab-appearance" hidden>
+            <div class="panel-heading">
+              <div><p class="step-label">STEP 04</p><h2>調整網站的節奏與顏色</h2></div>
+            </div>
+            <div class="appearance-card appearance-card--color">
+              <div>
+                <p class="mini-label">MAIN COLOR</p>
+                <h3>主色</h3>
+                <p>亮色與暗色模式會由這個顏色自動延伸。</p>
+              </div>
+              <label class="color-control">
+                <input type="color" data-bind="appearance.mainColor" aria-label="選擇主色" />
+                <input type="text" maxlength="7" data-bind="appearance.mainColor" data-color-text aria-label="主色 HEX" />
+                <button class="button button--small random-color-action" id="random-main-color" type="button">沒想法？抽！</button>
+              </label>
+            </div>
+            <div class="field-grid">
+              <label class="field">
+                <span>About me 排版</span>
+                <select data-bind="appearance.sectionsLayout">
+                  <option value="grid">格狀卡片</option>
+                  <option value="list">直向列表</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>內文字型</span>
+                <select data-bind="appearance.bodyFont">
+                  <option value="system">系統預設</option>
+                  <option value="noto-sans-tc">Noto Sans TC</option>
+                  <option value="noto-serif-tc">Noto Serif TC</option>
+                  <option value="lxgw-wenkai-tc">LXGW WenKai TC</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>標題字型</span>
+                <select data-bind="appearance.displayFont">
+                  <option value="system">系統預設</option>
+                  <option value="noto-sans-tc">Noto Sans TC</option>
+                  <option value="noto-serif-tc">Noto Serif TC</option>
+                  <option value="lxgw-wenkai-tc">LXGW WenKai TC</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="appearance-card">
+              <div>
+                <p class="mini-label">HOME ORDER</p>
+                <h3>首頁板塊順序</h3>
+                <p>用箭頭排出想讓訪客看到的順序。</p>
+              </div>
+              <ol class="home-order" id="home-order"></ol>
+            </div>
+
+            <div class="finish-card">
+              <p class="mini-label">READY WHEN YOU ARE</p>
+              <h3>線上下載，或直接存進本機專案</h3>
+              <p>線上模式會下載包含 JSON 與圖片的 ZIP 設定包；用 <code>npm run studio</code> 開啟時，則能直接儲存到專案。</p>
+              <div id="privacy-summary" class="privacy-summary" aria-live="polite"></div>
+              <div class="finish-actions">
+                <button class="button button--primary button--large" id="download-answers-bottom" type="button">下載設定包</button>
+                <button class="button button--quiet" id="reset-draft" type="button">還原成目前網站</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="editor-panel" id="panel-features" role="tabpanel" aria-labelledby="tab-features" hidden>
+            <div class="panel-heading">
+              <div><p class="step-label">STEP 05</p><h2>放進一些不是自介、但很好玩的東西</h2></div>
+            </div>
+            <div class="feature-grid">
+              <section class="feature-card">
+                <div class="feature-card__heading">
+                  <div><p class="mini-label">PLAYLIST</p><h3>YouTube 播放清單</h3></div>
+                  <label class="switch"><input type="checkbox" id="playlist-enabled" /><span></span><b>啟用</b></label>
+                </div>
+                <div id="playlist-fields" class="feature-fields">
+                  <label class="field"><span>播放清單網址或 ID</span><input type="text" maxlength="500" data-bind="playlist.youtubePlaylistId" /></label>
+                  <label class="field"><span>標題</span><input type="text" maxlength="80" data-bind="playlist.title" /></label>
+                  <label class="field"><span>說明</span><textarea rows="3" maxlength="500" data-bind="playlist.description"></textarea></label>
+                </div>
+              </section>
+              <section class="feature-card">
+                <div class="feature-card__heading">
+                  <div><p class="mini-label">FORTUNE</p><h3>今日手氣</h3></div>
+                  <label class="switch"><input type="checkbox" data-bind="features.fortune" data-boolean /><span></span><b>啟用</b></label>
+                </div>
+                <p>設定檔只控制顯示／隱藏；籤詩內容可之後用本機 Studio 編輯。</p>
+              </section>
+            </div>
+
+            <div class="finish-card">
+              <p class="mini-label">AI PROFILE IMPORT</p>
+              <h3>匯入與 AI 討論後產生的設定</h3>
+              <p>貼上符合 <code>profile.answers.json</code> 的內容即可預覽；匯入只更新目前草稿，不會直接發布或寫入專案。</p>
+              <label class="field field--wide">
+                <span>AI 產生的 JSON</span>
+                <textarea id="ai-answers-json" rows="8" spellcheck="false" placeholder='{ "version": 1, "identity": { "displayName": "..." } }'></textarea>
+              </label>
+              <div class="finish-actions">
+                <button class="button button--primary" id="import-ai-answers" type="button">驗證並載入草稿</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="online-preview" aria-labelledby="preview-heading">
+        <div class="preview-toolbar">
+          <div>
+            <p class="mini-label">FORMAL RENDERER</p>
+            <h2 id="preview-heading">網站預覽</h2>
+          </div>
+          <div class="preview-width" role="group" aria-label="預覽寬度">
+            <button type="button" class="is-active" data-preview-width="wide" aria-pressed="true">寬</button>
+            <button type="button" data-preview-width="narrow" aria-pressed="false">窄</button>
+          </div>
+        </div>
+        <div class="preview-stage">
+          <div class="preview-browser">
+            <div class="preview-browser__bar" aria-hidden="true">
+              <span></span><span></span><span></span>
+              <p>your-profile.example</p>
+            </div>
+            <iframe
+              id="profile-preview"
+              class="profile-preview"
+              src={withBase('/')}
+              title="使用正式網站 renderer 的即時預覽"
+            ></iframe>
+          </div>
+        </div>
+        <p class="preview-footnote">預覽直接載入正式網站與同一套 CSS、元件結構及 SVG Icons；編輯內容會即時送入這個正式頁面。</p>
+      </aside>
+    </main>
+
+    <div class="online-toast" id="online-toast" role="status" aria-live="polite"></div>
+    <dialog class="social-picker" id="social-picker" aria-labelledby="social-picker-title">
+      <form method="dialog">
+        <div class="social-picker__heading">
+          <div><p class="mini-label">SOCIAL ICON</p><h2 id="social-picker-title">選擇社群</h2></div>
+          <button class="button button--quiet" value="cancel" aria-label="關閉">關閉</button>
+        </div>
+        <div class="social-picker__grid" id="social-picker-options"></div>
+      </form>
+    </dialog>
+
+    <script>
+      import { mountOnlineStudio } from '../scripts/online-studio.js';
+      mountOnlineStudio();
+    </script>
+  </body>
+</html>

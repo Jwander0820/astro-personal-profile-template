@@ -20,6 +20,14 @@
         "bio": { "type": "string", "maxLength": 5000 }
       }
     },
+    "media": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "avatar": { "type": "string", "pattern": "^/images/[A-Za-z0-9._/-]+$" },
+        "background": { "type": "string", "pattern": "^/images/[A-Za-z0-9._/-]+$" }
+      }
+    },
     "socials": {
       "type": "array",
       "maxItems": 20,

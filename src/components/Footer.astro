@@ -1,5 +1,14 @@
 ---
+import { withBase } from '../lib/paths';
+
 interface Props { name: string; }
 const { name } = Astro.props;
+const studioEnabled = import.meta.env.DEV || import.meta.env.ONLINE_STUDIO_MODE !== 'off';
 ---
-<footer><span>© {new Date().getFullYear()} {name}</span></footer>
+<footer>
+  <span>© {new Date().getFullYear()} {name}</span>
+  {studioEnabled && <a class="footer-studio-link" href={withBase('/studio/')}>
+    <span aria-hidden="true">↗</span>
+    線上 Studio
+  </a>}
+</footer>

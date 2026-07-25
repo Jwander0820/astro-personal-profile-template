@@ -15,9 +15,25 @@ npm run dev
 
 開發伺服器預設位於 `http://localhost:4321`。
 
-### 使用視覺化 Profile Studio
+### 使用統一的 Profile Studio
 
-不想直接修改 Markdown 時，可以啟動只在本機運作的內容編輯台：
+部署到 GitHub Pages 或 Cloudflare Pages 後，網站頁尾會提供「線上 Studio」，也可直接前往網站的 `/studio/`。這個版本可在手機或瀏覽器中：
+
+- 從目前網站內容開始修改顯示名稱、自介、公開連結、卡片、圖片板塊、播放清單與外觀。
+- 以正式首頁、同一套 CSS 與 SVG Icons 即時切換寬／窄版預覽。
+- 上傳頭像、封面及內容圖片，圖片草稿會連同文字保留在目前瀏覽器。
+- 匯入既有 JSON、AI 討論產生的 `profile.answers.json`，或包含圖片的 Studio ZIP 設定包。
+- 下載包含 `profile.answers.json` 與自訂圖片的 `profile-settings.zip`。
+
+公開網站上的 Studio 是純前端設定產生器，不會寫入 repository、修改 GitHub 或自動發布，也不會把草稿上傳到伺服器。若只有 JSON，仍可把 `profile.answers.json` 放到專案根目錄後執行：
+
+```bash
+npm run profile:apply -- profile.answers.json
+```
+
+### 在本機直接儲存
+
+需要直接寫入 Markdown 與圖片時，用同一個 `/studio/` 介面啟動本機模式：
 
 Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，首次啟動時會自動安裝專案所需套件。也可以在 PowerShell／CMD 執行：
 
@@ -27,7 +43,9 @@ Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，首次啟動時�
 
 也可以在 Windows 使用 `npm.cmd run studio`；其他環境使用 `npm run studio`。
 
-前往 `http://localhost:4322`，即可編輯基本資料、字型與圖片，建立可指定區域及版型的圖片板塊、拖曳首頁板塊、調整社群連結，並在右側即時檢查桌面／手機畫面。預設採手動儲存，修改會先留在 Studio 草稿中，再由頂端固定列的「儲存並更新」一次寫入並刷新預覽。
+前往 `http://localhost:4321/studio/`。畫面會自動偵測只綁定 loopback 的背景寫入服務，顯示「儲存到專案」；按下後才會更新 `src/content/**` 與 `public/images/`。`4322` 不再提供另一套 UI，只是 `/studio/` 在本機使用的背景 API。
+
+若個人網站不希望公開編輯入口，可在部署環境設定 `ONLINE_STUDIO_MODE=off`；建置會移除 `/studio/` 產物與頁尾連結。公開範本可保留預設的 `public`。
 
 
 ### 讓 AI 引導建立自介

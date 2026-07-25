@@ -1,6 +1,6 @@
 # Cloudflare Pages 部署
 
-本專案輸出純靜態網站，可直接由 Cloudflare Pages 連接 GitHub 或 GitLab repository 建置。Profile Studio 只在本機執行，不會進入 `dist/`，也不需要在 Cloudflare 保存 AI API key。
+本專案輸出純靜態網站，可直接由 Cloudflare Pages 連接 GitHub 或 GitLab repository 建置。本機 Profile Studio 的寫入服務不會進入 `dist/`；部署後的 `/studio/` 是純前端設定產生器，可即時預覽圖片並下載 ZIP 設定包，但不具備 repository 寫入能力，也不需要在 Cloudflare 保存 AI API key。
 
 ## 建置設定
 
@@ -29,6 +29,14 @@ Cloudflare Pages Build Image V3 預設提供 Node.js 22；若既有 Pages 專案
 ```text
 SITE_URL=https://<你的-project>.pages.dev
 ```
+
+公開範本可保留預設值 `ONLINE_STUDIO_MODE=public`。若這是個人正式網站、不希望公開 `/studio/` 與下載入口，請再設定：
+
+```text
+ONLINE_STUDIO_MODE=off
+```
+
+`off` 會在建置完成時移除 `/studio/` 靜態產物，首頁頁尾也不顯示 Studio 連結。這是靜態網站適用的建置開關；不要把它誤當成密碼保護。
 
 綁定自訂網域後，把 `SITE_URL` 改成正式的 `https://` 網址再重新部署，以產生正確 canonical URL。Preview deployment 可以不設定獨立的 `SITE_URL`；它只用於人工預覽，不應取代 production canonical。
 

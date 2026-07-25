@@ -1,0 +1,69 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import ProfileHeader from './ProfileHeader.astro';
+import SocialIcons from './SocialIcons.astro';
+import LinkCard from './LinkCard.astro';
+import SectionCard from './SectionCard.astro';
+import Footer from './Footer.astro';
+import CustomBlock from './CustomBlock.astro';
+
+interface Props {
+  profile: CollectionEntry<'profile'>;
+  links: CollectionEntry<'links'>[];
+  sections: CollectionEntry<'sections'>[];
+  blocks: CollectionEntry<'blocks'>[];
+  fortunes: CollectionEntry<'fortunes'>[];
+}
+
+const { profile, links, sections, blocks, fortunes } = Astro.props;
+const iconLinks = links.filter((link) => link.data.group !== 'footer' && link.data.layout === 'icon');
+const featuredLinks = links.filter((link) => ['main', 'featured'].includes(link.data.group) && link.data.layout === 'card');
+const turntableBlocks = blocks.filter((block) => block.data.layout === 'turntable');
+const fortuneBlocks = blocks.filter((block) => block.data.layout === 'fortune');
+const notionBlocks = blocks.filter((block) => block.data.layout === 'embed' && block.data.provider === 'notion');
+const orderedBlockIds = new Set([...turntableBlocks, ...fortuneBlocks, ...notionBlocks].map((block) => block.id));
+const remainingBlocks = blocks.filter((block) => !orderedBlockIds.has(block.id));
+const blocksBeforeLinks = remainingBlocks.filter((block) => block.data.placement === 'before-links');
+const blocksAfterLinks = remainingBlocks.filter((block) => block.data.placement === 'between-links-sections');
+const blocksAfterAbout = remainingBlocks.filter((block) => block.data.placement === 'after-sections');
+const visibleHomeSections = profile.data.homeOrder.filter((section) => profile.data.homeVisibility.includes(section));
+const fallbackBlocks = remainingBlocks.filter((block) => (
+  (block.data.placement === 'before-links' || block.data.placement === 'between-links-sections')
+    ? !visibleHomeSections.includes('links')
+    : !visibleHomeSections.includes('about')
+));
+---
+<div data-profile-renderer>
+  <ProfileHeader profile={profile} />
+  <SocialIcons links={iconLinks} />
+  {visibleHomeSections.map((section) => (
+    <>
+      {section === 'links' && blocksBeforeLinks.map((block) => <CustomBlock block={block} />)}
+      {section === 'about' ? sections.length > 0 && (
+        <section class="content-section" aria-labelledby="about-heading">
+          <h2 id="about-heading">{profile.data.aboutHeading}</h2>
+          <div class:list={['section-list', `section-list--${profile.data.sectionsLayout}`]}>
+            {sections.map((item) => <SectionCard section={item} />)}
+          </div>
+        </section>
+      ) : section === 'turntable' ? (
+        turntableBlocks.map((block) => <CustomBlock block={block} />)
+      ) : section === 'links' ? (
+        featuredLinks.length > 0 && (
+          <section class="content-section" aria-labelledby="links-heading">
+            <h2 id="links-heading">{profile.data.linksHeading}</h2>
+            <div class="link-list">{featuredLinks.map((link) => <LinkCard link={link} />)}</div>
+          </section>
+        )
+      ) : section === 'fortune' ? (
+        fortuneBlocks.map((block) => <CustomBlock block={block} fortunes={fortunes} />)
+      ) : (
+        notionBlocks.map((block) => <CustomBlock block={block} />)
+      )}
+      {section === 'links' && blocksAfterLinks.map((block) => <CustomBlock block={block} />)}
+      {section === 'about' && blocksAfterAbout.map((block) => <CustomBlock block={block} />)}
+    </>
+  ))}
+  {fallbackBlocks.map((block) => <CustomBlock block={block} />)}
+  <Footer name={profile.data.displayName} />
+</div>
