@@ -37,11 +37,27 @@ import {
   isSafeProfileUrl,
 } from './content-safety.mjs';
 import { createSettingsZip, readSettingsZip } from '../src/scripts/settings-package.js';
+import { resolveOnlineStudioAccess } from './studio-access.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), 'profile-tools-'));
 
 try {
+  assert.equal(resolveOnlineStudioAccess({ mode: 'off', isDev: true }), true);
+  assert.equal(resolveOnlineStudioAccess({ mode: 'auto', repository: 'someone/fork' }), false);
+  assert.equal(resolveOnlineStudioAccess({
+    mode: 'auto',
+    repository: 'Jwander0820/astro-personal-profile-template',
+    allowedRepositories: 'jwander0820/astro-personal-profile-template, someone/preview',
+  }), true);
+  assert.equal(resolveOnlineStudioAccess({
+    mode: 'auto',
+    siteUrl: 'https://example.com/profile/',
+    allowedSites: 'https://example.com/profile',
+  }), true);
+  assert.equal(resolveOnlineStudioAccess({ mode: 'public' }), true);
+  assert.throws(() => resolveOnlineStudioAccess({ mode: 'private' }), /auto、public 或 off/);
+
   await mkdir(path.join(temporaryRoot, 'src'), { recursive: true });
   await cp(path.join(projectRoot, 'src', 'content'), path.join(temporaryRoot, 'src', 'content'), { recursive: true });
   const answers = JSON.parse(await readFile(path.join(projectRoot, 'profile.answers.example.json'), 'utf8'));

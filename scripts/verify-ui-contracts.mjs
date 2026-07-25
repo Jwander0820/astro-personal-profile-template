@@ -6,6 +6,7 @@ const [
   indexPage,
   profileRenderer,
   linkCard,
+  studioLinkCard,
   footer,
   themeToggle,
   turntablePlayer,
@@ -19,11 +20,13 @@ const [
   previewBridge,
   answersModule,
   astroConfig,
+  studioAccess,
 ] = await Promise.all([
   readFile(new URL('../src/styles/global.css', import.meta.url), 'utf8'),
   readFile(new URL('../src/pages/index.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/ProfileRenderer.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/LinkCard.astro', import.meta.url), 'utf8'),
+  readFile(new URL('../src/components/StudioLinkCard.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/Footer.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/ThemeToggle.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/TurntablePlayer.astro', import.meta.url), 'utf8'),
@@ -37,6 +40,7 @@ const [
   readFile(new URL('../src/scripts/profile-preview-bridge.js', import.meta.url), 'utf8'),
   readFile(new URL('./profile-answers.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../astro.config.mjs', import.meta.url), 'utf8'),
+  readFile(new URL('./studio-access.mjs', import.meta.url), 'utf8'),
 ]);
 
 const fortunes = JSON.parse(fortuneContent);
@@ -57,8 +61,10 @@ const contracts = [
   ['custom blocks keep all configured anchors', profileRenderer.includes('blocksBeforeLinks') && profileRenderer.includes('blocksAfterLinks') && profileRenderer.includes('blocksAfterAbout')],
   ['profile typography and main color reach BaseLayout', indexPage.includes('bodyFont={profile.data.bodyFont}') && indexPage.includes('displayFont={profile.data.displayFont}') && indexPage.includes('mainColor={profile.data.mainColor}')],
   ['link cards remain unnumbered', !linkCard.includes('link-track') && !linkCard.includes('position?:')],
+  ['Studio entry is a gated Links card', profileRenderer.includes('<StudioLinkCard') && studioLinkCard.includes('data-studio-link-card') && studioLinkCard.includes('建立你的自介網站')],
   ['theme toggle synchronizes pressed state', themeToggle.includes('aria-pressed="false"') && themeToggle.includes('syncToggleState')],
   ['turntable keeps responsive geometry and API retry', css.includes('--tonearm-length') && turntablePlayer.includes('youtubeApiPromise = undefined')],
+  ['Studio preview rebinds and retains the playable turntable', profileRenderer.includes('studio-turntable-template') && liveRenderer.includes('configureTurntableFeature') && liveRenderer.includes('retainedTurntable') && liveRenderer.includes("profile-renderer:updated") && turntablePlayer.includes("profile-renderer:updated")],
   ['fortune data and interaction remain valid', fortuneBucketIsValid && fortunes.length > 0 && fortuneDraw.includes('aria-live="polite"') && JSON.stringify(FORTUNE_GRADES) === JSON.stringify(['大吉', '中吉', '小吉', '吉', '末吉', '凶', '大凶'])],
   ['fortune draw avoids immediate repeats without persistence', fortuneDraw.includes('fortune.id !== currentId') && !fortuneDraw.includes('localStorage')],
   ['primary controls keep usable touch targets', ruleBody('.turntable-player__button').includes('min-height: 44px') && ruleBody('.fortune-draw__button').includes('min-height: 48px')],
@@ -75,7 +81,7 @@ const contracts = [
   ['AI-generated JSON remains importable', onlineStudioPage.includes('ai-answers-json') && onlineStudioApp.includes('importJsonText')],
   ['local mode exposes explicit save-to-project', onlineStudioPage.includes('id="save-project"') && onlineStudioApp.includes('/api/answers/apply') && onlineStudioApp.includes('/api/images')],
   ['answer contract carries avatar and background', answersModule.includes("assertAllowedKeys(mediaInput, ['avatar', 'background']") && answersModule.includes('media: {')],
-  ['Studio production switch removes output and footer link', astroConfig.includes("onlineStudioMode !== 'off'") && astroConfig.includes("new URL('studio/', dir)") && footer.includes("ONLINE_STUDIO_MODE !== 'off'")],
+  ['Studio production allowlist removes route and navigation together', astroConfig.includes('resolveOnlineStudioAccess') && astroConfig.includes("new URL('studio/', dir)") && studioAccess.includes("VALID_STUDIO_MODES = new Set(['auto', 'public', 'off'])") && footer.includes('studioEnabled')],
   ['Studio remains responsive and motion-aware', onlineStudioStyle.includes('@media (max-width: 720px)') && onlineStudioStyle.includes('@media (prefers-reduced-motion: reduce)')],
   ['keyboard tab navigation remains cyclic', onlineStudioApp.includes("['ArrowLeft', 'ArrowRight']") && onlineStudioApp.includes('% tabs.length')],
 ];

@@ -35,7 +35,7 @@ Agent 應先取得網站最基本的顯示名稱，再讓使用者自行選擇�
 
 ## 沒有電腦時：使用線上 Studio
 
-部署後的網站頁尾可切換到 `/studio/`。線上 Studio 不需要安裝 Node.js 或 npm，手機也能使用；它會從目前網站內容建立草稿，並支援 AI JSON 匯入、正式頁面即時預覽、圖片暫存、複製 JSON，以及下載包含 JSON 與圖片的 `profile-settings.zip`。
+允許公開 Studio 的部署會在首頁 Links 與頁尾提供 `/studio/` 入口。線上 Studio 不需要安裝 Node.js 或 npm，手機也能使用；它會從目前網站內容建立草稿，並支援 AI JSON 匯入、正式頁面即時預覽、圖片暫存、唱盤試播、複製 JSON，以及下載包含 JSON 與圖片的 `profile-settings.zip`。
 
 線上版不具備 GitHub 寫入權限，也不會把草稿送到後端。下載後可先保留檔案，日後有本機專案時：
 

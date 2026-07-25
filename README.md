@@ -17,11 +17,12 @@ npm run dev
 
 ### 使用統一的 Profile Studio
 
-部署到 GitHub Pages 或 Cloudflare Pages 後，網站頁尾會提供「線上 Studio」，也可直接前往網站的 `/studio/`。這個版本可在手機或瀏覽器中：
+在允許公開 Studio 的 GitHub repository／網站部署後，首頁的 Links 會多一張「建立你的自介網站」卡片，頁尾也保留小型入口；兩者都會前往同站的 `/studio/`。這個版本可在手機或瀏覽器中：
 
 - 從目前網站內容開始修改顯示名稱、自介、公開連結、卡片、圖片板塊、播放清單與外觀。
 - 以正式首頁、同一套 CSS 與 SVG Icons 即時切換寬／窄版預覽。
 - 上傳頭像、封面及內容圖片，圖片草稿會連同文字保留在目前瀏覽器。
+- 直接操作正式唱盤播放器，確認播放清單與頁面上的實際效果。
 - 匯入既有 JSON、AI 討論產生的 `profile.answers.json`，或包含圖片的 Studio ZIP 設定包。
 - 下載包含 `profile.answers.json` 與自訂圖片的 `profile-settings.zip`。
 
@@ -45,7 +46,15 @@ Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，首次啟動時�
 
 前往 `http://localhost:4321/studio/`。畫面會自動偵測只綁定 loopback 的背景寫入服務，顯示「儲存到專案」；按下後才會更新 `src/content/**` 與 `public/images/`。`4322` 不再提供另一套 UI，只是 `/studio/` 在本機使用的背景 API。
 
-若個人網站不希望公開編輯入口，可在部署環境設定 `ONLINE_STUDIO_MODE=off`；建置會移除 `/studio/` 產物與頁尾連結。公開範本可保留預設的 `public`。
+正式部署預設使用 `ONLINE_STUDIO_MODE=auto`：本機永遠可使用 Studio，線上則只有 `ONLINE_STUDIO_ALLOWED_REPOSITORIES` 或 `ONLINE_STUDIO_ALLOWED_SITES` 精確列出的目標會產生 `/studio/`、Links 卡片與頁尾入口。GitHub Actions 目前只預先允許 `Jwander0820/astro-personal-profile-template`，因此 fork 到其他帳號後預設關閉。
+
+```text
+ONLINE_STUDIO_MODE=auto
+ONLINE_STUDIO_ALLOWED_REPOSITORIES=Jwander0820/astro-personal-profile-template
+ONLINE_STUDIO_ALLOWED_SITES=https://jwander0820.github.io/astro-personal-profile-template
+```
+
+`public` 可讓任何部署保留 Studio；`off` 會從所有正式建置移除 Studio。這些值是公開的建置規則，不是密碼或登入保護。
 
 
 ### 讓 AI 引導建立自介

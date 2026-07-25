@@ -1,4 +1,5 @@
 import { isSafeProfileUrl } from '../../scripts/content-safety.mjs';
+import { parseYoutubePlaylistId } from '../../scripts/youtube-playlist.mjs';
 
 const HOME_SECTIONS = ['about', 'turntable', 'links', 'fortune', 'notion'];
 
@@ -167,6 +168,23 @@ function renderLinkCard(item, index, icons) {
   return link;
 }
 
+function renderStudioLinkCard(studioHref, icons) {
+  const link = node('a', 'link-card is-studio');
+  link.href = studioHref;
+  link.dataset.studioLinkCard = '';
+  const icon = node('span', 'link-icon');
+  icon.append(svgIcon('code', icons, 24));
+  const copy = node('span', 'link-copy');
+  copy.append(node('strong', '', '建立你的自介網站'));
+  copy.append(node('span', 'description', '開啟線上 Studio，邊修改邊預覽，再下載自己的設定檔。'));
+  const tags = node('span', 'tags');
+  tags.append(node('small', '', '免安裝'), node('small', '', '即時預覽'));
+  copy.append(tags);
+  link.append(icon, copy, node('span', 'link-arrow', '›'));
+  link.lastElementChild.setAttribute('aria-hidden', 'true');
+  return link;
+}
+
 function renderImageBlock(item, assetHref) {
   const section = node('section', 'content-section custom-block custom-block--image');
   section.setAttribute('aria-labelledby', `preview-image-${item.id}`);
@@ -203,6 +221,44 @@ function cloneFeature(template, title, description) {
   return feature;
 }
 
+function configureTurntableFeature(feature, playlist) {
+  const playlistId = parseYoutubePlaylistId(playlist?.youtubePlaylistId);
+  const player = feature?.querySelector('[data-turntable-player]');
+  if (!playlistId || !player) return null;
+
+  player.dataset.playlistId = playlistId;
+  delete player.dataset.turntableBound;
+  delete player.dataset.turntableInitialized;
+  delete player.dataset.turntableInitializing;
+  player.classList.remove('has-error', 'has-track', 'is-paused', 'is-playing', 'is-scrubbing', 'is-video-revealed');
+
+  const reveal = player.querySelector('[data-turntable-video-reveal]');
+  const safeId = `preview-turntable-video-${playlistId.replace(/[^a-z0-9_-]/gi, '').slice(0, 48)}`;
+  if (reveal) {
+    reveal.id = safeId;
+    reveal.setAttribute('aria-hidden', 'true');
+  }
+  const toggle = player.querySelector('[data-turntable-toggle]');
+  toggle?.setAttribute('aria-controls', safeId);
+  toggle?.setAttribute('aria-expanded', 'false');
+  toggle?.setAttribute('aria-pressed', 'false');
+  toggle?.removeAttribute('disabled');
+
+  const video = player.querySelector('.turntable-player__video');
+  let playerHost = player.querySelector('[data-youtube-player]');
+  if (!playerHost || playerHost.tagName === 'IFRAME') {
+    const replacement = node('div');
+    replacement.dataset.youtubePlayer = '';
+    if (playerHost) playerHost.replaceWith(replacement);
+    else video?.append(replacement);
+    playerHost = replacement;
+  } else {
+    playerHost.replaceChildren();
+  }
+
+  return feature;
+}
+
 function renderPlacedImages(wrapper, answers, placement, assetHref) {
   (answers.imageBlocks || [])
     .filter((item) => item.placement === placement)
@@ -216,10 +272,14 @@ export function renderProfileDocument(root, answers, options) {
     assets = {},
     templates = {},
     notionVisible = false,
+    studioEnabled = false,
     studioHref = '/studio/',
   } = options;
+  const retainedTurntable = root.querySelector('[data-turntable-player]');
   const wrapper = node('div');
   wrapper.dataset.profileRenderer = '';
+  wrapper.dataset.studioEnabled = String(studioEnabled);
+  wrapper.dataset.studioHref = studioHref;
   wrapper.append(renderProfileHeader(answers, assetHref, assets));
   const socials = renderSocials(answers.socials, icons);
   if (socials) wrapper.append(socials);
@@ -236,17 +296,21 @@ export function renderProfileDocument(root, answers, options) {
       wrapper.append(section);
     }
     if (sectionId === 'turntable' && answers.playlist) {
-      const feature = cloneFeature(templates.turntable, answers.playlist.title || 'PLAY！', answers.playlist.description || '');
+      const feature = configureTurntableFeature(
+        cloneFeature(templates.turntable, answers.playlist.title || 'PLAY！', answers.playlist.description || ''),
+        answers.playlist,
+      );
       if (feature) wrapper.append(feature);
     }
     if (sectionId === 'links') {
       renderPlacedImages(wrapper, answers, 'before-links', assetHref);
-      if (answers.links?.length) {
+      if (answers.links?.length || studioEnabled) {
         const section = node('section', 'content-section');
         section.setAttribute('aria-labelledby', 'links-heading');
         section.append(renderHeading('links-heading', 'Links'));
         const list = node('div', 'link-list');
         answers.links.forEach((item, index) => list.append(renderLinkCard(item, index, icons)));
+        if (studioEnabled) list.append(renderStudioLinkCard(studioHref, icons));
         section.append(list);
         wrapper.append(section);
       }
@@ -265,11 +329,24 @@ export function renderProfileDocument(root, answers, options) {
 
   const footer = node('footer');
   footer.append(node('span', '', `© ${new Date().getFullYear()} ${answers.identity.displayName}`));
-  const studioLink = node('a', 'footer-studio-link');
-  studioLink.href = studioHref;
-  studioLink.append(node('span', '', '↗'), document.createTextNode(' 線上 Studio'));
-  studioLink.firstElementChild.setAttribute('aria-hidden', 'true');
-  footer.append(studioLink);
+  if (studioEnabled) {
+    const studioLink = node('a', 'footer-studio-link');
+    studioLink.href = studioHref;
+    studioLink.append(node('span', '', '↗'), document.createTextNode(' 線上 Studio'));
+    studioLink.firstElementChild.setAttribute('aria-hidden', 'true');
+    footer.append(studioLink);
+  }
   wrapper.append(footer);
+
+  const nextTurntable = wrapper.querySelector('[data-turntable-player]');
+  if (
+    retainedTurntable
+    && nextTurntable
+    && retainedTurntable.dataset.playlistId === nextTurntable.dataset.playlistId
+  ) {
+    nextTurntable.replaceWith(retainedTurntable);
+  }
+
   root.replaceChildren(wrapper);
+  document.dispatchEvent(new CustomEvent('profile-renderer:updated', { detail: { root } }));
 }

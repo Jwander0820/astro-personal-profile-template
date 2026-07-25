@@ -13,8 +13,13 @@ const FONT_FAMILIES = {
 
 if (window.parent !== window) {
   const rendererRoot = document.querySelector('main');
+  const initialProfileRenderer = document.querySelector('[data-profile-renderer]');
+  const studioEnabled = initialProfileRenderer?.dataset.studioEnabled === 'true';
+  const studioHref = initialProfileRenderer?.dataset.studioHref || withBase('/studio/');
+  const turntableTemplate = document.querySelector('#studio-turntable-template');
   const templates = {
-    turntable: document.querySelector('.custom-block--turntable')?.cloneNode(true),
+    turntable: turntableTemplate?.content?.firstElementChild?.cloneNode(true)
+      || document.querySelector('.custom-block--turntable')?.cloneNode(true),
     fortune: document.querySelector('.custom-block--fortune')?.cloneNode(true),
     notion: document.querySelector('.custom-block--embed')?.cloneNode(true),
   };
@@ -33,7 +38,8 @@ if (window.parent !== window) {
       assets,
       notionVisible,
       templates,
-      studioHref: withBase('/studio/'),
+      studioEnabled,
+      studioHref,
       assetHref: (path) => isSafeImagePath(path) ? (assets.objectUrls?.[path] || withBase(path)) : '',
     });
     window.parent.postMessage({ type: 'profile-studio:rendered' }, event.origin);

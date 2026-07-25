@@ -25,6 +25,10 @@ export async function getBlocks() {
     .sort((a, b) => a.data.order - b.data.order);
 }
 
+export async function getBlock(id: string) {
+  return (await getCollection('blocks')).find((entry) => entry.id === id);
+}
+
 export async function getFortunes() {
   return (await getCollection('fortunes')).filter((entry) => entry.data.visible);
 }

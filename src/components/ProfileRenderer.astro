@@ -6,6 +6,7 @@ import LinkCard from './LinkCard.astro';
 import SectionCard from './SectionCard.astro';
 import Footer from './Footer.astro';
 import CustomBlock from './CustomBlock.astro';
+import StudioLinkCard from './StudioLinkCard.astro';
 
 interface Props {
   profile: CollectionEntry<'profile'>;
@@ -13,9 +14,21 @@ interface Props {
   sections: CollectionEntry<'sections'>[];
   blocks: CollectionEntry<'blocks'>[];
   fortunes: CollectionEntry<'fortunes'>[];
+  turntableTemplate?: CollectionEntry<'blocks'>;
+  studioEnabled?: boolean;
+  studioHref?: string;
 }
 
-const { profile, links, sections, blocks, fortunes } = Astro.props;
+const {
+  profile,
+  links,
+  sections,
+  blocks,
+  fortunes,
+  turntableTemplate,
+  studioEnabled = false,
+  studioHref = '/studio/',
+} = Astro.props;
 const iconLinks = links.filter((link) => link.data.group !== 'footer' && link.data.layout === 'icon');
 const featuredLinks = links.filter((link) => ['main', 'featured'].includes(link.data.group) && link.data.layout === 'card');
 const turntableBlocks = blocks.filter((block) => block.data.layout === 'turntable');
@@ -33,7 +46,11 @@ const fallbackBlocks = remainingBlocks.filter((block) => (
     : !visibleHomeSections.includes('about')
 ));
 ---
-<div data-profile-renderer>
+<div
+  data-profile-renderer
+  data-studio-enabled={String(studioEnabled)}
+  data-studio-href={studioHref}
+>
   <ProfileHeader profile={profile} />
   <SocialIcons links={iconLinks} />
   {visibleHomeSections.map((section) => (
@@ -49,10 +66,13 @@ const fallbackBlocks = remainingBlocks.filter((block) => (
       ) : section === 'turntable' ? (
         turntableBlocks.map((block) => <CustomBlock block={block} />)
       ) : section === 'links' ? (
-        featuredLinks.length > 0 && (
+        (featuredLinks.length > 0 || studioEnabled) && (
           <section class="content-section" aria-labelledby="links-heading">
             <h2 id="links-heading">{profile.data.linksHeading}</h2>
-            <div class="link-list">{featuredLinks.map((link) => <LinkCard link={link} />)}</div>
+            <div class="link-list">
+              {featuredLinks.map((link) => <LinkCard link={link} />)}
+              {studioEnabled && <StudioLinkCard href={studioHref} />}
+            </div>
           </section>
         )
       ) : section === 'fortune' ? (
@@ -65,5 +85,8 @@ const fallbackBlocks = remainingBlocks.filter((block) => (
     </>
   ))}
   {fallbackBlocks.map((block) => <CustomBlock block={block} />)}
-  <Footer name={profile.data.displayName} />
+  <Footer name={profile.data.displayName} {studioEnabled} {studioHref} />
 </div>
+{studioEnabled && turntableTemplate && (
+  <template id="studio-turntable-template"><CustomBlock block={turntableTemplate} /></template>
+)}

@@ -1,0 +1,18 @@
+---
+import Icon from './Icon.astro';
+
+interface Props {
+  href: string;
+}
+
+const { href } = Astro.props;
+---
+<a class="link-card is-studio" href={href} data-studio-link-card>
+  <span class="link-icon"><Icon name="code" size={24} /></span>
+  <span class="link-copy">
+    <strong>建立你的自介網站</strong>
+    <span class="description">開啟線上 Studio，邊修改邊預覽，再下載自己的設定檔。</span>
+    <span class="tags"><small>免安裝</small><small>即時預覽</small></span>
+  </span>
+  <span class="link-arrow" aria-hidden="true">›</span>
+</a>

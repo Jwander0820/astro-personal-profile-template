@@ -218,6 +218,10 @@ const { playlistId, title, continuousPlayback } = Astro.props;
     };
 
     const updateTonearmProgress = () => {
+      if (!root.isConnected) {
+        stopProgressTracker();
+        return;
+      }
       const duration = player.getDuration();
       if (!Number.isFinite(duration) || duration <= 0) return;
       setTonearmProgress(player.getCurrentTime() / duration);
@@ -569,13 +573,15 @@ const { playlistId, title, continuousPlayback } = Astro.props;
     scrubber.addEventListener('keydown', seekWithKeyboard);
   }
 
-  document.querySelectorAll<HTMLElement>('[data-turntable-player]').forEach((root) => {
+  function bindTurntablePlayer(root: HTMLElement) {
+    if (root.dataset.turntableBound === 'true') return;
     const toggleButton = root.querySelector<HTMLButtonElement>('[data-turntable-toggle]');
     const toggleLabel = root.querySelector<HTMLElement>('[data-turntable-toggle-label]');
     const status = root.querySelector<HTMLElement>('[data-turntable-status]');
     const videoReveal = root.querySelector<HTMLElement>('[data-turntable-video-reveal]');
 
     if (!toggleButton || !toggleLabel || !status || !videoReveal) return;
+    root.dataset.turntableBound = 'true';
 
     toggleButton.addEventListener('click', () => {
       if (root.dataset.turntableInitialized === 'true' || root.dataset.turntableInitializing === 'true') return;
@@ -607,5 +613,15 @@ const { playlistId, title, continuousPlayback } = Astro.props;
           root.classList.add('has-error');
         });
     });
+  }
+
+  function bindTurntablePlayers(scope: ParentNode = document) {
+    scope.querySelectorAll<HTMLElement>('[data-turntable-player]').forEach(bindTurntablePlayer);
+  }
+
+  bindTurntablePlayers();
+  document.addEventListener('profile-renderer:updated', (event) => {
+    const rendererEvent = event as CustomEvent<{ root?: ParentNode }>;
+    bindTurntablePlayers(rendererEvent.detail?.root ?? document);
   });
 </script>

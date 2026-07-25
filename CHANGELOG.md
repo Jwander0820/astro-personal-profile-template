@@ -10,11 +10,13 @@
 
 - 新增統一的 `/studio/` Profile Studio；公開模式可在手機編輯、以正式首頁即時預覽並下載設定包，本機模式則在同一頁直接儲存到專案。
 - Studio 支援文字與圖片草稿、AI／既有 JSON 匯入、ZIP 圖片設定包、社群 Icon 選擇器、其它功能分頁與隨機主色。
+- 首頁 Links 新增受部署規則控制的 Studio 入口卡片，讓公開範本訪客能直接找到線上編輯器。
 
 ### 改善
 
 - 正式首頁改由 `ProfileRenderer` 統一組裝；Studio 預覽直接載入正式頁面、CSS 與 SVG Icon catalog，不再維護另一套模擬畫面。
-- 移除舊 4322 Studio UI；4322 僅保留 loopback 背景寫入 API，並加入 `ONLINE_STUDIO_MODE=public|off` 建置開關。
+- 移除舊 4322 Studio UI；4322 僅保留 loopback 背景寫入 API，並加入 `ONLINE_STUDIO_MODE=auto|public|off`、repository 與網站 allowlist。
+- Studio 正式預覽中的唱盤可重新掛載 YouTube 播放器；編輯相同播放清單的文字時會保留目前播放器，不再只顯示不可操作的外觀。
 
 ## [1.1.0] - 2026-07-24
 
