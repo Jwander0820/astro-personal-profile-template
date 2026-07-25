@@ -14,8 +14,12 @@
     "start": "astro dev",
     "studio": "node scripts/studio-server.mjs",
     "profile:apply": "node scripts/apply-profile.mjs",
-    "build": "astro check && astro build && npm run check:ui && npm run check:profile-tools && npm run check:template-safety",
+    "build": "astro check && astro build && npm run check:ui && npm run check:studio-preview && npm run check:profile-tools && npm run check:template-safety",
     "check:ui": "node scripts/verify-ui-contracts.mjs",
+    "check:studio-preview": "node scripts/verify-studio-preview-mode.mjs",
+    "check:studio-deployment": "node scripts/verify-studio-deployment.mjs",
+    "check:browser": "playwright test",
+    "check:browser:install": "playwright install --no-shell chromium",
     "check:profile-tools": "node scripts/verify-profile-tools.mjs",
     "check:template-safety": "node scripts/verify-template-safety.mjs",
     "check:template-defaults": "node scripts/verify-template-defaults.mjs",
@@ -27,5 +31,8 @@
     "@astrojs/markdown-satteri": "^0.3.4",
     "astro": "^7.1.3",
     "typescript": "^5.7.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.0"
   }
 }

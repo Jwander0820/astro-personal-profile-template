@@ -4,6 +4,7 @@ import { createProfileAnswersFromStudioContent } from '../../scripts/profile-ans
 import StudioExampleLink from '../components/StudioExampleLink.astro';
 import StudioRouteNav from '../components/StudioRouteNav.astro';
 import { withBase } from '../lib/paths';
+import { withStudioPreviewQuery } from '../../scripts/studio-preview-mode.mjs';
 import '../styles/online-studio.css';
 
 const runtime = globalThis as typeof globalThis & { process: { cwd(): string } };
@@ -17,7 +18,7 @@ const bootstrap = {
 };
 const bootstrapJson = JSON.stringify(bootstrap).replace(/</g, '\\u003c');
 const favicon = withBase('/favicon.svg');
-const previewHref = `${withBase('/')}?studioPreview=1`;
+const previewHref = withStudioPreviewQuery(withBase('/'));
 ---
 <!doctype html>
 <html lang="zh-Hant">

@@ -14,10 +14,13 @@
 - Studio 新增「完成設定」收尾分頁，集中完整 ZIP、純 JSON、匯入、還原預設與本機儲存，並支援公開 HTTPS 圖片網址。
 - Studio 新增同頁橫向功能 route，串接個人檔案、籤詩編輯器與 Icon 預覽；所有子路由沿用同一份公開開關。
 - 新增 `/studio/fortune-poem/` 籤詩編輯器，可編輯今日手氣標題、說明、籤文、等級、分類、啟用狀態與順序；右側獨立載入正式籤詩 block，支援隨機試抽與指定單張結果。
+- 新增 Studio 部署矩陣整合測試，實際建置並驗證 `auto` 精確 allowlist、`public`、`off` 的路由與入口輸出。
+- 新增 Playwright Chromium 測試，自動覆蓋預覽入口隱藏、390 px 畫面、唱盤與抽籤狀態保留、HTTPS 圖片及「06 完成設定」。
 
 ### 改善
 
 - 正式首頁改由 `ProfileRenderer` 統一組裝；Studio 預覽直接載入正式頁面、CSS 與 SVG Icon catalog，不再維護另一套模擬畫面。
+- 將 `studioPreview=1` 的參數名稱、值、URL 產生及辨識集中管理，避免 Studio 頁面、Layout 與預覽 bridge 各自維護字串。
 - Studio 預覽會省略範本自己的 Links 入口卡片與頁尾 Studio 連結，避免把平台導覽誤認為使用者無法刪除的個人內容。
 - 公開籤詩編輯器不再嘗試連線訪客電腦的 loopback adapter；本機寫入探測只在 `localhost` 或 `127.0.0.1` 執行。
 - 移除舊 4322 Studio UI；4322 僅保留 loopback 背景寫入 API，並加入 `ONLINE_STUDIO_MODE=auto|public|off`、repository 與網站 allowlist。

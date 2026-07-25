@@ -59,6 +59,18 @@ ONLINE_STUDIO_ALLOWED_SITES=https://jwander0820.github.io/astro-personal-profile
 
 要在自己的 fork 主動開放，可在 repository 的 **Settings → Secrets and variables → Actions → Variables** 新增 `ONLINE_STUDIO_ALLOWED_REPOSITORIES=你的帳號/你的repository`；自訂網域則可改用 `ONLINE_STUDIO_ALLOWED_SITES`。`public` 可讓任何部署保留 Studio；`off` 會從所有正式建置移除 Studio。這些值是公開的建置規則，不是密碼或登入保護。
 
+目前 Studio 路由的原始碼會一直保留，因為本機開發與允許公開的部署都要共用它。Astro 採檔案式路由，正式建置時會先產生這些頁面；若部署規則判定為關閉，`astro:build:done` 才從該次建置輸出移除 `studio/`。這不是舊版 4322 Studio 殘留，也不代表關閉後仍能連到 Studio；部署矩陣測試會直接檢查最終輸出、首頁卡片與頁尾入口是否一致。
+
+維護 Studio 或部署規則時，可執行：
+
+```bash
+npm run check:studio-deployment
+npm run check:browser:install
+npm run check:browser
+```
+
+第一個指令以實際 Astro 建置驗證 `auto`、精確 allowlist、`public` 與 `off`；後兩個指令安裝測試用 Chromium，並自動驗證 Studio 預覽、互動狀態、HTTPS 圖片、完成設定與 390 px 畫面。
+
 
 ### 讓 AI 引導建立自介
 

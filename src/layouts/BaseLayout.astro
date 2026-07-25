@@ -3,6 +3,10 @@ import '../styles/global.css';
 import { withBase } from '../lib/paths';
 import { getFontPreset, getGoogleFontsUrl } from '../lib/font-presets';
 import { buildThemeCss, DEFAULT_THEME_COLOR } from '../../scripts/theme-color.mjs';
+import {
+  STUDIO_PREVIEW_QUERY_PARAM,
+  STUDIO_PREVIEW_QUERY_VALUE,
+} from '../../scripts/studio-preview-mode.mjs';
 import ThemeToggle from '../components/ThemeToggle.astro';
 interface Props {
   title: string;
@@ -48,9 +52,15 @@ const themeCss = buildThemeCss(mainColor);
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script is:inline>
+    <script
+      is:inline
+      define:vars={{
+        studioPreviewQueryParam: STUDIO_PREVIEW_QUERY_PARAM,
+        studioPreviewQueryValue: STUDIO_PREVIEW_QUERY_VALUE,
+      }}
+    >
       (function() {
-        if (new URLSearchParams(window.location.search).get('studioPreview') === '1') {
+        if (new URLSearchParams(window.location.search).get(studioPreviewQueryParam) === studioPreviewQueryValue) {
           document.documentElement.dataset.studioPreview = 'true';
         }
         const savedTheme = localStorage.getItem('theme');

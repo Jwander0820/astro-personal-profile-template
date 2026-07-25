@@ -27,6 +27,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Verify Studio deployment matrix
+        run: npm run check:studio-deployment
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps --no-shell chromium
+      - name: Verify Profile Studio in Chromium
+        run: npm run check:browser
       - name: Verify upstream template defaults
         if: github.repository == 'Jwander0820/astro-personal-profile-template'
         run: npm run check:template-defaults

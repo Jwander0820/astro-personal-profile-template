@@ -54,8 +54,10 @@ Supported `homeOrder` values are exactly: `about`, `turntable`, `links`, `fortun
 
 - On Windows, prefer `npm.cmd` and `npx.cmd` when PowerShell execution policy blocks `.ps1` shims.
 - Run `npm.cmd run build` for the full verification chain. Also run `npm.cmd run check:template-defaults` when changing starter content or public template behavior.
+- Run `npm.cmd run check:studio-deployment` when changing Studio access or deployment behavior. It must verify `auto` deny/allow by exact repository or site, `public`, and `off` against final build output.
+- Run `npm.cmd run check:browser` when changing Studio UI or preview behavior. Install its Chromium runtime once with `npm.cmd run check:browser:install`.
 - If Windows locks `dist` or Astro cache files with `EPERM`, do not treat that as a code failure. Run `npm.cmd exec astro check`, build to an isolated directory such as `.astro/codex-build`, then run `check:ui`, `check:profile-tools`, `check:template-safety`, `check:template-defaults`, and `git diff --check`.
-- For Studio UI changes, use a real browser to verify the affected flow. Important smoke cases include interactive fortune draws, player retention, HTTPS image loading, the `06 完成設定` actions, and a 390 px mobile viewport without horizontal overflow.
+- For Studio UI changes, keep the browser suite covering interactive fortune draws, player retention, HTTPS image loading, the `06 完成設定` actions, and a 390 px mobile viewport without horizontal overflow. Add focused manual verification only for visual or platform behavior that the suite cannot reliably assert.
 - Before committing, confirm `src/content/`, `public/images/`, `profile.answers.json`, browser artifacts, and build output did not change unless they are intentionally in scope.
 - Commit, push, tag, Release, and deployment are separate permissions. A request to commit authorizes the intended local commit, not push or publishing.
 

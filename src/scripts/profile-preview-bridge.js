@@ -1,6 +1,7 @@
 import { icons } from '../lib/icons';
 import { withBase } from '../lib/paths';
 import { buildThemeCss, normalizeThemeColor } from '../../scripts/theme-color.mjs';
+import { isStudioPreviewSearch } from '../../scripts/studio-preview-mode.mjs';
 import { isSafeImageSource } from '../../scripts/content-safety.mjs';
 import { renderProfileDocument } from './profile-renderer.js';
 
@@ -15,7 +16,7 @@ if (window.parent !== window) {
   const rendererRoot = document.querySelector('main');
   const initialProfileRenderer = document.querySelector('[data-profile-renderer]');
   const studioEnabled = initialProfileRenderer?.dataset.studioEnabled === 'true'
-    && document.documentElement.dataset.studioPreview !== 'true';
+    && !isStudioPreviewSearch(window.location.search);
   const studioHref = initialProfileRenderer?.dataset.studioHref || withBase('/studio/');
   const turntableTemplate = document.querySelector('#studio-turntable-template');
   const fortuneTemplate = document.querySelector('#studio-fortune-template');
