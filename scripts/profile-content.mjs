@@ -3,6 +3,7 @@ import path from 'node:path';
 import { isSafeHttpUrl, isSafeImageSource, isSafeProfileUrl } from './content-safety.mjs';
 import { atomicWriteText, withFileWriteLock } from './file-writes.mjs';
 import { loadFortuneBucket, replaceFortuneBucket } from './fortune-content.mjs';
+import { coerceDisplayText } from './text-values.mjs';
 import { assertThemeColor, DEFAULT_THEME_COLOR } from './theme-color.mjs';
 import {
   extractYoutubePlaylistId,
@@ -124,6 +125,10 @@ function assertText(value, label, { required = false, max = 5000 } = {}) {
   return text;
 }
 
+function assertDisplayText(value, label, options) {
+  return assertText(coerceDisplayText(value), label, options);
+}
+
 function assertSlug(value, label = 'ID') {
   const slug = assertText(value, label, { required: true, max: 48 }).toLowerCase();
   if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) throw new Error(`${label}只能使用小寫英數字與連字號。`);
@@ -138,10 +143,10 @@ function assertUrl(value, label = '網址') {
   return url;
 }
 
-function assertProvidedText(value, label, { max = 5000 } = {}) {
+function assertProvidedDisplayText(value, label, { max = 5000 } = {}) {
   if (value === undefined) return '';
   if (value === null) throw new Error(`${label}格式不正確。`);
-  return assertText(value, label, { max });
+  return assertDisplayText(value, label, { max });
 }
 
 function assertHttpUrl(value, label = '網址') {
@@ -154,7 +159,7 @@ function assertHttpUrl(value, label = '網址') {
 
 function assertStringArray(value, label, { min = 0, max = 12 } = {}) {
   if (!Array.isArray(value) || value.length < min || value.length > max) throw new Error(`${label}數量不正確。`);
-  return value.map((item) => assertText(item, label, { required: true, max: 80 }));
+  return value.map((item) => assertDisplayText(item, label, { required: true, max: 80 }));
 }
 
 function assertUnique(items, key, label) {
@@ -249,10 +254,10 @@ export async function saveStudioProfile(projectRoot, input) {
     const { name: _legacyName, ...currentData } = current.data;
     const next = {
       ...currentData,
-      displayName: assertText(input.displayName, '顯示名稱', { required: true, max: 80 }),
-      title: assertText(input.title, '一句話身分', { max: 120 }) || undefined,
-      location: assertText(input.location, '地點', { max: 100 }) || undefined,
-      archiveLabel: assertText(input.archiveLabel, '封面標籤', { max: 100 }) || undefined,
+      displayName: assertDisplayText(input.displayName, '顯示名稱', { required: true, max: 80 }),
+      title: assertDisplayText(input.title, '一句話身分', { max: 120 }) || undefined,
+      location: assertDisplayText(input.location, '地點', { max: 100 }) || undefined,
+      archiveLabel: assertDisplayText(input.archiveLabel, '封面標籤', { max: 100 }) || undefined,
       avatar: assertImageSource(input.avatar, '頭像') || undefined,
       background: assertImageSource(input.background, '背景圖片') || undefined,
       sectionsLayout: ['list', 'grid'].includes(input.sectionsLayout) ? input.sectionsLayout : 'grid',
@@ -263,7 +268,7 @@ export async function saveStudioProfile(projectRoot, input) {
       smallTextScale,
       tagline: tagline.length > 0 ? tagline : undefined,
     };
-    const body = assertProvidedText(input.bio, '自我介紹', { max: 5000 });
+    const body = assertProvidedDisplayText(input.bio, '自我介紹', { max: 5000 });
     return { data: next, body, result: { ...next, bio: body } };
   });
 }
@@ -299,8 +304,8 @@ export async function saveHomeSettings(projectRoot, input) {
       ...current.data,
       homeOrder: order,
       homeVisibility: visibility,
-      aboutHeading: assertText(input.aboutHeading ?? current.data.aboutHeading ?? 'About me', 'About 標題', { required: true, max: 80 }),
-      linksHeading: assertText(input.linksHeading ?? current.data.linksHeading ?? 'Links', 'Links 標題', { required: true, max: 80 }),
+      aboutHeading: assertDisplayText(input.aboutHeading ?? current.data.aboutHeading ?? 'About me', 'About 標題', { required: true, max: 80 }),
+      linksHeading: assertDisplayText(input.linksHeading ?? current.data.linksHeading ?? 'Links', 'Links 標題', { required: true, max: 80 }),
     };
     return { data, body: current.body, result: data };
   });
@@ -324,10 +329,10 @@ export async function saveStudioBlock(projectRoot, id, input) {
   if (!isObject(input)) throw new Error('板塊格式不正確。');
   const blockPath = safeFile(projectRoot, 'src', 'content', 'blocks', `${safeId}.md`);
   return updateMarkdownFile(blockPath, async (current) => {
-    const body = assertText(input.body ?? current.body, '板塊說明', { max: 5000 });
+    const body = assertDisplayText(input.body ?? current.body, '板塊說明', { max: 5000 });
     const common = {
       ...current.data,
-      title: assertText(input.title ?? current.data.title, '板塊標題', { required: true, max: 80 }),
+      title: assertDisplayText(input.title ?? current.data.title, '板塊標題', { required: true, max: 80 }),
       visible: input.visible === undefined ? Boolean(current.data.visible) : Boolean(input.visible),
     };
     let next;
@@ -370,7 +375,7 @@ export async function saveStudioSection(projectRoot, id, input) {
     const image = assertImageSource(input.image ?? current.data.image, '卡片圖片');
     const next = {
       ...current.data,
-      title: assertText(input.title, '卡片標題', { required: true, max: 80 }),
+      title: assertDisplayText(input.title, '卡片標題', { required: true, max: 80 }),
       slug: assertSlug(input.slug ?? current.data.slug ?? safeId, '卡片 slug'),
       image: image || undefined,
       order,
@@ -378,7 +383,7 @@ export async function saveStudioSection(projectRoot, id, input) {
       layout: ['card', 'compact'].includes(input.layout) ? input.layout : current.data.layout ?? 'card',
       tags: assertStringArray(input.tags ?? current.data.tags ?? [], '卡片標籤', { max: 8 }),
     };
-    const body = assertText(input.body ?? current.body, '卡片內容', { max: 5000 });
+    const body = assertDisplayText(input.body ?? current.body, '卡片內容', { max: 5000 });
     const result = { id: safeId, file: `sections/${safeId}.md`, data: next, body };
     return { data: next, body, result };
   }, { allowMissing: true });
@@ -410,10 +415,10 @@ export async function saveStudioLink(projectRoot, id, input) {
     const tags = assertStringArray(input.tags ?? current.data.tags ?? [], '連結標籤', { max: 8 });
     const body = input.body === undefined
       ? current.body
-      : assertText(input.body, '連結說明', { max: 3000 });
+      : assertDisplayText(input.body, '連結說明', { max: 3000 });
     const next = {
       ...current.data,
-      title: assertText(input.title, '連結名稱', { required: true, max: 80 }),
+      title: assertDisplayText(input.title, '連結名稱', { required: true, max: 80 }),
       url: assertUrl(input.url),
       icon: assertSlug(input.icon ?? current.data.icon ?? 'arrow', 'Icon 名稱'),
       group,
@@ -480,20 +485,20 @@ export async function saveStudioImageBlock(projectRoot, id, input) {
     if (!Number.isFinite(order) || order < 0 || order > 10000) throw new Error('圖片板塊順序必須介於 0～10000。');
     const next = {
       ...current.data,
-      title: assertText(input.title ?? current.data.title, '圖片板塊標題', { required: true, max: 80 }),
+      title: assertDisplayText(input.title ?? current.data.title, '圖片板塊標題', { required: true, max: 80 }),
       placement: IMAGE_BLOCK_PLACEMENTS.includes(input.placement) ? input.placement : current.data.placement ?? 'after-sections',
       order,
       visible: input.visible === undefined ? Boolean(current.data.visible ?? true) : Boolean(input.visible),
       layout: 'image',
       image: assertImageSource(input.image ?? current.data.image, '圖片來源'),
-      imageAlt: assertText(input.imageAlt ?? current.data.imageAlt, '圖片替代文字', { max: 300 }),
+      imageAlt: assertDisplayText(input.imageAlt ?? current.data.imageAlt, '圖片替代文字', { max: 300 }),
       imageLayout: IMAGE_BLOCK_LAYOUTS.includes(input.imageLayout) ? input.imageLayout : current.data.imageLayout ?? 'full',
       imageAspect: IMAGE_BLOCK_ASPECTS.includes(input.imageAspect) ? input.imageAspect : current.data.imageAspect ?? 'landscape',
       imagePosition: IMAGE_BLOCK_POSITIONS.includes(input.imagePosition) ? input.imagePosition : current.data.imagePosition ?? 'center',
       tags: assertStringArray(input.tags ?? current.data.tags ?? [], '圖片板塊標籤', { max: 8 }),
     };
     if (!next.image) throw new Error('圖片板塊必須選擇圖片。');
-    const body = assertText(input.body ?? current.body, '圖片板塊文字', { max: 5000 });
+    const body = assertDisplayText(input.body ?? current.body, '圖片板塊文字', { max: 5000 });
     const result = { id: safeId, file: `blocks/${safeId}.md`, data: next, body };
     return { data: next, body, result };
   }, { allowMissing: true });

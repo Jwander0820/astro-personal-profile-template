@@ -71,6 +71,81 @@ try {
   const minimalPreview = previewProfileAnswers(minimalAnswers);
   const sensitiveRefusalPreview = previewProfileAnswers(sensitiveRefusalAnswers);
   const lunaPreview = previewProfileAnswers(lunaAnswers);
+  const numericTextAnswers = structuredClone(answers);
+  numericTextAnswers.identity = {
+    ...numericTextAnswers.identity,
+    displayName: 2026,
+    title: 101,
+    location: 886,
+    tagline: [1, 2],
+    bio: 314159,
+  };
+  numericTextAnswers.socials[0].title = 1024;
+  numericTextAnswers.links[0] = {
+    ...numericTextAnswers.links[0],
+    title: 2048,
+    description: 4096,
+    tags: [8192],
+  };
+  numericTextAnswers.sections[0] = {
+    ...numericTextAnswers.sections[0],
+    title: 16384,
+    description: 32768,
+    tags: [65536],
+  };
+  numericTextAnswers.imageBlocks[0] = {
+    ...numericTextAnswers.imageBlocks[0],
+    title: 131072,
+    imageAlt: 262144,
+    description: 524288,
+    tags: [1048576],
+  };
+  numericTextAnswers.playlist = {
+    youtubePlaylistId: 'PL1234567890abcdef',
+    title: 2097152,
+    description: 4194304,
+  };
+  numericTextAnswers.fortune = {
+    ...numericTextAnswers.fortune,
+    title: 8388608,
+    description: 16777216,
+    fortunes: numericTextAnswers.fortune.fortunes.map((fortune, index) => ({
+      ...fortune,
+      message: 33554432 + index,
+      ...(index === 0 ? { note: 67108864 } : {}),
+    })),
+  };
+  const normalizedNumericTextAnswers = validateProfileAnswers(numericTextAnswers);
+  assert.equal(normalizedNumericTextAnswers.identity.displayName, '2026');
+  assert.equal(normalizedNumericTextAnswers.identity.title, '101');
+  assert.equal(normalizedNumericTextAnswers.identity.location, '886');
+  assert.deepEqual(normalizedNumericTextAnswers.identity.tagline, ['1', '2']);
+  assert.equal(normalizedNumericTextAnswers.identity.bio, '314159');
+  assert.equal(normalizedNumericTextAnswers.socials[0].title, '1024');
+  assert.equal(normalizedNumericTextAnswers.links[0].title, '2048');
+  assert.equal(normalizedNumericTextAnswers.links[0].description, '4096');
+  assert.deepEqual(normalizedNumericTextAnswers.links[0].tags, ['8192']);
+  assert.equal(normalizedNumericTextAnswers.sections[0].title, '16384');
+  assert.equal(normalizedNumericTextAnswers.sections[0].description, '32768');
+  assert.deepEqual(normalizedNumericTextAnswers.sections[0].tags, ['65536']);
+  assert.equal(normalizedNumericTextAnswers.imageBlocks[0].title, '131072');
+  assert.equal(normalizedNumericTextAnswers.imageBlocks[0].imageAlt, '262144');
+  assert.equal(normalizedNumericTextAnswers.imageBlocks[0].description, '524288');
+  assert.deepEqual(normalizedNumericTextAnswers.imageBlocks[0].tags, ['1048576']);
+  assert.equal(normalizedNumericTextAnswers.playlist.title, '2097152');
+  assert.equal(normalizedNumericTextAnswers.playlist.description, '4194304');
+  assert.equal(normalizedNumericTextAnswers.fortune.title, '8388608');
+  assert.equal(normalizedNumericTextAnswers.fortune.description, '16777216');
+  assert.equal(normalizedNumericTextAnswers.fortune.fortunes[0].message, '33554432');
+  assert.equal(normalizedNumericTextAnswers.fortune.fortunes[0].note, '67108864');
+  assert.match(serializeProfileAnswers(numericTextAnswers), /"displayName": "2026"/);
+  assert.throws(
+    () => validateProfileAnswers({
+      ...numericTextAnswers,
+      identity: { ...numericTextAnswers.identity, displayName: true },
+    }),
+    /顯示名稱格式不正確/,
+  );
   const exportedCurrentAnswers = createProfileAnswersFromStudioContent(await loadStudioContent(temporaryRoot));
   assert.equal(exportedCurrentAnswers.$schema, './docs/profile-answers.schema.json');
   assert.equal(exportedCurrentAnswers.identity.displayName, '你的名字');
@@ -196,6 +271,10 @@ try {
   assert.equal(answersSchema.properties.identity.required.includes('title'), false);
   assert.equal(answersSchema.properties.identity.required.includes('tagline'), false);
   assert.equal(answersSchema.properties.appearance.properties.mainColor.default, '#7A58A6');
+  assert.ok(answersSchema.properties.identity.properties.displayName.type.includes('number'));
+  assert.ok(answersSchema.properties.links.items.properties.title.type.includes('number'));
+  assert.ok(answersSchema.properties.sections.items.properties.description.type.includes('number'));
+  assert.ok(answersSchema.properties.fortune.properties.fortunes.items.properties.message.type.includes('number'));
   assert.equal('minLength' in answersSchema.properties.identity.properties.title, false);
   assert.equal('minLength' in answersSchema.properties.identity.properties.bio, false);
   assert.equal(answersPreview.summary.socialCount, 2);

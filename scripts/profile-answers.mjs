@@ -1,6 +1,7 @@
 import { isSafeImageSource, isSafeProfileUrl } from './content-safety.mjs';
 import { validateFortuneBucket } from './fortune-schema.mjs';
 import { assertThemeColor, DEFAULT_THEME_COLOR } from './theme-color.mjs';
+import { coerceDisplayText } from './text-values.mjs';
 import { parseYoutubePlaylistId } from './youtube-playlist.mjs';
 
 export const HOME_SECTIONS = ['about', 'turntable', 'links', 'fortune', 'notion'];
@@ -36,10 +37,14 @@ function assertText(value, label, { required = false, max = 5000 } = {}) {
   return text;
 }
 
-function assertProvidedText(value, label, { max = 5000 } = {}) {
+function assertDisplayText(value, label, options) {
+  return assertText(coerceDisplayText(value), label, options);
+}
+
+function assertProvidedDisplayText(value, label, { max = 5000 } = {}) {
   if (value === undefined) return '';
   if (value === null) throw new Error(`${label}格式不正確。`);
-  return assertText(value, label, { max });
+  return assertDisplayText(value, label, { max });
 }
 
 function assertSlug(value, label = 'ID') {
@@ -56,7 +61,7 @@ function assertUrl(value, label = '網址') {
 
 function assertStringArray(value, label, { min = 0, max = 12 } = {}) {
   if (!Array.isArray(value) || value.length < min || value.length > max) throw new Error(`${label}數量不正確。`);
-  return value.map((item) => assertText(item, label, { required: true, max: 80 }));
+  return value.map((item) => assertDisplayText(item, label, { required: true, max: 80 }));
 }
 
 function assertAllowedKeys(value, allowedKeys, label) {
@@ -108,11 +113,11 @@ export function validateProfileAnswers(input) {
   const tagline = assertStringArray(input.identity.tagline ?? [], '關鍵字', { max: 6 });
   if (new Set(tagline).size !== tagline.length) throw new Error('關鍵字不可重複。');
   const identity = {
-    displayName: assertText(input.identity.displayName, '顯示名稱', { required: true, max: 80 }),
-    title: assertText(input.identity.title, '一句話身分', { max: 120 }),
-    location: assertText(input.identity.location, '地點', { max: 100 }),
+    displayName: assertDisplayText(input.identity.displayName, '顯示名稱', { required: true, max: 80 }),
+    title: assertDisplayText(input.identity.title, '一句話身分', { max: 120 }),
+    location: assertDisplayText(input.identity.location, '地點', { max: 100 }),
     tagline,
-    bio: assertProvidedText(input.identity.bio, '自我介紹', { max: 5000 }),
+    bio: assertProvidedDisplayText(input.identity.bio, '自我介紹', { max: 5000 }),
   };
   if (input.media !== undefined && !isObject(input.media)) throw new Error('media 格式不正確。');
   const mediaInput = input.media ?? {};
@@ -129,7 +134,7 @@ export function validateProfileAnswers(input) {
     const service = assertSlug(item.service, '社群服務');
     return {
       service,
-      title: assertProvidedText(item.title, '社群名稱', { max: 80 }) || SERVICE_DEFAULTS[service]?.title || service,
+      title: assertProvidedDisplayText(item.title, '社群名稱', { max: 80 }) || SERVICE_DEFAULTS[service]?.title || service,
       url: assertUrl(item.url, '社群網址'),
       icon: item.icon === undefined ? SERVICE_DEFAULTS[service]?.icon || 'arrow' : assertSlug(item.icon, '圖示名稱'),
     };
@@ -141,9 +146,9 @@ export function validateProfileAnswers(input) {
     assertAllowedKeys(item, ['id', 'title', 'url', 'description', 'icon', 'tags'], `第 ${index + 1} 個精選連結`);
     return {
       id: assertSlug(item.id, '精選連結 ID'),
-      title: assertText(item.title, '精選連結名稱', { required: true, max: 80 }),
+      title: assertDisplayText(item.title, '精選連結名稱', { required: true, max: 80 }),
       url: assertUrl(item.url, '精選連結網址'),
-      description: assertText(item.description, '精選連結說明', { required: true, max: 500 }),
+      description: assertDisplayText(item.description, '精選連結說明', { required: true, max: 500 }),
       icon: item.icon === undefined ? 'arrow' : assertSlug(item.icon, '圖示名稱'),
       tags: assertStringArray(item.tags ?? [], '精選連結標籤', { max: 6 }),
     };
@@ -156,8 +161,8 @@ export function validateProfileAnswers(input) {
     const image = item.image === undefined ? '' : assertImageSource(item.image, '圖片來源', { required: true });
     return {
       id: assertSlug(item.id, '自介區塊 ID'),
-      title: assertText(item.title, '自介區塊名稱', { required: true, max: 80 }),
-      description: assertText(item.description, '自介區塊內容', { required: true, max: 2000 }),
+      title: assertDisplayText(item.title, '自介區塊名稱', { required: true, max: 80 }),
+      description: assertDisplayText(item.description, '自介區塊內容', { required: true, max: 2000 }),
       tags: assertStringArray(item.tags ?? [], '自介區塊標籤', { max: 8 }),
       ...(image ? { image } : {}),
     };
@@ -169,10 +174,10 @@ export function validateProfileAnswers(input) {
     assertAllowedKeys(item, ['id', 'title', 'image', 'imageAlt', 'description', 'placement', 'imageLayout', 'imageAspect', 'imagePosition', 'tags'], `第 ${index + 1} 個圖片板塊`);
     return {
       id: assertSlug(item.id, '圖片板塊 ID'),
-      title: assertText(item.title, '圖片板塊標題', { required: true, max: 80 }),
+      title: assertDisplayText(item.title, '圖片板塊標題', { required: true, max: 80 }),
       image: assertImageSource(item.image, '圖片板塊圖片', { required: true }),
-      imageAlt: assertProvidedText(item.imageAlt, '圖片替代文字', { max: 300 }),
-      description: assertProvidedText(item.description, '圖片板塊文字', { max: 5000 }),
+      imageAlt: assertProvidedDisplayText(item.imageAlt, '圖片替代文字', { max: 300 }),
+      description: assertProvidedDisplayText(item.description, '圖片板塊文字', { max: 5000 }),
       placement: assertOptionalEnum(item.placement, IMAGE_BLOCK_PLACEMENTS, '圖片板塊位置', 'after-sections'),
       imageLayout: assertOptionalEnum(item.imageLayout, IMAGE_BLOCK_LAYOUTS, '圖片板塊版型', 'full'),
       imageAspect: assertOptionalEnum(item.imageAspect, IMAGE_BLOCK_ASPECTS, '圖片板塊比例', 'landscape'),
@@ -202,8 +207,8 @@ export function validateProfileAnswers(input) {
   if (isObject(input.playlist)) assertAllowedKeys(input.playlist, ['youtubePlaylistId', 'title', 'description'], 'playlist');
   const playlist = input.playlist === null || input.playlist === undefined ? null : {
     youtubePlaylistId: extractYoutubePlaylistId(input.playlist.youtubePlaylistId),
-    title: assertProvidedText(input.playlist.title, '播放清單名稱', { max: 80 }) || 'PLAY！',
-    description: assertProvidedText(input.playlist.description, '播放清單說明', { max: 500 }) || '按下唱針，隨機抽一首歌。',
+    title: assertProvidedDisplayText(input.playlist.title, '播放清單名稱', { max: 80 }) || 'PLAY！',
+    description: assertProvidedDisplayText(input.playlist.description, '播放清單說明', { max: 500 }) || '按下唱針，隨機抽一首歌。',
   };
 
   if (input.fortune !== undefined && !isObject(input.fortune)) throw new Error('fortune 格式不正確。');
@@ -211,8 +216,8 @@ export function validateProfileAnswers(input) {
   if (isObject(input.fortune)) {
     assertAllowedKeys(input.fortune, ['title', 'description', 'fortunes'], 'fortune');
     fortune = {
-      title: assertProvidedText(input.fortune.title, '今日手氣標題', { max: 80 }) || '今日手氣',
-      description: assertProvidedText(input.fortune.description, '今日手氣說明', { max: 500 }) || '搖一搖，抽走今天的一點好運。',
+      title: assertProvidedDisplayText(input.fortune.title, '今日手氣標題', { max: 80 }) || '今日手氣',
+      description: assertProvidedDisplayText(input.fortune.description, '今日手氣說明', { max: 500 }) || '搖一搖，抽走今天的一點好運。',
       fortunes: validateFortuneBucket(input.fortune.fortunes),
     };
   }

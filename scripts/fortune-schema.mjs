@@ -1,3 +1,5 @@
+import { coerceDisplayText } from './text-values.mjs';
+
 export const FORTUNE_GRADES = /** @type {const} */ (['大吉', '中吉', '小吉', '吉', '末吉', '凶', '大凶']);
 
 const GRADES = new Set(FORTUNE_GRADES);
@@ -7,8 +9,10 @@ const ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 function normalizeFortune(fortune, index) {
   if (!fortune || typeof fortune !== 'object' || Array.isArray(fortune)) throw new Error(`第 ${index + 1} 張籤的格式不正確。`);
   const id = typeof fortune.id === 'string' ? fortune.id.trim() : '';
-  const message = typeof fortune.message === 'string' ? fortune.message.trim() : '';
-  const note = typeof fortune.note === 'string' ? fortune.note.trim() : '';
+  const messageValue = coerceDisplayText(fortune.message);
+  const noteValue = coerceDisplayText(fortune.note);
+  const message = typeof messageValue === 'string' ? messageValue.trim() : '';
+  const note = typeof noteValue === 'string' ? noteValue.trim() : '';
   if (!ID_PATTERN.test(id)) throw new Error(`第 ${index + 1} 張籤的 ID 必須使用小寫英數字與連字號。`);
   if (!GRADES.has(fortune.grade)) throw new Error(`籤「${id}」的等級必須是${FORTUNE_GRADES.join('、')}其中之一。`);
   if (!CATEGORIES.has(fortune.category)) throw new Error(`籤「${id}」的分類必須是 blessing 或 joke。`);
