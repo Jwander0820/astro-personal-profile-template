@@ -1,4 +1,4 @@
-import { isSafeProfileUrl } from '../../scripts/content-safety.mjs';
+import { isSafeHttpUrl, isSafeProfileUrl } from '../../scripts/content-safety.mjs';
 import { parseYoutubePlaylistId } from '../../scripts/youtube-playlist.mjs';
 
 const HOME_SECTIONS = ['about', 'turntable', 'links', 'fortune', 'notion'];
@@ -204,6 +204,62 @@ function renderImageBlock(item, assetHref) {
   return section;
 }
 
+function renderEmbedBlock(item) {
+  const section = node('section', 'content-section custom-block custom-block--embed');
+  const headingId = `preview-embed-${item.id}`;
+  section.setAttribute('aria-labelledby', headingId);
+  section.append(renderHeading(headingId, item.title));
+  const body = node('div', 'custom-block__body');
+  const copy = node('div', 'custom-block__content');
+  copy.append(markdownFragment(item.description));
+  body.append(copy);
+
+  const url = isSafeHttpUrl(item.url) ? item.url : '#';
+  const embedLabel = item.provider === 'notion'
+    ? '在 Notion 開啟'
+    : item.provider === 'youtube'
+      ? '在 YouTube 開啟'
+      : '開啟完整內容';
+  if (item.embedMode === 'inline' && url !== '#') {
+    const embed = node('div', 'custom-block__embed');
+    const frame = node('iframe');
+    frame.src = url;
+    frame.title = item.title;
+    frame.height = String(item.height || 600);
+    frame.loading = 'lazy';
+    frame.referrerPolicy = 'strict-origin-when-cross-origin';
+    frame.allow = item.provider === 'youtube'
+      ? 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen'
+      : 'clipboard-write; fullscreen';
+    frame.allowFullscreen = true;
+    embed.append(frame);
+    const link = node('a', 'custom-block__embed-link', `${embedLabel} ↗`);
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    body.append(embed, link);
+  } else {
+    const link = node('a', 'custom-block__embed-preview');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.setAttribute('aria-label', `${embedLabel}：${item.title}`);
+    link.append(
+      node('span', 'custom-block__embed-kicker', 'Personal archive'),
+      node('strong', '', `查看完整的 ${item.title}`),
+      node('span', 'custom-block__embed-cta', `${embedLabel} ↗`),
+    );
+    body.append(link);
+  }
+  if (item.tags?.length) {
+    const tags = node('ul');
+    item.tags.forEach((tag) => tags.append(node('li', '', tag)));
+    body.append(tags);
+  }
+  section.append(body);
+  return section;
+}
+
 function cloneFeature(template, title, description) {
   if (!template) return null;
   const feature = template.cloneNode(true);
@@ -278,7 +334,6 @@ export function renderProfileDocument(root, answers, options) {
     assetHref,
     assets = {},
     templates = {},
-    notionVisible = false,
     studioEnabled = false,
     studioHref = '/studio/',
   } = options;
@@ -335,9 +390,8 @@ export function renderProfileDocument(root, answers, options) {
       );
       if (feature) wrapper.append(feature);
     }
-    if (sectionId === 'notion' && notionVisible) {
-      const feature = cloneFeature(templates.notion, '最近動態', '');
-      if (feature) wrapper.append(feature);
+    if (sectionId === 'notion') {
+      (answers.embedBlocks || []).forEach((item) => wrapper.append(renderEmbedBlock(item)));
     }
     if (sectionId === 'about') renderPlacedImages(wrapper, answers, 'after-sections', assetHref);
   }

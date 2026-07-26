@@ -84,7 +84,7 @@ const blocks = defineCollection({
     order: z.number().default(100),
     visible: z.boolean().default(true),
     layout: z.enum(['card', 'plain', 'image', 'embed', 'turntable', 'fortune']).default('card'),
-    provider: z.enum(['notion', 'youtube']).optional(),
+    provider: z.enum(['notion', 'website', 'youtube']).optional(),
     url: z.string().refine(isSafeHttpUrl, 'Embed URL must use http(s).').optional(),
     embedMode: z.enum(['preview', 'inline']).default('preview'),
     playlistId: youtubePlaylist.optional(),

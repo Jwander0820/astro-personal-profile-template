@@ -54,6 +54,18 @@
       "tags": ["Story"]
     }
   ],
+  "embedBlocks": [
+    {
+      "id": "recent-updates",
+      "title": "最近動態",
+      "url": "https://example.com",
+      "description": "可在 Studio 選擇預覽連結或直接嵌入。",
+      "provider": "website",
+      "embedMode": "preview",
+      "height": 600,
+      "tags": ["Archive"]
+    }
+  ],
   "playlist": null,
   "fortune": {
     "title": "今日手氣",

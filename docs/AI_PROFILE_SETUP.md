@@ -35,7 +35,7 @@ Agent 應先取得網站最基本的顯示名稱，再讓使用者自行選擇�
 
 ## 沒有電腦時：使用線上 Studio
 
-允許公開 Studio 的部署會在正式首頁 Links 與頁尾提供 `/studio/` 入口。線上 Studio 不需要安裝 Node.js 或 npm，手機也能使用；它會從目前網站內容建立草稿，並支援 AI JSON 匯入、正式頁面即時預覽、圖片上傳或公開 HTTPS 圖片網址、唱盤試播、今日手氣標題／說明／籤桶編輯與試抽，以及下載包含 JSON 與圖片的 `profile-settings.zip`。頂端 route 可在同一分頁切換個人檔案、籤詩與 Icon 預覽。
+允許公開 Studio 的部署會在正式首頁 Links 與頁尾提供 `/studio/` 入口。線上 Studio 不需要安裝 Node.js 或 npm，手機也能使用；它會從目前網站內容建立草稿，並支援 AI JSON 匯入、正式頁面即時預覽、圖片上傳或公開 HTTPS 圖片網址、網頁內嵌卡片、唱盤試播、今日手氣標題／說明／籤桶編輯與試抽，以及下載包含 JSON 與圖片的 `profile-settings.zip`。頂端 route 可在同一分頁切換個人檔案、籤詩與 Icon 預覽。
 
 線上版不具備 GitHub 寫入權限，也不會把草稿送到後端。下載後可先保留檔案，日後有本機專案時：
 
@@ -74,13 +74,14 @@ Agent 應先取得網站最基本的顯示名稱，再讓使用者自行選擇�
 | 精選連結 | 標題、網址、簡短說明與選填標籤，例如作品集、專案或文章 |
 | About me 卡片 | 卡片標題、內容、選填標籤與 `/images/` 圖片路徑或公開 HTTPS 圖片網址 |
 | 圖片板塊 | 標題、`/images/` 圖片路徑或公開 HTTPS 圖片網址、替代文字、說明、顯示位置與版型 |
+| 網頁內嵌 | 標題、公開 http(s) 網址或 Notion／YouTube iframe 程式碼、預覽連結或直接 iframe、選填高度與標籤 |
 | YouTube 播放清單 | 完整播放清單網址，或網址中 `list=` 後方的 ID |
 | 今日手氣 | 保留或關閉；選填標題、說明與籤詩內容，不指定時保留專案既有籤桶 |
 | 外觀 | 6 碼 HEX 主色、內文／標題字型、About me 格狀或列表排版，以及首頁板塊順序 |
 
 圖片板塊的位置可選 Links 前、Links 後或 About 後；版型可選滿版、圖片在左、圖片在右或海報。字型可選系統預設、Noto Sans TC、Noto Serif TC 或 LXGW WenKai TC。主色使用 `#7A58A6` 這類 6 碼 HEX 色碼；沒有偏好時可省略並保留預設紫色。
 
-任意自訂 Markdown 區塊、Notion 網址與唱盤連續播放設定目前不在 AI 回答檔格式內，請改用 Profile Studio 或參考 [`CUSTOMIZATION_GUIDE.md`](CUSTOMIZATION_GUIDE.md) 手動設定。
+任意自訂 Markdown 區塊與唱盤連續播放設定目前不在 AI 回答檔格式內，請參考 [`CUSTOMIZATION_GUIDE.md`](CUSTOMIZATION_GUIDE.md) 手動設定。一般網站與 Notion 可使用回答檔的 `embedBlocks`，或直接在 Profile Studio「其它功能」新增。
 
 ### 可直接複製的空白模板
 
@@ -129,6 +130,7 @@ Agent 應先取得網站最基本的顯示名稱，再讓使用者自行選擇�
 【功能】
 
 YouTube 播放清單：
+網頁內嵌（標題、網址、預覽連結／直接 iframe、高度、標籤）：
 今日手氣：
 今日手氣標題：
 今日手氣說明：

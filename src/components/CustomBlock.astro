@@ -16,7 +16,14 @@ const isImage = block.data.layout === 'image';
 const isTurntable = block.data.layout === 'turntable';
 const isFortune = block.data.layout === 'fortune';
 const embedUrl = block.data.url;
-const embedLabel = block.data.provider === 'notion' ? '在 Notion 開啟' : '開啟完整內容';
+const embedLabel = block.data.provider === 'notion'
+  ? '在 Notion 開啟'
+  : block.data.provider === 'youtube'
+    ? '在 YouTube 開啟'
+    : '開啟完整內容';
+const embedAllow = block.data.provider === 'youtube'
+  ? 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen'
+  : 'clipboard-write; fullscreen';
 const imagePosition = block.data.imagePosition.replace('-', ' ');
 ---
 <section class:list={['content-section', 'custom-block', `custom-block--${block.data.layout}`]} aria-labelledby={`block-${block.id}`}>
@@ -48,7 +55,7 @@ const imagePosition = block.data.imagePosition.replace('-', ' ');
             height={block.data.height}
             loading="lazy"
             referrerpolicy="strict-origin-when-cross-origin"
-            allow="clipboard-write; fullscreen"
+            allow={embedAllow}
             allowfullscreen
           ></iframe>
         </div>

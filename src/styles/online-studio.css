@@ -536,6 +536,7 @@ code {
 .feature-card__heading { align-items: center; }
 .feature-fields { display: grid; gap: .8rem; margin-top: 1rem; }
 .feature-fields[hidden] { display: none; }
+.feature-collection-heading { margin-top: 2rem; }
 
 .switch { display: inline-flex; align-items: center; gap: .45rem; cursor: pointer; }
 .switch input { position: absolute; opacity: 0; pointer-events: none; }

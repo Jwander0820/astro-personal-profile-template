@@ -4,6 +4,7 @@ import {
   validateProfileAnswers,
 } from '../../scripts/profile-answers.mjs';
 import { normalizeThemeColor } from '../../scripts/theme-color.mjs';
+import { normalizeEmbedSource } from '../../scripts/embed-source.mjs';
 import { icons } from '../lib/icons';
 import { createSettingsZip, readSettingsZip } from './settings-package.js';
 
@@ -13,7 +14,7 @@ const HOME_LABELS = {
   turntable: '播放清單',
   links: 'Links',
   fortune: '今日手氣',
-  notion: 'Notion',
+  notion: '網頁內嵌',
 };
 const SOCIAL_OPTIONS = [
   ['github', 'GitHub', 'https://github.com/yourname'],
@@ -105,6 +106,29 @@ const COLLECTIONS = {
       ['tags', '標籤', 'list', 'Story, Photo', false],
     ],
   },
+  embedBlocks: {
+    container: '#embed-block-list',
+    empty: '還沒有網頁內嵌。可加入支援 iframe 的公開網站，或先使用預覽連結模式。',
+    title: (item) => item.title || item.id || '未命名網頁內嵌',
+    subtitle: (item) => item.url || '尚未填寫網址',
+    fields: [
+      ['id', '板塊 ID', 'text', 'my-embed', false],
+      ['title', '標題', 'text', '最近動態', false],
+      ['url', '嵌入網址或 iframe 程式碼', 'textarea', '貼上公開網址，或從服務複製的 <iframe ...></iframe>', true],
+      ['description', '說明', 'textarea', '補充這個內嵌內容。', true],
+      ['provider', '網站類型', 'select', [
+        ['website', '一般網站'],
+        ['notion', 'Notion'],
+        ['youtube', 'YouTube'],
+      ], false],
+      ['embedMode', '顯示方式', 'select', [
+        ['preview', '預覽連結卡片'],
+        ['inline', '直接嵌入 iframe'],
+      ], false],
+      ['height', '內嵌高度（320～1200 px）', 'number', '600', false],
+      ['tags', '標籤', 'list', 'Notes, Archive', false],
+    ],
+  },
 };
 
 const DEFAULT_ITEMS = {
@@ -120,6 +144,16 @@ const DEFAULT_ITEMS = {
     imageLayout: 'full',
     imageAspect: 'landscape',
     imagePosition: 'center',
+    tags: [],
+  },
+  embedBlocks: {
+    id: 'my-embed',
+    title: '最近動態',
+    url: 'https://example.com',
+    description: '',
+    provider: 'website',
+    embedMode: 'preview',
+    height: 600,
     tags: [],
   },
 };
@@ -162,6 +196,7 @@ function normalizeDraft(value, fallback = {}) {
   draft.media ||= { avatar: '/images/avatar.svg', background: '/images/background.svg' };
   draft.media.avatar ||= '/images/avatar.svg';
   draft.media.background ||= '/images/background.svg';
+  draft.embedBlocks ||= [];
   if ((!draft.fortune || !Array.isArray(draft.fortune.fortunes)) && fallback.fortune) {
     draft.fortune = clone(fallback.fortune);
   }
@@ -351,7 +386,12 @@ export function mountOnlineStudio() {
       });
     } else {
       control = document.createElement('input');
-      control.type = 'text';
+      control.type = inputType === 'number' ? 'number' : 'text';
+      if (inputType === 'number') {
+        control.min = '320';
+        control.max = '1200';
+        control.step = '1';
+      }
       if (typeof placeholder === 'string') control.placeholder = placeholder;
     }
     control.dataset.array = kind;
@@ -425,7 +465,6 @@ export function mountOnlineStudio() {
     preview.contentWindow.postMessage({
       type: 'profile-studio:render',
       answers: state,
-      notionVisible: bootstrap.notionVisible,
       assets: {
         avatar: state.media.avatar,
         background: state.media.background,
@@ -685,6 +724,20 @@ export function mountOnlineStudio() {
       const maximumItems = kind === 'links' ? 6 : 8;
       state[kind][index][field] = control.dataset.list !== undefined ? splitList(control.value, maximumItems) : control.value;
       const details = control.closest('.collection-item');
+      if (kind === 'embedBlocks' && ['url', 'provider'].includes(field)) {
+        try {
+          const normalized = normalizeEmbedSource(state[kind][index].url, state[kind][index].provider);
+          state[kind][index].url = normalized.url;
+          state[kind][index].provider = normalized.provider;
+          if (normalized.height) state[kind][index].height = normalized.height;
+          details.querySelector('[data-field="url"]').value = normalized.url;
+          details.querySelector('[data-field="provider"]').value = normalized.provider;
+          details.querySelector('[data-field="height"]').value = String(state[kind][index].height);
+          if (normalized.fromIframe && field === 'url') toast('已從 iframe 程式碼取出安全網址與高度。');
+        } catch {
+          // Keep incomplete input editable; shared validation reports details on export or save.
+        }
+      }
       details.querySelector('.collection-item__title strong').textContent = COLLECTIONS[kind].title(state[kind][index]);
       details.querySelector('.collection-item__title small').textContent = COLLECTIONS[kind].subtitle(state[kind][index]);
       renderPreview();

@@ -39,6 +39,7 @@ import {
 } from './content-safety.mjs';
 import { createSettingsZip, readSettingsZip } from '../src/scripts/settings-package.js';
 import { resolveOnlineStudioAccess } from './studio-access.mjs';
+import { extractIframeSource, normalizeEmbedSource } from './embed-source.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), 'profile-tools-'));
@@ -58,6 +59,42 @@ try {
   }), true);
   assert.equal(resolveOnlineStudioAccess({ mode: 'public' }), true);
   assert.throws(() => resolveOnlineStudioAccess({ mode: 'private' }), /auto、public 或 off/);
+  const notionIframe = '<iframe src="https://jwander.notion.site/ebd/page?v=view&amp;mode=full" width="100%" height="600" frameborder="0" allowfullscreen />';
+  assert.deepEqual(extractIframeSource(notionIframe), {
+    url: 'https://jwander.notion.site/ebd/page?v=view&mode=full',
+    height: 600,
+  });
+  assert.deepEqual(normalizeEmbedSource(notionIframe), {
+    url: 'https://jwander.notion.site/ebd/page?v=view&mode=full',
+    provider: 'notion',
+    height: 600,
+    fromIframe: true,
+  });
+  assert.deepEqual(
+    normalizeEmbedSource('https://www.youtube.com/watch?v=vfQvkPAjmws&si=tracking'),
+    {
+      url: 'https://www.youtube.com/embed/vfQvkPAjmws',
+      provider: 'youtube',
+      fromIframe: false,
+    },
+  );
+  assert.equal(
+    normalizeEmbedSource('https://www.youtube-nocookie.com/embed/vfQvkPAjmws').url,
+    'https://www.youtube-nocookie.com/embed/vfQvkPAjmws',
+  );
+  assert.deepEqual(
+    normalizeEmbedSource('<iframe width="560" height="315" src="https://www.youtube.com/embed/vfQvkPAjmws?si=tracking" allowfullscreen></iframe>'),
+    {
+      url: 'https://www.youtube.com/embed/vfQvkPAjmws',
+      provider: 'youtube',
+      height: 320,
+      fromIframe: true,
+    },
+  );
+  assert.throws(
+    () => normalizeEmbedSource('<iframe src="javascript:alert(1)"></iframe>'),
+    /iframe 的 src 必須是公開的 http\(s\) 網址/,
+  );
 
   await mkdir(path.join(temporaryRoot, 'src'), { recursive: true });
   await cp(path.join(projectRoot, 'src', 'content'), path.join(temporaryRoot, 'src', 'content'), { recursive: true });
@@ -71,6 +108,18 @@ try {
   const minimalPreview = previewProfileAnswers(minimalAnswers);
   const sensitiveRefusalPreview = previewProfileAnswers(sensitiveRefusalAnswers);
   const lunaPreview = previewProfileAnswers(lunaAnswers);
+  const iframeAnswers = validateProfileAnswers({
+    ...minimalAnswers,
+    embedBlocks: [{
+      id: 'notion-notes',
+      title: 'Notion notes',
+      url: notionIframe,
+      embedMode: 'inline',
+    }],
+  });
+  assert.equal(iframeAnswers.embedBlocks[0].url, 'https://jwander.notion.site/ebd/page?v=view&mode=full');
+  assert.equal(iframeAnswers.embedBlocks[0].provider, 'notion');
+  assert.equal(iframeAnswers.embedBlocks[0].height, 600);
   const numericTextAnswers = structuredClone(answers);
   numericTextAnswers.identity = {
     ...numericTextAnswers.identity,
@@ -280,6 +329,9 @@ try {
   assert.equal(answersPreview.summary.socialCount, 2);
   assert.equal(answersPreview.summary.sectionCount, 2);
   assert.equal(answersPreview.summary.imageBlockCount, 1);
+  assert.equal(answersPreview.summary.embedBlockCount, 1);
+  assert.equal(answersSchema.properties.embedBlocks.items.properties.height.minimum, 320);
+  assert.equal(answersSchema.properties.embedBlocks.items.properties.height.maximum, 1200);
   assert.equal(answersPreview.answers.identity.location, 'Taiwan');
   assert.ok(answersPreview.warnings.some((warning) => warning.includes('location')));
   assert.equal(minimalPreview.summary.socialCount, 0);
@@ -294,6 +346,7 @@ try {
   assert.equal(lunaPreview.summary.linkCount, 0);
   assert.equal(lunaPreview.summary.sectionCount, 2);
   assert.equal(lunaPreview.summary.imageBlockCount, 0);
+  assert.equal(lunaPreview.summary.embedBlockCount, 0);
   assert.equal(lunaPreview.summary.playlistEnabled, false);
   assert.equal(lunaPreview.summary.fortuneEnabled, true);
   assert.deepEqual(lunaPreview.warnings, []);
@@ -360,6 +413,13 @@ try {
     () => previewProfileAnswers({ ...lunaAnswers, socials: [{ service: 'github', title: 'GitHub', url: 'github.com/luna', icon: 'github' }] }),
     /社群網址必須是 http\(s\)、mailto 或頁面錨點/,
   );
+  assert.throws(
+    () => previewProfileAnswers({
+      ...lunaAnswers,
+      embedBlocks: [{ id: 'unsafe', title: 'Unsafe', url: 'javascript:alert(1)' }],
+    }),
+    /網頁內嵌網址必須是公開的 http\(s\) 網址/,
+  );
   assert.equal('name' in result.profile, false);
   assert.ok(Number.isFinite(result.profile.fontScale) && result.profile.fontScale >= 0.9 && result.profile.fontScale <= 1.2);
   assert.ok(Number.isFinite(result.profile.smallTextScale) && result.profile.smallTextScale >= 0.9 && result.profile.smallTextScale <= 1.35);
@@ -373,6 +433,10 @@ try {
   assert.deepEqual(visibleSections.map((item) => item.id), ['generated-about', 'generated-music']);
   assert.equal(result.blocks.find((item) => item.id === 'turntable')?.data.visible, false);
   assert.equal(result.blocks.find((item) => item.id === 'fortune')?.data.visible, true);
+  assert.equal(result.blocks.find((item) => item.id === 'generated-embed-recent-updates')?.data.layout, 'embed');
+  assert.equal(result.blocks.find((item) => item.id === 'generated-embed-recent-updates')?.data.embedMode, 'preview');
+  assert.equal(result.blocks.find((item) => item.id === 'notion-embed')?.data.visible, false);
+  assert.equal(result.profile.homeVisibility.includes('notion'), true);
   assert.equal(result.profile.homeVisibility.includes('turntable'), false);
   assert.equal(result.profile.homeVisibility.includes('fortune'), true);
   assert.equal(social.data.visible, false);

@@ -35,8 +35,8 @@ const iconLinks = links.filter((link) => link.data.group !== 'footer' && link.da
 const featuredLinks = links.filter((link) => ['main', 'featured'].includes(link.data.group) && link.data.layout === 'card');
 const turntableBlocks = blocks.filter((block) => block.data.layout === 'turntable');
 const fortuneBlocks = blocks.filter((block) => block.data.layout === 'fortune');
-const notionBlocks = blocks.filter((block) => block.data.layout === 'embed' && block.data.provider === 'notion');
-const orderedBlockIds = new Set([...turntableBlocks, ...fortuneBlocks, ...notionBlocks].map((block) => block.id));
+const embedBlocks = blocks.filter((block) => block.data.layout === 'embed');
+const orderedBlockIds = new Set([...turntableBlocks, ...fortuneBlocks, ...embedBlocks].map((block) => block.id));
 const remainingBlocks = blocks.filter((block) => !orderedBlockIds.has(block.id));
 const blocksBeforeLinks = remainingBlocks.filter((block) => block.data.placement === 'before-links');
 const blocksAfterLinks = remainingBlocks.filter((block) => block.data.placement === 'between-links-sections');
@@ -84,7 +84,7 @@ const fallbackBlocks = remainingBlocks.filter((block) => (
       ) : section === 'fortune' ? (
         fortuneBlocks.map((block) => <CustomBlock block={block} fortunes={fortunes} />)
       ) : (
-        notionBlocks.map((block) => <CustomBlock block={block} />)
+        embedBlocks.map((block) => <CustomBlock block={block} />)
       )}
       {section === 'links' && blocksAfterLinks.map((block) => <CustomBlock block={block} />)}
       {section === 'about' && blocksAfterAbout.map((block) => <CustomBlock block={block} />)}

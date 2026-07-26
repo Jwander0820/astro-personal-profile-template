@@ -56,6 +56,12 @@ JSON 適合純文字設定，只保存圖片路徑或公開 HTTPS 網址。從�
 
 正式元件仍受第三方服務的嵌入政策、Cookie、瀏覽器隱私設定與網路狀態影響。Studio 能確認本站的版面和設定，但無法繞過第三方禁止 iframe 或播放的限制。
 
+### 要怎麼在 Studio 新增可嵌入的網頁？
+
+到「05 其它功能」的「網頁內嵌」按「新增內嵌」，可以填公開 http(s) 網址，也可以直接貼 Notion 或 YouTube 的整段 `<iframe>`。Studio 只會取出安全的 `src` 與 `height`，不會執行或保存其餘 HTML；YouTube 一般影片、Shorts、直播與播放清單網址也會轉成正式 embed URL。直接 iframe 可設定 320～1200 px 高度；若右側預覽空白或被拒絕，代表來源網站不允許被嵌入，請改用預覽連結。
+
+iframe 中真正必要的是 `src`；`title` 是無障礙說明，`height` 是顯示高度，`allowfullscreen` 與 `allow` 是授權全螢幕、播放或剪貼簿等能力。`width` 由本站響應式版面接管，`frameborder` 已由 CSS 取代。Notion 的 `v=` 等查詢參數可能代表指定檢視，Studio 會保留；YouTube 的 `si=` 是分享識別參數，不是播放必要值，轉換時會移除。
+
 ## AI 與發布
 
 ### 哪些資料一定要提供給 AI？

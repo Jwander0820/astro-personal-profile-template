@@ -25,13 +25,12 @@ if (window.parent !== window) {
       || document.querySelector('.custom-block--turntable')?.cloneNode(true),
     fortune: fortuneTemplate?.content?.firstElementChild?.cloneNode(true)
       || document.querySelector('.custom-block--fortune')?.cloneNode(true),
-    notion: document.querySelector('.custom-block--embed')?.cloneNode(true),
   };
 
   window.addEventListener('message', (event) => {
     if (event.source !== window.parent || event.origin !== window.location.origin) return;
     if (event.data?.type !== 'profile-studio:render' || !rendererRoot) return;
-    const { answers, assets = {}, notionVisible = false } = event.data;
+    const { answers, assets = {} } = event.data;
     const mainColor = normalizeThemeColor(answers?.appearance?.mainColor) || '#7A58A6';
     const themeStyle = document.querySelector('#profile-theme-css');
     if (themeStyle) themeStyle.textContent = buildThemeCss(mainColor);
@@ -40,7 +39,6 @@ if (window.parent !== window) {
     renderProfileDocument(rendererRoot, answers, {
       icons,
       assets,
-      notionVisible,
       templates,
       studioEnabled,
       studioHref,

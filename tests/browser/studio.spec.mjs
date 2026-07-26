@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   STUDIO_PREVIEW_QUERY_PARAM,
@@ -82,6 +83,61 @@ test('HTTPS 頭像網址會進入正式預覽', async ({ page }) => {
   const avatar = page.frameLocator('#profile-preview').locator('.avatar');
   await expect(avatar).toHaveAttribute('src', imageUrl);
   await expect.poll(() => avatar.evaluate((image) => image.complete && image.naturalWidth)).toBeTruthy();
+});
+
+test('其它功能可建立網頁內嵌並匯出設定', async ({ page }) => {
+  const notionUrl = 'https://jwander.notion.site/ebd//3910d2e549f980278eadc9533fc7d039?v=2e00d2e549f98237bd5988c12092c07c';
+  const notionIframe = `<iframe src="${notionUrl}" width="100%" height="600" frameborder="0" allowfullscreen />`;
+  const youtubeUrl = 'https://www.youtube.com/embed/vfQvkPAjmws';
+  const youtubeIframe = '<iframe width="560" height="315" src="https://www.youtube.com/embed/vfQvkPAjmws?si=VPAnKV-VC7ugYeN5" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>';
+  await page.goto('/studio/');
+  await page.getByRole('tab', { name: '其它功能' }).click();
+  await page.getByRole('button', { name: '新增內嵌' }).click();
+
+  const editor = page.locator('#embed-block-list .collection-item').last();
+  await editor.getByLabel('標題').fill('我的公開筆記');
+  await editor.getByLabel('嵌入網址或 iframe 程式碼').fill(notionIframe);
+  await editor.getByLabel('顯示方式').selectOption('inline');
+
+  const embed = page.frameLocator('#profile-preview').locator('.custom-block--embed');
+  await expect(embed.getByRole('heading', { name: '我的公開筆記' })).toBeVisible();
+  await expect(embed.locator('iframe')).toHaveAttribute('src', notionUrl);
+  await expect(embed.locator('iframe')).toHaveAttribute('height', '600');
+  await expect(editor.getByLabel('網站類型')).toHaveValue('notion');
+
+  await page.getByRole('button', { name: '新增內嵌' }).click();
+  const youtubeEditor = page.locator('#embed-block-list .collection-item').last();
+  await youtubeEditor.getByLabel('標題').fill('YouTube 影片');
+  await youtubeEditor.getByLabel('嵌入網址或 iframe 程式碼').fill(youtubeIframe);
+  await youtubeEditor.getByLabel('顯示方式').selectOption('inline');
+  await expect(youtubeEditor.getByLabel('網站類型')).toHaveValue('youtube');
+  await expect(youtubeEditor.getByLabel('內嵌高度（320～1200 px）')).toHaveValue('320');
+
+  const youtubeEmbed = page.frameLocator('#profile-preview').locator('.custom-block--embed').last();
+  await expect(youtubeEmbed.locator('iframe')).toHaveAttribute('src', youtubeUrl);
+  await expect(youtubeEmbed.locator('iframe')).toHaveAttribute('allow', /encrypted-media/);
+
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#download-json').click();
+  const download = await downloadPromise;
+  const answers = JSON.parse(await readFile(await download.path(), 'utf8'));
+  expect(answers.embedBlocks).toEqual([
+    expect.objectContaining({
+      title: '我的公開筆記',
+      url: notionUrl,
+      provider: 'notion',
+      embedMode: 'inline',
+      height: 600,
+    }),
+    expect.objectContaining({
+      title: 'YouTube 影片',
+      url: youtubeUrl,
+      provider: 'youtube',
+      embedMode: 'inline',
+      height: 320,
+    }),
+  ]);
 });
 
 test('06 完成設定可下載 JSON、ZIP 並匯入既有回答檔', async ({ page }) => {

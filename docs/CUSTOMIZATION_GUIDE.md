@@ -135,9 +135,9 @@ tags: [Travel]
 | `imageAspect` | `auto`、`landscape`、`square`、`portrait` |
 | `imagePosition` | `center`、`top`、`bottom`、`left`、`right` 或四角組合 |
 
-## 內嵌 Notion 頁面
+## 內嵌網頁或 Notion 頁面
 
-先在 Notion 將頁面發布到網路，再複製 `src/content/blocks/notion-embed.md` 並填入公開網址：
+最簡單的方式是在 Profile Studio「05 其它功能」的「網頁內嵌」新增卡片。也可以複製 `src/content/blocks/notion-embed.md` 並填入公開網址；一般網站將 `provider` 改為 `website`：
 
 ```yaml
 ---
@@ -158,7 +158,9 @@ tags: []
 - `embedMode: inline`：嘗試直接載入 iframe。
 - `height`：inline 模式高度，可設為 `320`～`1200`。
 
-Notion 頁面必須可公開存取。inline 是否能正常顯示仍取決於 Notion 回應的嵌入限制；若無法載入，可改用 `preview`。
+來源頁面必須可公開存取。inline 是否能正常顯示仍取決於網站的嵌入限制；若無法載入，可改用 `preview`。
+
+Studio 也接受 Notion 或 YouTube 複製出的整段 `<iframe>`，但只會保存安全的 `src` 與 320～1200 之間的 `height`。YouTube 的一般影片、`youtu.be`、Shorts、直播、播放清單與官方 iframe 都會正規化為 `/embed/` 網址，非必要的 `si` 分享參數不會保存。Notion 的查詢參數可能指定資料庫檢視，因此會完整保留。
 
 ## 黑膠唱盤隨機播放器
 

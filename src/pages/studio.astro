@@ -10,11 +10,9 @@ import '../styles/online-studio.css';
 const runtime = globalThis as typeof globalThis & { process: { cwd(): string } };
 const content = await loadStudioContent(runtime.process.cwd());
 const initialAnswers = createProfileAnswersFromStudioContent(content);
-const notionVisible = content.blocks.some((block: { id: string; data: { visible?: boolean } }) => block.id === 'notion-embed' && block.data.visible);
 const bootstrap = {
   initialAnswers,
   localApiUrl: 'http://localhost:4322',
-  notionVisible,
 };
 const bootstrapJson = JSON.stringify(bootstrap).replace(/</g, '\\u003c');
 const favicon = withBase('/favicon.svg');
@@ -245,6 +243,14 @@ const previewHref = withStudioPreviewQuery(withBase('/'));
                 <a class="button button--quiet feature-route-link" href={withBase('/studio/fortune-poem/')}>編輯籤詩內容 →</a>
               </section>
             </div>
+            <div class="collection-heading feature-collection-heading">
+              <div>
+                <h3>網頁內嵌</h3>
+                <p>可直接貼公開網址，或貼上 Notion／YouTube 提供的整段 iframe 程式碼；Studio 會安全取出網址與高度。</p>
+              </div>
+              <button class="button button--small" type="button" data-add="embedBlocks">＋ 新增內嵌</button>
+            </div>
+            <div class="collection-list" id="embed-block-list"></div>
           </section>
 
           <section class="editor-panel" id="panel-finish" role="tabpanel" aria-labelledby="tab-finish" hidden>

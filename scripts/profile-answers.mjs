@@ -1,8 +1,9 @@
-import { isSafeImageSource, isSafeProfileUrl } from './content-safety.mjs';
+import { isSafeHttpUrl, isSafeImageSource, isSafeProfileUrl } from './content-safety.mjs';
 import { validateFortuneBucket } from './fortune-schema.mjs';
 import { assertThemeColor, DEFAULT_THEME_COLOR } from './theme-color.mjs';
 import { coerceDisplayText } from './text-values.mjs';
 import { parseYoutubePlaylistId } from './youtube-playlist.mjs';
+import { normalizeEmbedSource } from './embed-source.mjs';
 
 export const HOME_SECTIONS = ['about', 'turntable', 'links', 'fortune', 'notion'];
 export const FONT_PRESETS = ['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc'];
@@ -10,6 +11,8 @@ export const IMAGE_BLOCK_PLACEMENTS = ['before-links', 'between-links-sections',
 export const IMAGE_BLOCK_LAYOUTS = ['full', 'split-left', 'split-right', 'poster'];
 export const IMAGE_BLOCK_ASPECTS = ['auto', 'landscape', 'square', 'portrait'];
 export const IMAGE_BLOCK_POSITIONS = ['center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
+export const EMBED_BLOCK_MODES = ['preview', 'inline'];
+export const EMBED_BLOCK_PROVIDERS = ['website', 'notion', 'youtube'];
 
 const SERVICE_DEFAULTS = {
   github: { title: 'GitHub', icon: 'github' },
@@ -56,6 +59,12 @@ function assertSlug(value, label = 'ID') {
 function assertUrl(value, label = '網址') {
   const url = assertText(value, label, { required: true, max: 500 });
   if (!isSafeProfileUrl(url)) throw new Error(`${label}必須是 http(s)、mailto 或頁面錨點。`);
+  return url;
+}
+
+function assertHttpUrl(value, label = '網址', { max = 500 } = {}) {
+  const url = assertText(value, label, { required: true, max });
+  if (!isSafeHttpUrl(url)) throw new Error(`${label}必須是公開的 http(s) 網址。`);
   return url;
 }
 
@@ -107,7 +116,7 @@ export function extractYoutubePlaylistId(value) {
 export function validateProfileAnswers(input) {
   if (!isObject(input) || input.version !== 1) throw new Error('回答檔 version 必須為 1。');
   if (!isObject(input.identity)) throw new Error('回答檔缺少 identity。');
-  assertAllowedKeys(input, ['$schema', 'version', 'identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'playlist', 'fortune', 'features', 'appearance'], '回答檔');
+  assertAllowedKeys(input, ['$schema', 'version', 'identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features', 'appearance'], '回答檔');
   if (input.$schema !== undefined && typeof input.$schema !== 'string') throw new Error('$schema 格式不正確。');
   assertAllowedKeys(input.identity, ['displayName', 'title', 'location', 'tagline', 'bio'], 'identity');
   const tagline = assertStringArray(input.identity.tagline ?? [], '關鍵字', { max: 6 });
@@ -186,10 +195,33 @@ export function validateProfileAnswers(input) {
     };
   });
 
+  const embedBlockInput = input.embedBlocks === undefined ? [] : assertObjectArray(input.embedBlocks, '網頁內嵌板塊', 8);
+  const embedBlocks = embedBlockInput.map((item, index) => {
+    if (!isObject(item)) throw new Error(`第 ${index + 1} 個網頁內嵌板塊格式不正確。`);
+    assertAllowedKeys(item, ['id', 'title', 'url', 'description', 'provider', 'embedMode', 'height', 'tags'], `第 ${index + 1} 個網頁內嵌板塊`);
+    const requestedProvider = assertOptionalEnum(item.provider, EMBED_BLOCK_PROVIDERS, '網頁內嵌類型', 'website');
+    const embedSource = normalizeEmbedSource(item.url, requestedProvider);
+    const height = item.height === undefined ? embedSource.height ?? 600 : Number(item.height);
+    if (!Number.isInteger(height) || height < 320 || height > 1200) {
+      throw new Error(`第 ${index + 1} 個網頁內嵌高度必須介於 320～1200。`);
+    }
+    return {
+      id: assertSlug(item.id, '網頁內嵌板塊 ID'),
+      title: assertDisplayText(item.title, '網頁內嵌板塊標題', { required: true, max: 80 }),
+      url: assertHttpUrl(embedSource.url, '網頁內嵌網址', { max: 2048 }),
+      description: assertProvidedDisplayText(item.description, '網頁內嵌板塊說明', { max: 5000 }),
+      provider: embedSource.provider,
+      embedMode: assertOptionalEnum(item.embedMode, EMBED_BLOCK_MODES, '網頁內嵌模式', 'preview'),
+      height,
+      tags: assertStringArray(item.tags ?? [], '網頁內嵌板塊標籤', { max: 8 }),
+    };
+  });
+
   assertUnique(socials, 'service', '社群服務');
   assertUnique(links, 'id', '精選連結 ID');
   assertUnique(sections, 'id', '自介區塊 ID');
   assertUnique(imageBlocks, 'id', '圖片板塊 ID');
+  assertUnique(embedBlocks, 'id', '網頁內嵌板塊 ID');
 
   if (input.appearance !== undefined && !isObject(input.appearance)) throw new Error('appearance 格式不正確。');
   const appearance = input.appearance ?? {};
@@ -235,6 +267,7 @@ export function validateProfileAnswers(input) {
     links,
     sections,
     imageBlocks,
+    embedBlocks,
     playlist,
     ...(fortune ? { fortune } : {}),
     appearance: { sectionsLayout, homeOrder, bodyFont, displayFont, mainColor },
@@ -262,6 +295,8 @@ export function previewProfileAnswers(rawInput) {
       sectionTitles: answers.sections.map((section) => section.title),
       imageBlockCount: answers.imageBlocks.length,
       imageBlockTitles: answers.imageBlocks.map((block) => block.title),
+      embedBlockCount: answers.embedBlocks.length,
+      embedBlockTitles: answers.embedBlocks.map((block) => block.title),
       playlistEnabled: Boolean(answers.playlist),
       fortuneEnabled: answers.features.fortune,
       fortuneCount: answers.fortune?.fortunes.length ?? 0,
@@ -301,6 +336,7 @@ export function createProfileAnswersFromStudioContent(content) {
   const linkIds = new Set();
   const sectionIds = new Set();
   const imageBlockIds = new Set();
+  const embedBlockIds = new Set();
   const blocks = content.blocks ?? [];
   const turntable = blocks.find((block) => block.id === 'turntable' && block.data.visible !== false);
   const fortune = blocks.find((block) => block.id === 'fortune');
@@ -353,6 +389,17 @@ export function createProfileAnswersFromStudioContent(content) {
         imageLayout: entry.data.imageLayout ?? 'full',
         imageAspect: entry.data.imageAspect ?? 'landscape',
         imagePosition: entry.data.imagePosition ?? 'center',
+        tags: Array.isArray(entry.data.tags) ? entry.data.tags : [],
+      })),
+    embedBlocks: orderedVisible(blocks, (entry) => entry.data.layout === 'embed')
+      .map((entry) => ({
+        id: uniqueId(strippedId(entry.id, ['generated-embed-']), embedBlockIds),
+        title: entry.data.title ?? '',
+        url: entry.data.url ?? '',
+        description: entry.body ?? '',
+        provider: EMBED_BLOCK_PROVIDERS.includes(entry.data.provider) ? entry.data.provider : 'website',
+        embedMode: entry.data.embedMode ?? 'preview',
+        height: entry.data.height ?? 600,
         tags: Array.isArray(entry.data.tags) ? entry.data.tags : [],
       })),
     playlist: turntable ? {

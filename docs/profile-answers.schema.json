@@ -111,6 +111,33 @@
         }
       }
     },
+    "embedBlocks": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "url"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "title": { "type": ["string", "number"], "minLength": 1, "maxLength": 80 },
+          "url": {
+            "type": "string",
+            "maxLength": 5000,
+            "description": "公開 http(s) 網址，或從 Notion／YouTube 複製的 iframe 程式碼；儲存時會正規化為網址",
+            "anyOf": [
+              { "format": "uri", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://" },
+              { "pattern": "^\\s*<[Ii][Ff][Rr][Aa][Mm][Ee]\\b" }
+            ]
+          },
+          "description": { "type": ["string", "number"], "maxLength": 5000 },
+          "provider": { "enum": ["website", "notion", "youtube"], "default": "website" },
+          "embedMode": { "enum": ["preview", "inline"], "default": "preview" },
+          "height": { "type": "integer", "minimum": 320, "maximum": 1200, "default": 600 },
+          "tags": { "type": "array", "maxItems": 8, "items": { "type": ["string", "number"], "minLength": 1, "maxLength": 80 } }
+        }
+      }
+    },
     "playlist": {
       "type": ["object", "null"],
       "additionalProperties": false,

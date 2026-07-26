@@ -38,12 +38,12 @@ Windows 建議直接雙擊 `start-studio.cmd`，或執行：
 | 社群連結 | `links/*.md` | URL protocol、content schema |
 | 自介卡片 | `sections/*.md` | `order`、`visible`、layout |
 | 圖片板塊 | `blocks/*.md` | 圖片路徑或 HTTPS 網址、區域、版型、比例、焦點與替代文字 |
-| 播放清單／抽籤／Notion | `blocks/*.md` | 各 block 的條件驗證 |
+| 播放清單／抽籤／網頁內嵌 | `blocks/*.md` | 各 block 的條件驗證 |
 | 籤桶內容 | `fortunes.json` | 共用籤桶模組的 ID、等級、分類、訊息、啟用數與 revision 驗證 |
 
 籤桶管理採整份檔案儲存：搜尋不改變來源順序，只有上移／下移操作會改變草稿順序。`profile.answers.json` 的選填 `fortune` 物件包含標題、說明與籤桶；舊版回答檔沒有此物件時，套用流程會保留專案既有籤詩。籤詩頁直接儲存時若偵測到 `fortunes.json` 已被外部修改，Studio 會拒絕覆寫並要求重新載入。
 
-唱盤欄位在 Studio、AI 回答檔與手動 Markdown 三種入口都接受 YouTube 播放清單完整網址或 playlist ID；`si` 等分享參數可以保留，程式載入時會自動取出 `list` ID，Studio 儲存時則只保留 ID。Notion 欄位接受已發布到網路的完整頁面網址；`preview` 產生簡化連結卡片，`inline` 則嘗試 iframe 內嵌，實際是否允許內嵌仍取決於 Notion 回應標頭。
+唱盤欄位在 Studio、AI 回答檔與手動 Markdown 三種入口都接受 YouTube 播放清單完整網址或 playlist ID；`si` 等分享參數可以保留，程式載入時會自動取出 `list` ID，Studio 儲存時則只保留 ID。`embedBlocks` 接受一般網站網址、Notion／YouTube 網址或整段 iframe；共用 parser 只取出安全的 `src` 與高度，YouTube 會轉成正式 embed URL，Notion 查詢參數則保留。`preview` 產生簡化連結卡片，`inline` 則嘗試 iframe 內嵌，實際是否允許仍取決於來源網站的回應標頭。
 
 ## 為什麼線上 Studio 不直接發布
 

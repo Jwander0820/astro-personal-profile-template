@@ -13,6 +13,8 @@ import {
   IMAGE_BLOCK_LAYOUTS,
   IMAGE_BLOCK_PLACEMENTS,
   IMAGE_BLOCK_POSITIONS,
+  EMBED_BLOCK_MODES,
+  EMBED_BLOCK_PROVIDERS,
   previewProfileAnswers,
   validateProfileAnswers,
 } from './profile-answers.mjs';
@@ -312,7 +314,6 @@ export async function saveHomeSettings(projectRoot, input) {
   const blockVisibility = {
     turntable: visibility.includes('turntable'),
     fortune: visibility.includes('fortune'),
-    'notion-embed': visibility.includes('notion'),
   };
   await Promise.all(Object.entries(blockVisibility).map(([id, visible]) => setVisible(projectRoot, 'blocks', id, visible)));
   return {
@@ -625,6 +626,24 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
     }, block.description);
   }
 
+  for (const block of current.blocks.filter((item) => item.data.layout === 'embed')) {
+    await setVisible(projectRoot, 'blocks', block.id, false);
+  }
+  for (const [index, block] of input.embedBlocks.entries()) {
+    await upsertMarkdown(projectRoot, 'blocks', `generated-embed-${block.id}`, {
+      title: block.title,
+      placement: 'after-sections',
+      order: (index + 1) * 10,
+      visible: true,
+      layout: 'embed',
+      provider: EMBED_BLOCK_PROVIDERS.includes(block.provider) ? block.provider : 'website',
+      url: block.url,
+      embedMode: EMBED_BLOCK_MODES.includes(block.embedMode) ? block.embedMode : 'preview',
+      height: block.height,
+      tags: block.tags,
+    }, block.description);
+  }
+
   if (input.playlist) {
     await upsertMarkdown(projectRoot, 'blocks', 'turntable', {
       title: input.playlist.title,
@@ -659,7 +678,7 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
   if (nextContent.blocks.some((block) => block.id === 'turntable' && block.data.visible)) homeVisibility.push('turntable');
   if (nextContent.links.some((link) => ['main', 'featured'].includes(link.data.group) && link.data.visible)) homeVisibility.push('links');
   if (nextContent.blocks.some((block) => block.id === 'fortune' && block.data.visible)) homeVisibility.push('fortune');
-  if (nextContent.blocks.some((block) => block.id === 'notion-embed' && block.data.visible)) homeVisibility.push('notion');
+  if (nextContent.blocks.some((block) => block.data.layout === 'embed' && block.data.visible)) homeVisibility.push('notion');
   await saveHomeSettings(projectRoot, {
     homeOrder: input.appearance.homeOrder,
     homeVisibility,
