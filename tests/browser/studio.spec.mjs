@@ -94,6 +94,8 @@ test('Links 卡片可排序並個別選擇樣式', async ({ page }) => {
   const firstTitle = await editors.nth(0).locator('.collection-item__title strong').textContent();
   const secondTitle = await editors.nth(1).locator('.collection-item__title strong').textContent();
 
+  await editors.nth(0).locator('summary').click();
+  await expect(editors.nth(0)).toHaveAttribute('open', '');
   await editors.nth(0).locator('[data-field="style"]').selectOption('normal');
   await expect(page.frameLocator('#profile-preview').locator('.link-list .link-card').nth(0)).toHaveClass(/is-normal/);
   await expect(page.frameLocator('#profile-preview').locator('.link-list .link-card').nth(0)).not.toHaveClass(/is-primary/);
