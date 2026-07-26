@@ -7,6 +7,7 @@ import { normalizeEmbedSource } from './embed-source.mjs';
 
 export const HOME_SECTIONS = ['about', 'turntable', 'links', 'fortune', 'notion'];
 export const FONT_PRESETS = ['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc'];
+export const LINK_STYLES = ['primary', 'normal', 'subtle'];
 export const IMAGE_BLOCK_PLACEMENTS = ['before-links', 'between-links-sections', 'after-sections'];
 export const IMAGE_BLOCK_LAYOUTS = ['full', 'split-left', 'split-right', 'poster'];
 export const IMAGE_BLOCK_ASPECTS = ['auto', 'landscape', 'square', 'portrait'];
@@ -152,13 +153,14 @@ export function validateProfileAnswers(input) {
   const linkInput = input.links === undefined ? [] : assertObjectArray(input.links, '精選連結', 20);
   const links = linkInput.map((item, index) => {
     if (!isObject(item)) throw new Error(`第 ${index + 1} 個精選連結格式不正確。`);
-    assertAllowedKeys(item, ['id', 'title', 'url', 'description', 'icon', 'tags'], `第 ${index + 1} 個精選連結`);
+    assertAllowedKeys(item, ['id', 'title', 'url', 'description', 'icon', 'style', 'tags'], `第 ${index + 1} 個精選連結`);
     return {
       id: assertSlug(item.id, '精選連結 ID'),
       title: assertDisplayText(item.title, '精選連結名稱', { required: true, max: 80 }),
       url: assertUrl(item.url, '精選連結網址'),
       description: assertDisplayText(item.description, '精選連結說明', { required: true, max: 500 }),
       icon: item.icon === undefined ? 'arrow' : assertSlug(item.icon, '圖示名稱'),
+      style: assertOptionalEnum(item.style, LINK_STYLES, '精選連結樣式', 'normal'),
       tags: assertStringArray(item.tags ?? [], '精選連結標籤', { max: 6 }),
     };
   });
@@ -368,6 +370,7 @@ export function createProfileAnswersFromStudioContent(content) {
         url: entry.data.url ?? '',
         description: entry.body ?? '',
         icon: entry.data.icon ?? 'arrow',
+        style: LINK_STYLES.includes(entry.data.style) ? entry.data.style : 'normal',
         tags: Array.isArray(entry.data.tags) ? entry.data.tags : [],
       })),
     sections: orderedVisible(content.sections)

@@ -55,6 +55,11 @@ const COLLECTIONS = {
       ['url', '公開網址', 'text', 'https://example.com', false],
       ['description', '簡短說明', 'textarea', '這個連結想介紹什麼？', true],
       ['icon', 'Icon 名稱', 'text', 'arrow', false],
+      ['style', '卡片樣式', 'select', [
+        ['normal', '一般'],
+        ['primary', '主色強調'],
+        ['subtle', '低調'],
+      ], false],
       ['tags', '標籤', 'list', 'Open source, Side project', false],
     ],
   },
@@ -132,7 +137,7 @@ const COLLECTIONS = {
 };
 
 const DEFAULT_ITEMS = {
-  links: { id: 'my-link', title: 'My link', url: 'https://example.com', description: '介紹這個連結。', icon: 'arrow', tags: [] },
+  links: { id: 'my-link', title: 'My link', url: 'https://example.com', description: '介紹這個連結。', icon: 'arrow', style: 'normal', tags: [] },
   sections: { id: 'about-me', title: 'About', description: '寫下一段關於你的內容。', tags: [] },
   imageBlocks: {
     id: 'featured-story',
@@ -197,6 +202,8 @@ function normalizeDraft(value, fallback = {}) {
   draft.media.avatar ||= '/images/avatar.svg';
   draft.media.background ||= '/images/background.svg';
   draft.embedBlocks ||= [];
+  draft.links ||= [];
+  draft.links.forEach((link) => { link.style ||= 'normal'; });
   if ((!draft.fortune || !Array.isArray(draft.fortune.fortunes)) && fallback.fortune) {
     draft.fortune = clone(fallback.fortune);
   }
@@ -420,7 +427,21 @@ export function mountOnlineStudio() {
       remove.type = 'button';
       remove.dataset.remove = kind;
       remove.dataset.index = String(index);
-      summary.append(title, remove);
+      const actions = element('span', 'collection-item__actions');
+      if (kind === 'links') {
+        [['up', '↑', index === 0], ['down', '↓', index === state[kind].length - 1]].forEach(([direction, label, disabled]) => {
+          const move = element('button', 'move-item', label);
+          move.type = 'button';
+          move.dataset.moveCollection = direction;
+          move.dataset.collection = kind;
+          move.dataset.index = String(index);
+          move.disabled = disabled;
+          move.setAttribute('aria-label', `${config.title(item)}往${direction === 'up' ? '上' : '下'}移`);
+          actions.append(move);
+        });
+      }
+      actions.append(remove);
+      summary.append(title, actions);
       const fields = element('div', 'collection-item__fields');
       config.fields.forEach(([fieldName, labelText, inputType, placeholder, wide]) => {
         const label = element('label', `field${wide ? ' field--wide' : ''}`);
@@ -774,6 +795,20 @@ export function mountOnlineStudio() {
       event.stopPropagation();
       const kind = removeButton.dataset.remove;
       state[kind].splice(Number(removeButton.dataset.index), 1);
+      renderCollection(kind);
+      renderPreview();
+      persist();
+      return;
+    }
+    const collectionMoveButton = event.target.closest('[data-move-collection]');
+    if (collectionMoveButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const kind = collectionMoveButton.dataset.collection;
+      const index = Number(collectionMoveButton.dataset.index);
+      const nextIndex = collectionMoveButton.dataset.moveCollection === 'up' ? index - 1 : index + 1;
+      if (nextIndex < 0 || nextIndex >= state[kind].length) return;
+      [state[kind][index], state[kind][nextIndex]] = [state[kind][nextIndex], state[kind][index]];
       renderCollection(kind);
       renderPreview();
       persist();

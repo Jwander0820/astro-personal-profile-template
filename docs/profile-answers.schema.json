@@ -70,6 +70,7 @@
           "url": { "type": "string", "maxLength": 500 },
           "description": { "type": ["string", "number"], "minLength": 1, "maxLength": 500 },
           "icon": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "style": { "enum": ["primary", "normal", "subtle"], "default": "normal" },
           "tags": { "type": "array", "maxItems": 6, "items": { "type": ["string", "number"], "minLength": 1, "maxLength": 80 } }
         }
       }

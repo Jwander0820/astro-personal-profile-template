@@ -85,6 +85,33 @@ test('HTTPS 頭像網址會進入正式預覽', async ({ page }) => {
   await expect.poll(() => avatar.evaluate((image) => image.complete && image.naturalWidth)).toBeTruthy();
 });
 
+test('Links 卡片可排序並個別選擇樣式', async ({ page }) => {
+  await page.goto('/studio/');
+  await page.getByRole('tab', { name: '公開連結' }).click();
+
+  const editors = page.locator('#featured-link-list .collection-item');
+  await expect(editors).toHaveCount(4);
+  const firstTitle = await editors.nth(0).locator('.collection-item__title strong').textContent();
+  const secondTitle = await editors.nth(1).locator('.collection-item__title strong').textContent();
+
+  await editors.nth(0).locator('[data-field="style"]').selectOption('normal');
+  await expect(page.frameLocator('#profile-preview').locator('.link-list .link-card').nth(0)).toHaveClass(/is-normal/);
+  await expect(page.frameLocator('#profile-preview').locator('.link-list .link-card').nth(0)).not.toHaveClass(/is-primary/);
+
+  await editors.nth(0).locator('[data-move-collection="down"]').click();
+  await expect(editors.nth(0).locator('.collection-item__title strong')).toHaveText(secondTitle || '');
+  await expect(editors.nth(1).locator('.collection-item__title strong')).toHaveText(firstTitle || '');
+  await expect(page.frameLocator('#profile-preview').locator('.link-list .link-card').nth(1).locator('strong')).toHaveText(firstTitle || '');
+
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#download-json').click();
+  const download = await downloadPromise;
+  const answers = JSON.parse(await readFile(await download.path(), 'utf8'));
+  expect(answers.links[0].title).toBe(secondTitle);
+  expect(answers.links[1]).toEqual(expect.objectContaining({ title: firstTitle, style: 'normal' }));
+});
+
 test('其它功能可建立網頁內嵌並匯出設定', async ({ page }) => {
   const notionUrl = 'https://jwander.notion.site/ebd//3910d2e549f980278eadc9533fc7d039?v=2e00d2e549f98237bd5988c12092c07c';
   const notionIframe = `<iframe src="${notionUrl}" width="100%" height="600" frameborder="0" allowfullscreen />`;

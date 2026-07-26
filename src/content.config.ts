@@ -3,6 +3,7 @@ import { file } from 'astro/loaders';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
 import { isSafeHttpUrl, isSafeImageSource, isSafeProfileUrl } from '../scripts/content-safety.mjs';
+import { contentText, contentTextArray, contentTextMax } from '../scripts/content-text-schema.mjs';
 import { FORTUNE_GRADES } from '../scripts/fortune-content.mjs';
 import { normalizeThemeColor } from '../scripts/theme-color.mjs';
 import { parseYoutubePlaylistId } from '../scripts/youtube-playlist.mjs';
@@ -21,12 +22,12 @@ const themeColor = z.string()
 const profile = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/profile' }),
   schema: z.object({
-    displayName: z.string(),
-    title: z.string().optional(),
+    displayName: contentText,
+    title: contentText.optional(),
     avatar: imageSource.optional(),
     background: imageSource.optional(),
-    location: z.string().optional(),
-    archiveLabel: z.string().optional(),
+    location: contentText.optional(),
+    archiveLabel: contentText.optional(),
     homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))
       .length(5)
       .refine((items) => new Set(items).size === items.length, 'homeOrder cannot contain duplicates.')
@@ -35,22 +36,22 @@ const profile = defineCollection({
       .max(5)
       .refine((items) => new Set(items).size === items.length, 'homeVisibility cannot contain duplicates.')
       .default(['about', 'turntable', 'links', 'fortune', 'notion']),
-    aboutHeading: z.string().default('About me'),
-    linksHeading: z.string().default('Links'),
+    aboutHeading: contentText.default('About me'),
+    linksHeading: contentText.default('Links'),
     sectionsLayout: z.enum(['list', 'grid']).default('list'),
     bodyFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default('system'),
     displayFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default('system'),
     mainColor: themeColor.default('#7A58A6'),
     fontScale: z.number().min(0.9).max(1.2).default(1),
     smallTextScale: z.number().min(0.9).max(1.35).default(1),
-    tagline: z.union([z.string(), z.array(z.string())]).optional(),
+    tagline: z.union([contentText, contentTextArray]).optional(),
   }),
 });
 
 const links = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/links' }),
   schema: z.object({
-    title: z.string(),
+    title: contentText,
     url: z.string().refine(isSafeProfileUrl, 'URL must use http(s), mailto, or a page anchor.'),
     icon: z.string().default('arrow'),
     group: z.enum(['social', 'main', 'featured', 'footer']),
@@ -59,27 +60,27 @@ const links = defineCollection({
     layout: z.enum(['icon', 'card', 'compact']).default('card'),
     style: z.enum(['primary', 'normal', 'subtle']).default('normal'),
     image: imageSource.optional(),
-    tags: z.array(z.string()).optional(),
+    tags: contentTextArray.optional(),
   }),
 });
 
 const sections = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/sections' }),
   schema: z.object({
-    title: z.string(),
+    title: contentText,
     slug: z.string(),
     image: imageSource.optional(),
     order: z.number().default(100),
     visible: z.boolean().default(true),
     layout: z.enum(['card', 'compact']).default('card'),
-    tags: z.array(z.string()).default([]),
+    tags: contentTextArray.default([]),
   }),
 });
 
 const blocks = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/blocks' }),
   schema: z.object({
-    title: z.string(),
+    title: contentText,
     placement: z.enum(['before-links', 'between-links-sections', 'after-sections']),
     order: z.number().default(100),
     visible: z.boolean().default(true),
@@ -91,11 +92,11 @@ const blocks = defineCollection({
     continuousPlayback: z.boolean().default(true),
     height: z.number().int().min(320).max(1200).default(600),
     image: imageSource.optional(),
-    imageAlt: z.string().max(300).default(''),
+    imageAlt: contentTextMax(300).default(''),
     imageLayout: z.enum(['full', 'split-left', 'split-right', 'poster']).default('full'),
     imageAspect: z.enum(['auto', 'landscape', 'square', 'portrait']).default('landscape'),
     imagePosition: z.enum(['center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right']).default('center'),
-    tags: z.array(z.string()).default([]),
+    tags: contentTextArray.default([]),
   }).superRefine((data, context) => {
     if (data.layout === 'image' && !data.image) {
       context.addIssue({

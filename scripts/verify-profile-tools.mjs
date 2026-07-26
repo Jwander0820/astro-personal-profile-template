@@ -15,7 +15,9 @@ import {
   saveStudioProfile,
   saveStudioSocialOrder,
   saveStudioSection,
+  parseMarkdown,
   previewProfileAnswers,
+  stringifyMarkdown,
   validateProfileAnswers,
 } from './profile-content.mjs';
 import { FORTUNE_GRADES, FortuneConflictError, loadFortuneBucket, restoreFortuneBucket, saveFortuneBucket, validateFortuneBucket } from './fortune-content.mjs';
@@ -40,11 +42,21 @@ import {
 import { createSettingsZip, readSettingsZip } from '../src/scripts/settings-package.js';
 import { resolveOnlineStudioAccess } from './studio-access.mjs';
 import { extractIframeSource, normalizeEmbedSource } from './embed-source.mjs';
+import { contentText, contentTextArray, contentTextMax } from './content-text-schema.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), 'profile-tools-'));
 
 try {
+  assert.equal(contentText.parse(12345), '12345');
+  assert.equal(contentText.parse('12345'), '12345');
+  assert.deepEqual(contentTextArray.parse([101, '202']), ['101', '202']);
+  assert.equal(contentTextMax(3).parse(123), '123');
+  assert.equal(contentText.safeParse(true).success, false);
+  assert.equal(contentText.safeParse(null).success, false);
+  assert.equal(contentText.safeParse({ value: 123 }).success, false);
+  assert.equal(contentText.safeParse(Number.POSITIVE_INFINITY).success, false);
+  assert.equal(contentTextMax(3).safeParse(1234).success, false);
   assert.equal(resolveOnlineStudioAccess({ mode: 'off', isDev: true }), true);
   assert.equal(resolveOnlineStudioAccess({ mode: 'auto', repository: 'someone/fork' }), false);
   assert.equal(resolveOnlineStudioAccess({
@@ -134,6 +146,7 @@ try {
     ...numericTextAnswers.links[0],
     title: 2048,
     description: 4096,
+    style: 'subtle',
     tags: [8192],
   };
   numericTextAnswers.sections[0] = {
@@ -173,6 +186,7 @@ try {
   assert.equal(normalizedNumericTextAnswers.socials[0].title, '1024');
   assert.equal(normalizedNumericTextAnswers.links[0].title, '2048');
   assert.equal(normalizedNumericTextAnswers.links[0].description, '4096');
+  assert.equal(normalizedNumericTextAnswers.links[0].style, 'subtle');
   assert.deepEqual(normalizedNumericTextAnswers.links[0].tags, ['8192']);
   assert.equal(normalizedNumericTextAnswers.sections[0].title, '16384');
   assert.equal(normalizedNumericTextAnswers.sections[0].description, '32768');
@@ -188,6 +202,16 @@ try {
   assert.equal(normalizedNumericTextAnswers.fortune.fortunes[0].message, '33554432');
   assert.equal(normalizedNumericTextAnswers.fortune.fortunes[0].note, '67108864');
   assert.match(serializeProfileAnswers(numericTextAnswers), /"displayName": "2026"/);
+  const numericMarkdown = stringifyMarkdown({
+    title: normalizedNumericTextAnswers.links[0].title,
+    tags: normalizedNumericTextAnswers.links[0].tags,
+  }, normalizedNumericTextAnswers.links[0].description);
+  assert.match(numericMarkdown, /^title: "2048"$/m);
+  assert.match(numericMarkdown, /^tags: \["8192"\]$/m);
+  const numericMarkdownRoundTrip = parseMarkdown(numericMarkdown);
+  assert.equal(numericMarkdownRoundTrip.data.title, '2048');
+  assert.deepEqual(numericMarkdownRoundTrip.data.tags, ['8192']);
+  assert.equal(numericMarkdownRoundTrip.body, '4096');
   assert.throws(
     () => validateProfileAnswers({
       ...numericTextAnswers,
@@ -237,6 +261,12 @@ try {
 
   await applyProfileAnswers(temporaryRoot, answers);
   await applyProfileAnswers(temporaryRoot, answersPreview.answers);
+  const numericAppliedResult = await applyProfileAnswers(temporaryRoot, numericTextAnswers);
+  const numericAppliedLink = numericAppliedResult.links.find((link) => link.id === `generated-link-${numericTextAnswers.links[0].id}`);
+  assert.equal(numericAppliedLink?.data.title, '2048');
+  assert.equal(typeof numericAppliedLink?.data.title, 'string');
+  assert.equal(numericAppliedLink?.data.style, 'subtle');
+  assert.equal(numericAppliedLink?.body, '4096');
   const result = await applyProfileAnswers(temporaryRoot, answers);
   assert.equal(result.blocks.find((block) => block.id === 'fortune')?.data.title, answers.fortune.title);
   assert.equal(result.fortunes.length, answers.fortune.fortunes.length);
@@ -325,6 +355,7 @@ try {
   assert.equal(answersSchema.properties.appearance.properties.mainColor.default, '#7A58A6');
   assert.ok(answersSchema.properties.identity.properties.displayName.type.includes('number'));
   assert.ok(answersSchema.properties.links.items.properties.title.type.includes('number'));
+  assert.deepEqual(answersSchema.properties.links.items.properties.style.enum, ['primary', 'normal', 'subtle']);
   assert.ok(answersSchema.properties.sections.items.properties.description.type.includes('number'));
   assert.ok(answersSchema.properties.fortune.properties.fortunes.items.properties.message.type.includes('number'));
   assert.equal('minLength' in answersSchema.properties.identity.properties.title, false);
@@ -569,6 +600,13 @@ try {
   assert.throws(
     () => validateProfileAnswers({ ...answers, appearance: { ...answers.appearance, mainColor: 'purple' } }),
     /appearance\.mainColor必須是 3 或 6 碼十六進位色碼/,
+  );
+  assert.throws(
+    () => validateProfileAnswers({
+      ...answers,
+      links: [{ ...answers.links[0], style: 'loud' }],
+    }),
+    /精選連結樣式包含不支援的值/,
   );
 
   const concurrencyRoot = path.join(temporaryRoot, 'concurrency');

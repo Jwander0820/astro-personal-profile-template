@@ -89,7 +89,8 @@ function formatScalar(value) {
   if (typeof value === 'boolean' || typeof value === 'number') return String(value);
   if (value === null || value === undefined) return '';
   const text = String(value);
-  if (!text || /[:#[\]{},&*!?|>'"%@`]|^[-?]|\s$|^\s/.test(text) || ['true', 'false', 'null'].includes(text)) {
+  const resemblesTypedScalar = /^-?\d+(?:\.\d+)?$/.test(text) || ['true', 'false', 'null', '~'].includes(text);
+  if (!text || resemblesTypedScalar || /[:#[\]{},&*!?|>'"%@`]|^[-?]|\s$|^\s/.test(text)) {
     return JSON.stringify(text);
   }
   return text;
@@ -585,7 +586,7 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
       order: (index + 1) * 10,
       visible: true,
       layout: 'card',
-      style: index === 0 ? 'primary' : 'normal',
+      style: link.style,
       tags: link.tags,
     }, link.description);
   }

@@ -436,6 +436,27 @@ code {
 .collection-item__title strong { font-size: .84rem; }
 .collection-item__title small { margin-top: .18rem; color: var(--studio-muted); font-size: .7rem; }
 
+.collection-item__actions {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+}
+
+.move-item {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--studio-line);
+  border-radius: .45rem;
+  background: rgba(255,255,255,.72);
+  color: var(--studio-purple);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.move-item:hover:not(:disabled) { background: var(--studio-purple-soft); }
+.move-item:disabled { cursor: not-allowed; opacity: .35; }
+
 .remove-item {
   padding: .36rem .55rem;
   border: 0;

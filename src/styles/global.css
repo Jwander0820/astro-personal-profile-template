@@ -362,6 +362,7 @@ h1 { margin: 0; font-family: var(--font-display); font-size: clamp(1.9rem, 4vw, 
 .link-card:hover { transform: translateY(-3px); border-color: var(--link-card-hover-border); box-shadow: 0 13px 28px var(--link-card-hover-shadow); }
 .link-card:active { transform: translateY(-1px) scale(.99); }
 .link-card.is-primary { color: var(--link-card-primary-color); background: var(--link-card-primary-bg); border-color: var(--link-card-primary-bg); }
+.link-card.is-subtle { min-height: 78px; background: transparent; box-shadow: none; }
 .link-card.is-studio { border-style: dashed; background: linear-gradient(115deg, var(--accent-soft), transparent 78%), var(--card); }
 .link-icon { flex: 0 0 auto; display: grid; place-items: center; width: 48px; height: 48px; color: var(--link-icon-color); background: var(--link-icon-bg); border-radius: 15px; }
 .link-icon img { width: 24px; height: 24px; }

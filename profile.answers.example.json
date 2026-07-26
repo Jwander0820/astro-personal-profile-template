@@ -23,6 +23,7 @@
       "url": "https://github.com/yourname?tab=repositories",
       "description": "最近完成的工具、練習與實驗。",
       "icon": "code",
+      "style": "normal",
       "tags": ["Open source", "Side projects"]
     }
   ],

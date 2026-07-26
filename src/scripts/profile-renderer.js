@@ -144,8 +144,9 @@ function renderSectionCard(item, assetHref) {
   return article;
 }
 
-function renderLinkCard(item, index, icons) {
-  const link = node('a', `link-card is-${index === 0 ? 'primary' : 'normal'}`);
+function renderLinkCard(item, icons) {
+  const style = ['primary', 'normal', 'subtle'].includes(item.style) ? item.style : 'normal';
+  const link = node('a', `link-card is-${style}`);
   link.href = isSafeProfileUrl(item.url) ? item.url : '#';
   if (item.url.startsWith('http')) {
     link.target = '_blank';
@@ -372,7 +373,7 @@ export function renderProfileDocument(root, answers, options) {
         section.setAttribute('aria-labelledby', 'links-heading');
         section.append(renderHeading('links-heading', 'Links'));
         const list = node('div', 'link-list');
-        answers.links.forEach((item, index) => list.append(renderLinkCard(item, index, icons)));
+        answers.links.forEach((item) => list.append(renderLinkCard(item, icons)));
         if (studioEnabled) list.append(renderStudioLinkCard(studioHref, icons));
         section.append(list);
         wrapper.append(section);
