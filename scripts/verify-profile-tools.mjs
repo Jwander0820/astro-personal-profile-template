@@ -195,9 +195,12 @@ try {
     }),
     /顯示名稱格式不正確/,
   );
-  const exportedCurrentAnswers = createProfileAnswersFromStudioContent(await loadStudioContent(temporaryRoot));
+  const currentStudioContent = await loadStudioContent(temporaryRoot);
+  const exportedCurrentAnswers = createProfileAnswersFromStudioContent(currentStudioContent);
   assert.equal(exportedCurrentAnswers.$schema, './docs/profile-answers.schema.json');
-  assert.equal(exportedCurrentAnswers.identity.displayName, '你的名字');
+  assert.equal(typeof exportedCurrentAnswers.identity.displayName, 'string');
+  assert.ok(exportedCurrentAnswers.identity.displayName.trim().length > 0);
+  assert.equal(exportedCurrentAnswers.identity.displayName, currentStudioContent.profile.displayName);
   assert.ok(exportedCurrentAnswers.socials.some((social) => social.service === 'github'));
   assert.ok(exportedCurrentAnswers.links.some((link) => link.id === 'projects'));
   assert.ok(exportedCurrentAnswers.sections.some((section) => section.id === 'about'));
@@ -657,8 +660,8 @@ try {
   const packageEntries = readSettingsZip(packageBytes);
   assert.equal(new TextDecoder().decode(packageEntries.get('profile.answers.json')), serializedCurrentAnswers);
   assert.deepEqual([...packageEntries.get('images/avatar.png')], [1, 2, 3, 4]);
-  assert.equal(exportedCurrentAnswers.media.avatar, '/images/avatar.svg');
-  assert.equal(exportedCurrentAnswers.media.background, '/images/background.svg');
+  assert.equal(exportedCurrentAnswers.media.avatar, currentStudioContent.profile.avatar ?? '/images/avatar.svg');
+  assert.equal(exportedCurrentAnswers.media.background, currentStudioContent.profile.background ?? '/images/background.svg');
 
   const localPreviewRequest = {
     method: 'POST',
