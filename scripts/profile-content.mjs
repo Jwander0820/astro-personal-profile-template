@@ -254,13 +254,16 @@ export async function saveStudioProfile(projectRoot, input) {
     const mainColor = assertThemeColor(input.mainColor ?? current.data.mainColor ?? DEFAULT_THEME_COLOR);
     if (fontScale < 0.9 || fontScale > 1.2) throw new Error('整體字級必須介於 0.9～1.2。');
     if (smallTextScale < 0.9 || smallTextScale > 1.35) throw new Error('小字比例必須介於 0.9～1.35。');
-    const { name: _legacyName, ...currentData } = current.data;
+    const {
+      name: _legacyName,
+      archiveLabel: _legacyArchiveLabel,
+      ...currentData
+    } = current.data;
     const next = {
       ...currentData,
       displayName: assertDisplayText(input.displayName, '顯示名稱', { required: true, max: 80 }),
       title: assertDisplayText(input.title, '一句話身分', { max: 120 }) || undefined,
       location: assertDisplayText(input.location, '地點', { max: 100 }) || undefined,
-      archiveLabel: assertDisplayText(input.archiveLabel, '封面標籤', { max: 100 }) || undefined,
       avatar: assertImageSource(input.avatar, '頭像') || undefined,
       background: assertImageSource(input.background, '背景圖片') || undefined,
       sectionsLayout: ['list', 'grid'].includes(input.sectionsLayout) ? input.sectionsLayout : 'grid',

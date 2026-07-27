@@ -27,6 +27,7 @@ const profile = defineCollection({
     avatar: imageSource.optional(),
     background: imageSource.optional(),
     location: contentText.optional(),
+    // Backward compatibility only. Profiles created before the cover-label removal may still contain it.
     archiveLabel: contentText.optional(),
     homeOrder: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))
       .length(5)

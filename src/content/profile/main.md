@@ -3,7 +3,6 @@ displayName: 你的名字
 title: 用一頁整理作品、興趣與生活
 avatar: /images/avatar.svg
 background: /images/background.svg
-archiveLabel: PERSONAL PROFILE
 homeOrder: [about, links, turntable, fortune, notion]
 sectionsLayout: grid
 bodyFont: system
