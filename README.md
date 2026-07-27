@@ -110,6 +110,8 @@ AI 問答、空白填寫模板與完整發布流程請見 [`docs/AI_PROFILE_SETU
 
 在 fork 中啟用 **Actions**，並到 **Settings → Pages → Build and deployment** 將 Source 設為 **GitHub Actions**。推送至 `main` 後，`.github/workflows/deploy.yml` 會自動建置並發布；`astro.config.mjs` 會依 repository 擁有者與名稱設定正確的 `site` 與 `base`。
 
+部署只以 `npm run build` 的 Astro 診斷、內容驗證與靜態輸出為硬性條件。Studio matrix、Playwright、UI contracts、Profile tools、模板安全與預設內容屬於上游範本維護檢查：它們仍會在上游 Actions 留下結果，但不會阻擋一份可正常建置的網站部署；fork 也不會執行這組範本專用品質鏈。本機維護範本時可另跑 `npm run check:quality`、`npm run check:studio-deployment`、`npm run check:browser` 與 `npm run check:template-defaults`。
+
 ## Cloudflare Pages 部署
 
 Cloudflare Pages 使用 `npm run build`、輸出目錄 `dist`，並建議固定使用 Node.js 22。完整設定、`SITE_URL` 與錯誤排除請見 [`docs/CLOUDFLARE_PAGES.md`](docs/CLOUDFLARE_PAGES.md)。

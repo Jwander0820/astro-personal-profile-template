@@ -53,7 +53,7 @@ Supported `homeOrder` values are exactly: `about`, `turntable`, `links`, `fortun
 ## Verification and Git habits
 
 - On Windows, prefer `npm.cmd` and `npx.cmd` when PowerShell execution policy blocks `.ps1` shims.
-- Run `npm.cmd run build` for the full verification chain. Also run `npm.cmd run check:template-defaults` when changing starter content or public template behavior.
+- Run `npm.cmd run build` to verify Astro diagnostics, content validation, and the deployable static output. For upstream template maintenance, also run `npm.cmd run check:quality`; run `npm.cmd run check:template-defaults` when changing starter content or public template behavior. These maintenance checks provide regression evidence but are not deployment gates.
 - Run `npm.cmd run check:studio-deployment` when changing Studio access or deployment behavior. It must verify `auto` deny/allow by exact repository or site, `public`, and `off` against final build output.
 - Run `npm.cmd run check:browser` when changing Studio UI or preview behavior. Install its Chromium runtime once with `npm.cmd run check:browser:install`.
 - If Windows locks `dist` or Astro cache files with `EPERM`, do not treat that as a code failure. Run `npm.cmd exec astro check`, build to an isolated directory such as `.astro/codex-build`, then run `check:ui`, `check:profile-tools`, `check:template-safety`, `check:template-defaults`, and `git diff --check`.

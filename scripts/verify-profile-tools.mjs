@@ -225,13 +225,40 @@ try {
   assert.equal(typeof exportedCurrentAnswers.identity.displayName, 'string');
   assert.ok(exportedCurrentAnswers.identity.displayName.trim().length > 0);
   assert.equal(exportedCurrentAnswers.identity.displayName, currentStudioContent.profile.displayName);
-  assert.ok(exportedCurrentAnswers.socials.some((social) => social.service === 'github'));
-  assert.ok(exportedCurrentAnswers.links.some((link) => link.id === 'projects'));
-  assert.ok(exportedCurrentAnswers.sections.some((section) => section.id === 'about'));
+  const expectedSocialCount = currentStudioContent.links.filter(
+    (link) => link.data.visible !== false && link.data.group === 'social' && link.data.layout === 'icon',
+  ).length;
+  const expectedFeaturedLinkCount = currentStudioContent.links.filter(
+    (link) => link.data.visible !== false
+      && ['main', 'featured'].includes(link.data.group)
+      && link.data.layout === 'card',
+  ).length;
+  const expectedSectionCount = currentStudioContent.sections.filter(
+    (section) => section.data.visible !== false,
+  ).length;
+  assert.equal(exportedCurrentAnswers.socials.length, expectedSocialCount);
+  assert.equal(exportedCurrentAnswers.links.length, expectedFeaturedLinkCount);
+  assert.equal(exportedCurrentAnswers.sections.length, expectedSectionCount);
   assert.ok(exportedCurrentAnswers.fortune.fortunes.length > 0);
   assert.equal(answersPreview.summary.fortuneCount, 2);
   assert.equal('fortune' in minimalPreview.answers, false, '舊版回答檔未提供 fortune 時必須保持向下相容');
   assert.doesNotThrow(() => validateProfileAnswers(exportedCurrentAnswers));
+  const contentWithoutOptionalCards = {
+    ...structuredClone(currentStudioContent),
+    links: currentStudioContent.links.map((link) => ({
+      ...structuredClone(link),
+      data: { ...structuredClone(link.data), visible: false },
+    })),
+    sections: currentStudioContent.sections.map((section) => ({
+      ...structuredClone(section),
+      data: { ...structuredClone(section.data), visible: false },
+    })),
+  };
+  const answersWithoutOptionalCards = createProfileAnswersFromStudioContent(contentWithoutOptionalCards);
+  assert.deepEqual(answersWithoutOptionalCards.socials, []);
+  assert.deepEqual(answersWithoutOptionalCards.links, []);
+  assert.deepEqual(answersWithoutOptionalCards.sections, []);
+  assert.doesNotThrow(() => validateProfileAnswers(answersWithoutOptionalCards));
   const serializedCurrentAnswers = serializeProfileAnswers(exportedCurrentAnswers);
   assert.match(serializedCurrentAnswers, /^\{\n  "\$schema": "\.\/docs\/profile-answers\.schema\.json"/);
   assert.ok(serializedCurrentAnswers.endsWith('\n'));

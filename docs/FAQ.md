@@ -86,6 +86,10 @@ iframe 中真正必要的是 `src`；`title` 是無障礙說明，`height` 是�
 
 ## 問題排除
 
+### 為什麼上游 Actions 的品質檢查有警告，網站仍然部署成功？
+
+這是預期行為。部署的硬性條件只有依賴安裝、Astro 診斷、內容驗證、靜態建置、artifact 上傳與 Pages 發布。Studio matrix、Playwright、UI contracts、Profile tools、模板安全與預設內容是上游範本的維護訊號，失敗時應修正，但不再阻擋一份可正常建置的網站上線；一般 fork 不執行這組範本專用品質鏈。
+
 ### 儲存後 Git 顯示很多不相關變更怎麼辦？
 
 先不要 commit。檢查 `git status` 與 diff，只保留這次要公開的內容和圖片。本專案會跳過內容完全相同的寫入，以避免無意義的 mtime 變更；若仍出現大量變更，請確認是否匯入了不同的設定包或重設了既有內容。

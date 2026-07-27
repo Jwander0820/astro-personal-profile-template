@@ -7,6 +7,42 @@ import {
 } from '../../scripts/studio-preview-mode.mjs';
 
 const minimalAnswers = path.resolve('docs', 'ai', 'examples', 'minimal.json');
+const exampleAnswers = JSON.parse(await readFile(path.resolve('profile.answers.example.json'), 'utf8'));
+const browserFixtureAnswers = {
+  ...exampleAnswers,
+  links: [
+    {
+      id: 'first-link',
+      title: 'First link',
+      url: 'https://example.com/first',
+      description: 'First fixture link.',
+      icon: 'arrow',
+      style: 'primary',
+      tags: [],
+    },
+    {
+      id: 'second-link',
+      title: 'Second link',
+      url: 'https://example.com/second',
+      description: 'Second fixture link.',
+      icon: 'arrow',
+      style: 'normal',
+      tags: [],
+    },
+  ],
+  embedBlocks: [],
+  playlist: {
+    youtubePlaylistId: 'PL1234567890abcdef',
+    title: 'Test playlist',
+    description: 'Browser fixture playlist.',
+  },
+};
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript((draft) => {
+    window.localStorage.setItem('profile-online-studio-draft-v2', JSON.stringify(draft));
+  }, browserFixtureAnswers);
+});
 
 test('正式首頁保留入口，但 Studio 預覽只顯示使用者內容', async ({ page }) => {
   await page.goto('/');
@@ -90,7 +126,7 @@ test('Links 卡片可排序並個別選擇樣式', async ({ page }) => {
   await page.getByRole('tab', { name: '公開連結' }).click();
 
   const editors = page.locator('#featured-link-list .collection-item');
-  await expect(editors).toHaveCount(4);
+  await expect(editors).toHaveCount(browserFixtureAnswers.links.length);
   const firstTitle = await editors.nth(0).locator('.collection-item__title strong').textContent();
   const secondTitle = await editors.nth(1).locator('.collection-item__title strong').textContent();
 

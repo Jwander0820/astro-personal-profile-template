@@ -170,7 +170,7 @@ npm run build
 - 原本手寫的自訂 Markdown 不會被刪除；範本預設自介卡片會被隱藏。
 - 依回答啟用或停用唱盤與抽籤。
 
-`profile.answers.json` 已加入 `.gitignore`。網站只需要提交產生後的 Markdown 與圖片，不需要提交原始訪談答案。`npm run build` 允許這個本機回答檔存在，並會掃描 Git 已追蹤或未忽略的公開檔案是否含有疑似密鑰；套用回答後，首頁區塊顯示狀態也會依實際產生的內容同步。
+`profile.answers.json` 已加入 `.gitignore`。網站只需要提交產生後的 Markdown 與圖片，不需要提交原始訪談答案。`npm run build` 會執行 Astro 診斷、內容驗證與靜態建置；上游範本維護者可另跑 `npm run check:quality` 掃描公開檔案中的疑似密鑰並執行工具鏈回歸檢查。套用回答後，首頁區塊顯示狀態也會依實際產生的內容同步。
 
 ## 發布與 GitHub Pages 首次設定
 
@@ -182,7 +182,7 @@ npm run build
 4. 確認 coding agent 使用的 `origin` 是自己的 repository，並已具備 push 權限。
 5. 將完成內容推送到 `main`。
 
-部署 workflow 會自動判斷使用者首頁 repository（`帳號.github.io`）與一般 project repository 的 base path。若 workflow 失敗，Agent 應回報失敗階段與可操作的修正方式，不應把本機 build 成功當成部署完成。
+部署 workflow 會自動判斷使用者首頁 repository（`帳號.github.io`）與一般 project repository 的 base path。只有安裝依賴、Astro 診斷、內容驗證、靜態建置、artifact 上傳或 Pages 發布失敗會阻擋部署；上游範本的 Studio、Playwright 與維護契約檢查會保留結果但不阻擋網站上線。若 workflow 失敗，Agent 應回報失敗階段與可操作的修正方式，不應把本機 build 成功當成部署完成。
 
 Studio 與發布常見問題請見 [`FAQ.md`](FAQ.md)。
 
