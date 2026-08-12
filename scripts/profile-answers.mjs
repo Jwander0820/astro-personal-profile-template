@@ -1,19 +1,41 @@
 import { isSafeHttpUrl, isSafeImageSource, isSafeProfileUrl } from './content-safety.mjs';
 import { validateFortuneBucket } from './fortune-schema.mjs';
-import { assertThemeColor, DEFAULT_THEME_COLOR } from './theme-color.mjs';
+import { assertThemeColor } from './theme-color.mjs';
 import { coerceDisplayText } from './text-values.mjs';
 import { parseYoutubePlaylistId } from './youtube-playlist.mjs';
 import { normalizeEmbedSource } from './embed-source.mjs';
+import {
+  APPEARANCE_DEFAULTS,
+  APPEARANCE_RANGES,
+  APPLY_MODES,
+  EMBED_BLOCK_MODES,
+  EMBED_BLOCK_PROVIDERS,
+  EMBED_URL_MAX_LENGTH,
+  FONT_PRESETS,
+  HOME_SECTIONS,
+  IMAGE_BLOCK_ASPECTS,
+  IMAGE_BLOCK_LAYOUTS,
+  IMAGE_BLOCK_PLACEMENTS,
+  IMAGE_BLOCK_POSITIONS,
+  LINK_STYLES,
+  PROFILE_ANSWER_VERSION,
+} from './profile-contract.mjs';
 
-export const HOME_SECTIONS = ['about', 'turntable', 'links', 'fortune', 'notion'];
-export const FONT_PRESETS = ['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc'];
-export const LINK_STYLES = ['primary', 'normal', 'subtle'];
-export const IMAGE_BLOCK_PLACEMENTS = ['before-links', 'between-links-sections', 'after-sections'];
-export const IMAGE_BLOCK_LAYOUTS = ['full', 'split-left', 'split-right', 'poster'];
-export const IMAGE_BLOCK_ASPECTS = ['auto', 'landscape', 'square', 'portrait'];
-export const IMAGE_BLOCK_POSITIONS = ['center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
-export const EMBED_BLOCK_MODES = ['preview', 'inline'];
-export const EMBED_BLOCK_PROVIDERS = ['website', 'notion', 'youtube'];
+export {
+  APPEARANCE_DEFAULTS,
+  APPEARANCE_RANGES,
+  APPLY_MODES,
+  EMBED_BLOCK_MODES,
+  EMBED_BLOCK_PROVIDERS,
+  FONT_PRESETS,
+  HOME_SECTIONS,
+  IMAGE_BLOCK_ASPECTS,
+  IMAGE_BLOCK_LAYOUTS,
+  IMAGE_BLOCK_PLACEMENTS,
+  IMAGE_BLOCK_POSITIONS,
+  LINK_STYLES,
+  PROFILE_ANSWER_VERSION,
+};
 
 const SERVICE_DEFAULTS = {
   github: { title: 'GitHub', icon: 'github' },
@@ -92,6 +114,15 @@ function assertOptionalEnum(value, allowed, label, fallback) {
   return value;
 }
 
+function assertOptionalNumber(value, label, range, fallback) {
+  if (value === undefined) return fallback;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < range.minimum || number > range.maximum) {
+    throw new Error(`${label} 必須介於 ${range.minimum}～${range.maximum}。`);
+  }
+  return number;
+}
+
 function assertUnique(items, key, label) {
   const values = items.map((item) => item[key]);
   if (new Set(values).size !== values.length) throw new Error(`${label}不可重複。`);
@@ -115,10 +146,11 @@ export function extractYoutubePlaylistId(value) {
 }
 
 export function validateProfileAnswers(input) {
-  if (!isObject(input) || input.version !== 1) throw new Error('回答檔 version 必須為 1。');
+  if (!isObject(input) || input.version !== PROFILE_ANSWER_VERSION) throw new Error('回答檔 version 必須為 1。');
   if (!isObject(input.identity)) throw new Error('回答檔缺少 identity。');
-  assertAllowedKeys(input, ['$schema', 'version', 'identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features', 'appearance'], '回答檔');
+  assertAllowedKeys(input, ['$schema', 'version', 'applyMode', 'identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features', 'appearance'], '回答檔');
   if (input.$schema !== undefined && typeof input.$schema !== 'string') throw new Error('$schema 格式不正確。');
+  const applyMode = assertOptionalEnum(input.applyMode, APPLY_MODES, 'applyMode', 'replace');
   assertAllowedKeys(input.identity, ['displayName', 'title', 'location', 'tagline', 'bio'], 'identity');
   const tagline = assertStringArray(input.identity.tagline ?? [], '關鍵字', { max: 6 });
   if (new Set(tagline).size !== tagline.length) throw new Error('關鍵字不可重複。');
@@ -210,7 +242,7 @@ export function validateProfileAnswers(input) {
     return {
       id: assertSlug(item.id, '網頁內嵌板塊 ID'),
       title: assertDisplayText(item.title, '網頁內嵌板塊標題', { required: true, max: 80 }),
-      url: assertHttpUrl(embedSource.url, '網頁內嵌網址', { max: 2048 }),
+      url: assertHttpUrl(embedSource.url, '網頁內嵌網址', { max: EMBED_URL_MAX_LENGTH }),
       description: assertProvidedDisplayText(item.description, '網頁內嵌板塊說明', { max: 5000 }),
       provider: embedSource.provider,
       embedMode: assertOptionalEnum(item.embedMode, EMBED_BLOCK_MODES, '網頁內嵌模式', 'preview'),
@@ -227,12 +259,14 @@ export function validateProfileAnswers(input) {
 
   if (input.appearance !== undefined && !isObject(input.appearance)) throw new Error('appearance 格式不正確。');
   const appearance = input.appearance ?? {};
-  assertAllowedKeys(appearance, ['sectionsLayout', 'bodyFont', 'displayFont', 'mainColor', 'homeOrder'], 'appearance');
-  const sectionsLayout = assertOptionalEnum(appearance.sectionsLayout, ['grid', 'list'], 'sectionsLayout', 'grid');
-  const bodyFont = assertOptionalEnum(appearance.bodyFont, FONT_PRESETS, 'bodyFont', 'system');
-  const displayFont = assertOptionalEnum(appearance.displayFont, FONT_PRESETS, 'displayFont', 'system');
-  const mainColor = assertThemeColor(appearance.mainColor ?? DEFAULT_THEME_COLOR, 'appearance.mainColor');
-  const homeOrder = appearance.homeOrder ?? HOME_SECTIONS;
+  assertAllowedKeys(appearance, ['sectionsLayout', 'bodyFont', 'displayFont', 'mainColor', 'fontScale', 'smallTextScale', 'homeOrder'], 'appearance');
+  const sectionsLayout = assertOptionalEnum(appearance.sectionsLayout, ['grid', 'list'], 'sectionsLayout', APPEARANCE_DEFAULTS.sectionsLayout);
+  const bodyFont = assertOptionalEnum(appearance.bodyFont, FONT_PRESETS, 'bodyFont', APPEARANCE_DEFAULTS.bodyFont);
+  const displayFont = assertOptionalEnum(appearance.displayFont, FONT_PRESETS, 'displayFont', APPEARANCE_DEFAULTS.displayFont);
+  const mainColor = assertThemeColor(appearance.mainColor ?? APPEARANCE_DEFAULTS.mainColor, 'appearance.mainColor');
+  const fontScale = assertOptionalNumber(appearance.fontScale, 'appearance.fontScale', APPEARANCE_RANGES.fontScale, APPEARANCE_DEFAULTS.fontScale);
+  const smallTextScale = assertOptionalNumber(appearance.smallTextScale, 'appearance.smallTextScale', APPEARANCE_RANGES.smallTextScale, APPEARANCE_DEFAULTS.smallTextScale);
+  const homeOrder = appearance.homeOrder ?? APPEARANCE_DEFAULTS.homeOrder;
   if (!Array.isArray(homeOrder) || homeOrder.length !== 5 || new Set(homeOrder).size !== 5 || homeOrder.some((item) => !HOME_SECTIONS.includes(item))) {
     throw new Error('appearance.homeOrder 必須包含五個首頁板塊。');
   }
@@ -262,7 +296,8 @@ export function validateProfileAnswers(input) {
   if (features.fortune !== undefined && typeof features.fortune !== 'boolean') throw new Error('features.fortune 必須是布林值。');
 
   return {
-    version: 1,
+    version: PROFILE_ANSWER_VERSION,
+    applyMode,
     identity,
     media,
     socials,
@@ -272,8 +307,49 @@ export function validateProfileAnswers(input) {
     embedBlocks,
     playlist,
     ...(fortune ? { fortune } : {}),
-    appearance: { sectionsLayout, homeOrder, bodyFont, displayFont, mainColor },
+    appearance: { sectionsLayout, homeOrder, bodyFont, displayFont, mainColor, fontScale, smallTextScale },
     features: { fortune: features.fortune !== false },
+  };
+}
+
+export function resolveProfileAnswerUpdate(currentInput, rawInput, requestedMode) {
+  if (!isObject(rawInput) || rawInput.version !== PROFILE_ANSWER_VERSION) {
+    throw new Error('回答檔 version 必須為 1。');
+  }
+  assertAllowedKeys(rawInput, ['$schema', 'version', 'applyMode', 'identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features', 'appearance'], '回答檔');
+  const mode = requestedMode ?? rawInput.applyMode ?? 'replace';
+  if (!APPLY_MODES.includes(mode)) throw new Error('applyMode 必須為 merge 或 replace。');
+  if (mode === 'replace') {
+    return {
+      mode,
+      answers: { ...validateProfileAnswers({ ...rawInput, applyMode: mode }), applyMode: mode },
+      updateKeys: new Set(['identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features', 'appearance']),
+    };
+  }
+
+  const current = validateProfileAnswers(currentInput);
+  const merged = structuredClone(current);
+  for (const key of ['identity', 'media', 'appearance', 'features']) {
+    if (rawInput[key] !== undefined) {
+      if (!isObject(rawInput[key])) throw new Error(`${key} 格式不正確。`);
+      merged[key] = { ...merged[key], ...rawInput[key] };
+    }
+  }
+  if (rawInput.fortune !== undefined) {
+    if (!isObject(rawInput.fortune)) throw new Error('fortune 格式不正確。');
+    merged.fortune = { ...merged.fortune, ...rawInput.fortune };
+  }
+  for (const key of ['socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist']) {
+    if (Object.hasOwn(rawInput, key)) merged[key] = structuredClone(rawInput[key]);
+  }
+  merged.version = PROFILE_ANSWER_VERSION;
+  merged.applyMode = mode;
+  if (rawInput.$schema !== undefined) merged.$schema = rawInput.$schema;
+  const answers = validateProfileAnswers(merged);
+  return {
+    mode,
+    answers: { ...answers, applyMode: mode },
+    updateKeys: new Set(Object.keys(rawInput).filter((key) => !['$schema', 'version', 'applyMode'].includes(key))),
   };
 }
 
@@ -344,7 +420,7 @@ export function createProfileAnswersFromStudioContent(content) {
   const fortune = blocks.find((block) => block.id === 'fortune');
 
   const draft = {
-    version: 1,
+    version: PROFILE_ANSWER_VERSION,
     identity: {
       displayName: content.profile.displayName ?? '',
       title: content.profile.title ?? '',
@@ -417,10 +493,12 @@ export function createProfileAnswersFromStudioContent(content) {
     },
     features: { fortune: fortune?.data?.visible !== false },
     appearance: {
-      sectionsLayout: content.profile.sectionsLayout ?? 'grid',
-      bodyFont: content.profile.bodyFont ?? 'system',
-      displayFont: content.profile.displayFont ?? 'system',
-      mainColor: content.profile.mainColor ?? DEFAULT_THEME_COLOR,
+      sectionsLayout: content.profile.sectionsLayout ?? APPEARANCE_DEFAULTS.sectionsLayout,
+      bodyFont: content.profile.bodyFont ?? APPEARANCE_DEFAULTS.bodyFont,
+      displayFont: content.profile.displayFont ?? APPEARANCE_DEFAULTS.displayFont,
+      mainColor: content.profile.mainColor ?? APPEARANCE_DEFAULTS.mainColor,
+      fontScale: content.profile.fontScale ?? APPEARANCE_DEFAULTS.fontScale,
+      smallTextScale: content.profile.smallTextScale ?? APPEARANCE_DEFAULTS.smallTextScale,
       homeOrder: Array.isArray(content.profile.homeOrder) ? content.profile.homeOrder : HOME_SECTIONS,
     },
   };

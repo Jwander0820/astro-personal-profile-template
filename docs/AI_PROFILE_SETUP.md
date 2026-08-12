@@ -193,3 +193,15 @@ Studio 與發布常見問題請見 [`FAQ.md`](FAQ.md)。
 - AI 不應自行開啟 repository Actions、修改 Pages 設定、commit 或 push；除非使用者明確要求。即使起始提示已要求發布，push 前仍要再確認一次公開內容摘要。
 - 發布前確認 `origin` 屬於使用者，不要把個人自介內容推回上游模板 repository。
 - 套用前建議先 commit 目前版本，讓所有變更都能從 Git 還原。
+
+## 套用前規劃與更新模式
+
+產生回答檔後，先執行：
+
+```bash
+npm run profile:plan -- profile.answers.json
+```
+
+確認預計新增或更新的公開內容，再執行 `profile:apply`。第一次設定與完整 Studio 匯出使用 `"applyMode": "replace"`；只更新少量既有欄位時使用 `"applyMode": "merge"`。merge 可以省略 identity.displayName，但不得猜測或補造未提供的個人資訊。
+
+本機 Studio 的圖片與內容會在同一份計畫中驗證和套用；不要先自行複製圖片再呼叫 apply，否則無法取得同名防覆蓋與交易回復保護。

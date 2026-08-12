@@ -4,8 +4,10 @@ import { isSafeHttpUrl, isSafeImageSource, isSafeProfileUrl } from './content-sa
 import { atomicWriteText, withFileWriteLock } from './file-writes.mjs';
 import { loadFortuneBucket, replaceFortuneBucket } from './fortune-content.mjs';
 import { coerceDisplayText } from './text-values.mjs';
-import { assertThemeColor, DEFAULT_THEME_COLOR } from './theme-color.mjs';
+import { assertThemeColor } from './theme-color.mjs';
 import {
+  APPEARANCE_DEFAULTS,
+  APPEARANCE_RANGES,
   extractYoutubePlaylistId,
   FONT_PRESETS,
   HOME_SECTIONS,
@@ -15,7 +17,9 @@ import {
   IMAGE_BLOCK_POSITIONS,
   EMBED_BLOCK_MODES,
   EMBED_BLOCK_PROVIDERS,
+  createProfileAnswersFromStudioContent,
   previewProfileAnswers,
+  resolveProfileAnswerUpdate,
   validateProfileAnswers,
 } from './profile-answers.mjs';
 
@@ -223,12 +227,12 @@ export async function loadStudioContent(projectRoot) {
       homeVisibility: defaultVisibility,
       aboutHeading: 'About me',
       linksHeading: 'Links',
-      sectionsLayout: 'list',
-      bodyFont: 'system',
-      displayFont: 'system',
-      mainColor: DEFAULT_THEME_COLOR,
-      fontScale: 1,
-      smallTextScale: 1,
+      sectionsLayout: APPEARANCE_DEFAULTS.sectionsLayout,
+      bodyFont: APPEARANCE_DEFAULTS.bodyFont,
+      displayFont: APPEARANCE_DEFAULTS.displayFont,
+      mainColor: APPEARANCE_DEFAULTS.mainColor,
+      fontScale: APPEARANCE_DEFAULTS.fontScale,
+      smallTextScale: APPEARANCE_DEFAULTS.smallTextScale,
       ...profile.data,
       bio: profile.body,
     },
@@ -247,13 +251,13 @@ export async function saveStudioProfile(projectRoot, input) {
   const profilePath = safeFile(contentRoot, 'profile', 'main.md');
   return updateMarkdownFile(profilePath, async (current) => {
     const tagline = assertStringArray(input.tagline ?? [], '關鍵字', { max: 6 });
-    const fontScale = Number(input.fontScale ?? current.data.fontScale ?? 1);
-    const smallTextScale = Number(input.smallTextScale ?? current.data.smallTextScale ?? 1);
-    const bodyFont = FONT_PRESETS.includes(input.bodyFont) ? input.bodyFont : current.data.bodyFont ?? 'system';
-    const displayFont = FONT_PRESETS.includes(input.displayFont) ? input.displayFont : current.data.displayFont ?? 'system';
-    const mainColor = assertThemeColor(input.mainColor ?? current.data.mainColor ?? DEFAULT_THEME_COLOR);
-    if (fontScale < 0.9 || fontScale > 1.2) throw new Error('整體字級必須介於 0.9～1.2。');
-    if (smallTextScale < 0.9 || smallTextScale > 1.35) throw new Error('小字比例必須介於 0.9～1.35。');
+    const fontScale = Number(input.fontScale ?? current.data.fontScale ?? APPEARANCE_DEFAULTS.fontScale);
+    const smallTextScale = Number(input.smallTextScale ?? current.data.smallTextScale ?? APPEARANCE_DEFAULTS.smallTextScale);
+    const bodyFont = FONT_PRESETS.includes(input.bodyFont) ? input.bodyFont : current.data.bodyFont ?? APPEARANCE_DEFAULTS.bodyFont;
+    const displayFont = FONT_PRESETS.includes(input.displayFont) ? input.displayFont : current.data.displayFont ?? APPEARANCE_DEFAULTS.displayFont;
+    const mainColor = assertThemeColor(input.mainColor ?? current.data.mainColor ?? APPEARANCE_DEFAULTS.mainColor);
+    if (fontScale < APPEARANCE_RANGES.fontScale.minimum || fontScale > APPEARANCE_RANGES.fontScale.maximum) throw new Error('整體字級必須介於 0.9～1.2。');
+    if (smallTextScale < APPEARANCE_RANGES.smallTextScale.minimum || smallTextScale > APPEARANCE_RANGES.smallTextScale.maximum) throw new Error('小字比例必須介於 0.9～1.35。');
     const {
       name: _legacyName,
       archiveLabel: _legacyArchiveLabel,
@@ -266,7 +270,7 @@ export async function saveStudioProfile(projectRoot, input) {
       location: assertDisplayText(input.location, '地點', { max: 100 }) || undefined,
       avatar: assertImageSource(input.avatar, '頭像') || undefined,
       background: assertImageSource(input.background, '背景圖片') || undefined,
-      sectionsLayout: ['list', 'grid'].includes(input.sectionsLayout) ? input.sectionsLayout : 'grid',
+      sectionsLayout: ['list', 'grid'].includes(input.sectionsLayout) ? input.sectionsLayout : APPEARANCE_DEFAULTS.sectionsLayout,
       bodyFont,
       displayFont,
       mainColor,
@@ -540,10 +544,14 @@ export async function saveStudioSocialOrder(projectRoot, input) {
   }));
 }
 
-export async function applyProfileAnswers(projectRoot, rawInput) {
-  const input = validateProfileAnswers(rawInput);
+export async function applyProfileAnswers(projectRoot, rawInput, options = {}) {
   const current = await loadStudioContent(projectRoot);
-  await saveStudioProfile(projectRoot, {
+  const resolved = options.answers && options.updateKeys
+    ? { answers: options.answers, updateKeys: new Set(options.updateKeys) }
+    : resolveProfileAnswerUpdate(createProfileAnswersFromStudioContent(current), rawInput, options.mode);
+  const input = resolved.answers;
+  const updates = resolved.updateKeys;
+  if (updates.has('identity') || updates.has('media') || updates.has('appearance')) await saveStudioProfile(projectRoot, {
     ...current.profile,
     displayName: input.identity.displayName,
     title: input.identity.title,
@@ -556,12 +564,14 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
     bodyFont: input.appearance.bodyFont,
     displayFont: input.appearance.displayFont,
     mainColor: input.appearance.mainColor,
+    fontScale: input.appearance.fontScale,
+    smallTextScale: input.appearance.smallTextScale,
   });
 
-  for (const link of current.links.filter((item) => item.data.group === 'social')) {
+  if (updates.has('socials')) for (const link of current.links.filter((item) => item.data.group === 'social')) {
     await setVisible(projectRoot, 'links', link.id, false);
   }
-  for (const [index, social] of input.socials.entries()) {
+  if (updates.has('socials')) for (const [index, social] of input.socials.entries()) {
     await upsertMarkdown(projectRoot, 'links', `generated-social-${social.service}`, {
       title: social.title,
       url: social.url,
@@ -574,13 +584,13 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
     }, '');
   }
 
-  for (const link of current.links.filter((item) => item.id.startsWith('generated-link-'))) {
+  if (updates.has('links')) for (const link of current.links.filter((item) => item.id.startsWith('generated-link-'))) {
     await setVisible(projectRoot, 'links', link.id, false);
   }
-  for (const link of current.links.filter((item) => STARTER_LINKS.has(item.id))) {
+  if (updates.has('links')) for (const link of current.links.filter((item) => STARTER_LINKS.has(item.id))) {
     await setVisible(projectRoot, 'links', link.id, false);
   }
-  for (const [index, link] of input.links.entries()) {
+  if (updates.has('links')) for (const [index, link] of input.links.entries()) {
     await upsertMarkdown(projectRoot, 'links', `generated-link-${link.id}`, {
       title: link.title,
       url: link.url,
@@ -594,12 +604,12 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
     }, link.description);
   }
 
-  for (const section of current.sections) {
+  if (updates.has('sections')) for (const section of current.sections) {
     if (STARTER_SECTIONS.has(section.id) || section.id.startsWith('generated-')) {
       await setVisible(projectRoot, 'sections', section.id, false);
     }
   }
-  for (const [index, section] of input.sections.entries()) {
+  if (updates.has('sections')) for (const [index, section] of input.sections.entries()) {
     await upsertMarkdown(projectRoot, 'sections', `generated-${section.id}`, {
       title: section.title,
       slug: section.id,
@@ -611,10 +621,10 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
     }, section.description);
   }
 
-  for (const block of current.blocks.filter((item) => item.id.startsWith('generated-image-'))) {
+  if (updates.has('imageBlocks')) for (const block of current.blocks.filter((item) => item.id.startsWith('generated-image-'))) {
     await setVisible(projectRoot, 'blocks', block.id, false);
   }
-  for (const [index, block] of input.imageBlocks.entries()) {
+  if (updates.has('imageBlocks')) for (const [index, block] of input.imageBlocks.entries()) {
     await upsertMarkdown(projectRoot, 'blocks', `generated-image-${block.id}`, {
       title: block.title,
       placement: block.placement,
@@ -630,10 +640,10 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
     }, block.description);
   }
 
-  for (const block of current.blocks.filter((item) => item.data.layout === 'embed')) {
+  if (updates.has('embedBlocks')) for (const block of current.blocks.filter((item) => item.data.layout === 'embed')) {
     await setVisible(projectRoot, 'blocks', block.id, false);
   }
-  for (const [index, block] of input.embedBlocks.entries()) {
+  if (updates.has('embedBlocks')) for (const [index, block] of input.embedBlocks.entries()) {
     await upsertMarkdown(projectRoot, 'blocks', `generated-embed-${block.id}`, {
       title: block.title,
       placement: 'after-sections',
@@ -648,7 +658,7 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
     }, block.description);
   }
 
-  if (input.playlist) {
+  if (updates.has('playlist') && input.playlist) {
     await upsertMarkdown(projectRoot, 'blocks', 'turntable', {
       title: input.playlist.title,
       placement: 'after-sections',
@@ -660,10 +670,10 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
       continuousPlayback: true,
       tags: [],
     }, input.playlist.description);
-  } else {
+  } else if (updates.has('playlist')) {
     await setVisible(projectRoot, 'blocks', 'turntable', false);
   }
-  if (input.fortune) {
+  if (updates.has('fortune') && input.fortune) {
     await upsertMarkdown(projectRoot, 'blocks', 'fortune', {
       title: input.fortune.title,
       placement: 'after-sections',
@@ -673,22 +683,28 @@ export async function applyProfileAnswers(projectRoot, rawInput) {
       tags: [],
     }, input.fortune.description);
     await replaceFortuneBucket(projectRoot, input.fortune.fortunes);
-  } else {
+  } else if (updates.has('fortune')) {
+    await setVisible(projectRoot, 'blocks', 'fortune', input.features.fortune);
+  } else if (updates.has('features')) {
     await setVisible(projectRoot, 'blocks', 'fortune', input.features.fortune);
   }
-  const nextContent = await loadStudioContent(projectRoot);
-  const homeVisibility = [];
-  if (nextContent.sections.some((section) => section.data.visible)) homeVisibility.push('about');
-  if (nextContent.blocks.some((block) => block.id === 'turntable' && block.data.visible)) homeVisibility.push('turntable');
-  if (nextContent.links.some((link) => ['main', 'featured'].includes(link.data.group) && link.data.visible)) homeVisibility.push('links');
-  if (nextContent.blocks.some((block) => block.id === 'fortune' && block.data.visible)) homeVisibility.push('fortune');
-  if (nextContent.blocks.some((block) => block.data.layout === 'embed' && block.data.visible)) homeVisibility.push('notion');
-  await saveHomeSettings(projectRoot, {
-    homeOrder: input.appearance.homeOrder,
-    homeVisibility,
-    aboutHeading: current.profile.aboutHeading,
-    linksHeading: current.profile.linksHeading,
-  });
+  const homeSettingsChanged = ['appearance', 'links', 'sections', 'embedBlocks', 'playlist', 'fortune', 'features']
+    .some((key) => updates.has(key));
+  if (homeSettingsChanged) {
+    const nextContent = await loadStudioContent(projectRoot);
+    const homeVisibility = [];
+    if (nextContent.sections.some((section) => section.data.visible)) homeVisibility.push('about');
+    if (nextContent.blocks.some((block) => block.id === 'turntable' && block.data.visible)) homeVisibility.push('turntable');
+    if (nextContent.links.some((link) => ['main', 'featured'].includes(link.data.group) && link.data.visible)) homeVisibility.push('links');
+    if (nextContent.blocks.some((block) => block.id === 'fortune' && block.data.visible)) homeVisibility.push('fortune');
+    if (nextContent.blocks.some((block) => block.data.layout === 'embed' && block.data.visible)) homeVisibility.push('notion');
+    await saveHomeSettings(projectRoot, {
+      homeOrder: input.appearance.homeOrder,
+      homeVisibility,
+      aboutHeading: current.profile.aboutHeading,
+      linksHeading: current.profile.linksHeading,
+    });
+  }
   return loadStudioContent(projectRoot);
 }
 

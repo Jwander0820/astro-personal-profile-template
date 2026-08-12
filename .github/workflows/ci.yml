@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build deployable site
+        run: npm run build
+      - name: Verify code and content contracts
+        run: npm run check:quality
+      - name: Verify Studio deployment matrix
+        run: npm run check:studio-deployment
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps --no-shell chromium
+      - name: Verify Profile Studio in Chromium
+        run: npm run check:browser
+      - name: Verify upstream template defaults
+        if: github.repository == 'Jwander0820/astro-personal-profile-template'
+        run: npm run check:template-defaults
+      - name: Reject whitespace errors and generated drift
+        run: git diff --check && git diff --exit-code

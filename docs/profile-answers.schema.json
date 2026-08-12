@@ -18,14 +18,42 @@
   },
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "identity"],
+  "required": ["version"],
+  "allOf": [
+    {
+      "if": {
+        "required": ["applyMode"],
+        "properties": { "applyMode": { "const": "merge" } }
+      },
+      "else": {
+        "required": ["identity"],
+        "properties": {
+          "identity": { "required": ["displayName"] }
+        },
+        "allOf": [
+          {
+            "if": { "required": ["fortune"] },
+            "then": {
+              "properties": {
+                "fortune": { "required": ["fortunes"] }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
   "properties": {
     "$schema": { "type": "string" },
     "version": { "const": 1 },
+    "applyMode": {
+      "enum": ["merge", "replace"],
+      "default": "replace",
+      "description": "replace 會以回答檔取代可管理集合；merge 只更新回答檔明確提供的頂層欄位。"
+    },
     "identity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["displayName"],
       "properties": {
         "displayName": { "type": ["string", "number"], "minLength": 1, "maxLength": 80 },
         "title": { "type": ["string", "number"], "maxLength": 120 },
@@ -124,7 +152,7 @@
           "title": { "type": ["string", "number"], "minLength": 1, "maxLength": 80 },
           "url": {
             "type": "string",
-            "maxLength": 5000,
+            "maxLength": 2048,
             "description": "公開 http(s) 網址，或從 Notion／YouTube 複製的 iframe 程式碼；儲存時會正規化為網址",
             "anyOf": [
               { "format": "uri", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://" },
@@ -160,7 +188,6 @@
     "fortune": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fortunes"],
       "properties": {
         "title": { "type": ["string", "number"], "maxLength": 80, "default": "今日手氣" },
         "description": { "type": ["string", "number"], "maxLength": 500, "default": "搖一搖，抽走今天的一點好運。" },
@@ -192,10 +219,12 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "sectionsLayout": { "enum": ["grid", "list"], "default": "grid" },
+        "sectionsLayout": { "enum": ["grid", "list"], "default": "list" },
         "bodyFont": { "enum": ["system", "noto-sans-tc", "noto-serif-tc", "lxgw-wenkai-tc"], "default": "system" },
         "displayFont": { "enum": ["system", "noto-sans-tc", "noto-serif-tc", "lxgw-wenkai-tc"], "default": "system" },
         "mainColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "default": "#7A58A6" },
+        "fontScale": { "type": "number", "minimum": 0.9, "maximum": 1.2, "default": 1 },
+        "smallTextScale": { "type": "number", "minimum": 0.9, "maximum": 1.35, "default": 1 },
         "homeOrder": {
           "type": "array",
           "minItems": 5,

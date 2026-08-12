@@ -59,3 +59,11 @@ GitHub Pages 是靜態主機，無法安全地在公開頁面直接改 repositor
 - 新增全新視覺 block 時，才修改 Astro component 與 CSS。
 - 所有寫入路徑必須限制於 `src/content` 或 `public/images`。
 - AI 產生的檔案使用 `generated-` 前綴，讓重複套用可預測，並避免刪除手寫檔案。
+
+## v1.3 專案更新介面
+
+`scripts/profile-contract.mjs` 集中管理答案版本、apply mode、外觀預設、數值範圍與共用 enum。`profile-answers.mjs` 負責把完整 replace 文件或部分 merge patch 解析成已驗證答案與 update key 集合。
+
+`scripts/profile-project.mjs` 是本機寫入的深模組：它驗證圖片、建立 `src/content` 與 `public/images` 暫存副本、配置不覆蓋的檔名、執行 content writer、輸出帶 token 的唯讀 plan，最後以 project-level queue 和 atomic writes 提交。apply 必須帶回使用者確認的 plan token；若底層內容或套用結果已改變，就要求重新預覽。Studio 只透過 `/api/project/plan` 與 `/api/project/apply` 使用這個介面。
+
+前端 `src/scripts/studio-media.js` 封裝 IndexedDB 與圖片序列化，`src/scripts/studio-project.js` 封裝本機 plan/apply transport；`online-studio.js` 保留編輯狀態與 UI 協調，不再自行逐檔寫入。

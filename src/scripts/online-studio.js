@@ -1,12 +1,21 @@
 import {
+  APPEARANCE_DEFAULTS,
   previewProfileAnswers,
+  resolveProfileAnswerUpdate,
   serializeProfileAnswers,
-  validateProfileAnswers,
 } from '../../scripts/profile-answers.mjs';
 import { normalizeThemeColor } from '../../scripts/theme-color.mjs';
 import { normalizeEmbedSource } from '../../scripts/embed-source.mjs';
 import { icons } from '../lib/icons';
 import { createSettingsZip, readSettingsZip } from './settings-package.js';
+import {
+  clearStoredMedia,
+  readStoredMedia,
+  registerStudioImage,
+  serializeStudioImages,
+  writeStoredMedia,
+} from './studio-media.js';
+import { applyProjectPlan, formatProjectPlan, requestProjectPlan } from './studio-project.js';
 
 const STORAGE_KEY = 'profile-online-studio-draft-v2';
 const HOME_LABELS = {
@@ -198,6 +207,9 @@ function safeDraft(value) {
 
 function normalizeDraft(value, fallback = {}) {
   const draft = clone(value);
+  draft.appearance ||= clone(APPEARANCE_DEFAULTS);
+  draft.appearance.fontScale ??= APPEARANCE_DEFAULTS.fontScale;
+  draft.appearance.smallTextScale ??= APPEARANCE_DEFAULTS.smallTextScale;
   draft.media ||= { avatar: '/images/avatar.svg', background: '/images/background.svg' };
   draft.media.avatar ||= '/images/avatar.svg';
   draft.media.background ||= '/images/background.svg';
@@ -218,13 +230,6 @@ function uniqueDraftId(items, field, preferred) {
   return `${preferred}-${suffix}`;
 }
 
-function safeImageName(name) {
-  const extension = name.toLowerCase().match(/\.(png|jpe?g|webp|gif)$/)?.[0] || '.png';
-  const base = name.slice(0, -extension.length).toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'profile-image';
-  return `${base}${extension === '.jpeg' ? '.jpg' : extension}`;
-}
-
 function iconSvg(name) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
@@ -233,57 +238,6 @@ function iconSvg(name) {
   template.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg">${icons[name] || icons.arrow}</svg>`;
   svg.append(...template.content.firstElementChild.childNodes);
   return svg;
-}
-
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-}
-
-function openMediaDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('profile-online-studio-media-v1', 1);
-    request.onupgradeneeded = () => request.result.createObjectStore('media', { keyPath: 'path' });
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function writeStoredMedia(path, blob) {
-  const database = await openMediaDatabase();
-  await new Promise((resolve, reject) => {
-    const transaction = database.transaction('media', 'readwrite');
-    transaction.objectStore('media').put({ path, blob });
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error);
-  });
-  database.close();
-}
-
-async function readStoredMedia() {
-  const database = await openMediaDatabase();
-  const entries = await new Promise((resolve, reject) => {
-    const request = database.transaction('media').objectStore('media').getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-  database.close();
-  return entries;
-}
-
-async function clearStoredMedia() {
-  const database = await openMediaDatabase();
-  await new Promise((resolve, reject) => {
-    const transaction = database.transaction('media', 'readwrite');
-    transaction.objectStore('media').clear();
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error);
-  });
-  database.close();
 }
 
 export function mountOnlineStudio() {
@@ -578,18 +532,7 @@ export function mountOnlineStudio() {
   }
 
   async function registerImage(file, assign) {
-    if (!file.type.match(/^image\/(png|jpeg|webp|gif)$/)) throw new Error('僅支援 PNG、JPG、WebP 或 GIF。');
-    if (file.size > 5 * 1024 * 1024) throw new Error('單張圖片不可超過 5 MB。');
-    let name = safeImageName(file.name);
-    let path = `/images/${name}`;
-    let suffix = 2;
-    while (imageFiles.has(path)) {
-      const dot = name.lastIndexOf('.');
-      path = `/images/${name.slice(0, dot)}-${suffix}${name.slice(dot)}`;
-      suffix += 1;
-    }
-    imageFiles.set(path, file);
-    await writeStoredMedia(path, file);
+    const path = await registerStudioImage(file, imageFiles);
     const previousUrl = objectUrls.get(path);
     if (previousUrl) URL.revokeObjectURL(previousUrl);
     objectUrls.set(path, URL.createObjectURL(file));
@@ -599,8 +542,12 @@ export function mountOnlineStudio() {
   }
 
   async function importJsonText(text) {
-    const imported = validateProfileAnswers(JSON.parse(text));
-    state = normalizeDraft({ $schema: './docs/profile-answers.schema.json', ...imported }, initialAnswers);
+    const imported = resolveProfileAnswerUpdate(state, JSON.parse(text)).answers;
+    state = normalizeDraft({
+      $schema: './docs/profile-answers.schema.json',
+      ...imported,
+      applyMode: 'replace',
+    }, initialAnswers);
     refreshAll();
   }
 
@@ -631,35 +578,20 @@ export function mountOnlineStudio() {
 
   async function saveToProject() {
     if (!localMode) return;
-    const replacements = new Map();
     try {
       saveProjectButton.disabled = true;
-      status.textContent = '正在儲存圖片與設定…';
-      for (const [path, blob] of imageFiles) {
-        const response = await fetch(`${bootstrap.localApiUrl}/api/images`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: path.split('/').pop(), dataUrl: await blobToDataUrl(blob) }),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || '圖片儲存失敗。');
-        replacements.set(path, result.path);
-      }
       const exported = exportAnswers();
       const answers = JSON.parse(exported.content);
-      const replace = (value) => replacements.get(value) || value;
-      answers.media.avatar = replace(answers.media.avatar);
-      answers.media.background = replace(answers.media.background);
-      answers.sections.forEach((item) => { if (item.image) item.image = replace(item.image); });
-      answers.imageBlocks.forEach((item) => { item.image = replace(item.image); });
-      const response = await fetch(`${bootstrap.localApiUrl}/api/answers/apply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(answers),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || '設定儲存失敗。');
-      state = normalizeDraft(answers);
+      const payload = { mode: 'replace', answers, images: await serializeStudioImages(imageFiles) };
+      status.textContent = '正在建立套用計畫…';
+      const plan = await requestProjectPlan(bootstrap.localApiUrl, payload);
+      if (plan.changes.length > 0 && !window.confirm(formatProjectPlan(plan))) {
+        status.textContent = '已取消，專案未變更';
+        return;
+      }
+      status.textContent = '正在一次寫入圖片與設定…';
+      const result = await applyProjectPlan(bootstrap.localApiUrl, { ...payload, expectedPlanToken: plan.token });
+      state = normalizeDraft(result.answers);
       imageFiles.clear();
       await clearStoredMedia();
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
@@ -678,7 +610,7 @@ export function mountOnlineStudio() {
   async function detectLocalAdapter() {
     if (!['localhost', '127.0.0.1'].includes(window.location.hostname)) return;
     try {
-      const response = await fetch(`${bootstrap.localApiUrl}/api/content`, { cache: 'no-store' });
+      const response = await fetch(`${bootstrap.localApiUrl}/api/status`, { cache: 'no-store' });
       if (!response.ok) return;
       localMode = true;
       saveProjectButton.hidden = false;
@@ -725,6 +657,7 @@ export function mountOnlineStudio() {
       : control.dataset.list !== undefined
         ? splitList(control.value, 6)
         : control.value;
+    if (control.dataset.number !== undefined) value = Number(control.value);
     if (control.type === 'color') value = normalizeThemeColor(value) || value;
     setPath(state, control.dataset.bind, value);
     if (control.dataset.bind === 'appearance.mainColor') {

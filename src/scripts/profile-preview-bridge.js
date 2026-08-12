@@ -34,6 +34,8 @@ if (window.parent !== window) {
     const mainColor = normalizeThemeColor(answers?.appearance?.mainColor) || '#7A58A6';
     const themeStyle = document.querySelector('#profile-theme-css');
     if (themeStyle) themeStyle.textContent = buildThemeCss(mainColor);
+    document.documentElement.style.fontSize = `${Number(answers.appearance.fontScale || 1) * 100}%`;
+    document.documentElement.style.setProperty('--small-text-base', `${Number(answers.appearance.smallTextScale || 1)}rem`);
     document.documentElement.style.setProperty('--font-body', FONT_FAMILIES[answers.appearance.bodyFont] || FONT_FAMILIES.system);
     document.documentElement.style.setProperty('--font-display', FONT_FAMILIES[answers.appearance.displayFont] || FONT_FAMILIES.system);
     renderProfileDocument(rendererRoot, answers, {

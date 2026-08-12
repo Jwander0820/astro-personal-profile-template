@@ -1,119 +1,196 @@
-# Astro 個人簡介
+# Astro 個人自介網站模板
 
-以 Astro 製作的靜態個人名片／Link in Bio 網站。採行動優先設計，個人資料、連結、首頁內容與自訂區塊都可由 Markdown 管理。
+用 Astro、Markdown 與 JSON 建立可自行託管的個人首頁。你可以用瀏覽器裡的 Profile Studio 視覺化編輯，也能直接維護內容檔或請 AI 協助產生設定。
 
-可參考的範例 https://jwander0820.github.io/astro-personal-profile-template/
+[線上示範](https://jwander0820.github.io/astro-personal-profile-template/) · [常見問題](docs/FAQ.md) · [自訂指南](docs/CUSTOMIZATION_GUIDE.md)
 
-## 本機開發
+## 快速開始
 
-請先安裝 Node.js 22.12 以上版本（一般 Node.js 安裝程式會一併安裝 npm）。
+需求：Node.js 22.12 以上版本與 npm。
+
+先 fork 或使用 GitHub 的「Use this template」建立自己的 repository，再把下列 `USERNAME` 與 `REPOSITORY` 換成自己的資料：
 
 ```bash
+git clone https://github.com/USERNAME/REPOSITORY.git
+cd REPOSITORY
 npm install
 npm run dev
 ```
 
-開發伺服器預設位於 `http://localhost:4321`。
+開啟 `http://localhost:4321` 查看網站。
 
-### 使用統一的 Profile Studio
+接著選一條最適合你的設定方式。
 
-在允許公開 Studio 的 GitHub repository／網站部署後，正式首頁的 Links 會多一張「建立你的自介網站」卡片，頁尾也保留小型入口；兩者都會前往同站的 `/studio/`。這兩個入口屬於範本導覽，不是個人資料，因此 Studio 右側預覽會省略它們。這個版本可在手機或瀏覽器中：
+### 路徑 A：直接使用網頁版 Profile Studio
 
-- 從目前網站內容開始修改顯示名稱、自介、公開連結、卡片、圖片板塊、播放清單與外觀。
-- 以正式首頁、同一套 CSS 與 SVG Icons 即時切換寬／窄版預覽。
-- 上傳頭像、封面及內容圖片，或貼上公開 HTTPS 圖片網址；圖片草稿會連同文字保留在目前瀏覽器。
-- 直接操作正式唱盤播放器，確認播放清單與頁面上的實際效果。
-- 在正式預覽中直接試抽「今日手氣」，確認互動與實際網站一致。
-- 透過頂端 route 在個人檔案、籤詩編輯器與 Icon 預覽之間切換，不會另開分頁。
-- 編輯今日手氣標題、說明與完整籤桶；內容會納入 JSON／ZIP 匯出匯入。
-- 在「其它功能」新增網頁內嵌卡片，可直接貼 Notion／YouTube iframe 程式碼或公開網址；Studio 會取出安全網址與高度，再納入 JSON／ZIP 與本機專案。
-- 匯入既有 JSON、AI 討論產生的 `profile.answers.json`，或包含圖片的 Studio ZIP 設定包。
-- 在「完成設定」下載完整 ZIP、下載／複製純 JSON、匯入設定或還原預設；本機模式也在同一處儲存到專案。
+開啟開發伺服器的 `/studio/`，依照六個步驟編輯並即時預覽正式首頁：
 
-公開網站上的 Studio 是純前端設定產生器，不會寫入 repository、修改 GitHub 或自動發布，也不會把草稿上傳到伺服器。純 JSON 只包含文字、圖片路徑與圖片網址，不包含從裝置上傳的圖片檔；使用自訂上傳圖片時請下載完整 ZIP。若只有 JSON，仍可把 `profile.answers.json` 放到專案根目錄後執行：
+1. 基本身份
+2. 公開連結
+3. 自介內容
+4. 外觀
+5. 其他功能
+6. 完成設定
 
-```bash
-npm run profile:apply -- profile.answers.json
-```
+網頁版只把草稿保存在瀏覽器的 localStorage 與 IndexedDB，不會存取 GitHub 或自動上傳。完成後下載 `profile-settings.zip` 或 `profile.answers.json`。
 
-### 在本機直接儲存
+若部署後看不到 Studio，請參考[部署模式說明](#profile-studio-部署模式)；未設定 allowlist 的 fork 在 `auto` 模式下預設不公開 Studio。
 
-需要直接寫入 Markdown 與圖片時，用同一個 `/studio/` 介面啟動本機模式：
+### 路徑 B：本機 Profile Studio 直接寫入專案
 
-Windows 可直接雙擊專案根目錄的 `start-studio.cmd`，首次啟動時會自動安裝專案所需套件。也可以在 PowerShell／CMD 執行：
+Windows 可執行：
 
 ```powershell
 .\start-studio.cmd
 ```
 
-也可以在 Windows 使用 `npm.cmd run studio`；其他環境使用 `npm run studio`。
-
-前往 `http://localhost:4321/studio/`。畫面會自動偵測只綁定 loopback 的背景寫入服務，顯示「儲存到專案」；按下後才會更新 `src/content/**` 與 `public/images/`。`4322` 不再提供另一套 UI，只是 `/studio/` 在本機使用的背景 API。
-
-正式部署預設使用 `ONLINE_STUDIO_MODE=auto`：本機永遠可使用 Studio，線上則只有 `ONLINE_STUDIO_ALLOWED_REPOSITORIES` 或 `ONLINE_STUDIO_ALLOWED_SITES` 精確列出的目標會產生 `/studio/`、`/studio/fortune-poem/`、`/studio/icons/`、Links 卡片與頁尾入口。GitHub Actions 目前只預先允許 `Jwander0820/astro-personal-profile-template`；fork 後的 `owner/repository` 不相同，所以別人的正式網站預設不會出現 Studio 路由或入口。
-
-```text
-ONLINE_STUDIO_MODE=auto
-ONLINE_STUDIO_ALLOWED_REPOSITORIES=Jwander0820/astro-personal-profile-template
-ONLINE_STUDIO_ALLOWED_SITES=https://jwander0820.github.io/astro-personal-profile-template
-```
-
-要在自己的 fork 主動開放，可在 repository 的 **Settings → Secrets and variables → Actions → Variables** 新增 `ONLINE_STUDIO_ALLOWED_REPOSITORIES=你的帳號/你的repository`；自訂網域則可改用 `ONLINE_STUDIO_ALLOWED_SITES`。`public` 可讓任何部署保留 Studio；`off` 會從所有正式建置移除 Studio。這些值是公開的建置規則，不是密碼或登入保護。
-
-目前 Studio 路由的原始碼會一直保留，因為本機開發與允許公開的部署都要共用它。Astro 採檔案式路由，正式建置時會先產生這些頁面；若部署規則判定為關閉，`astro:build:done` 才從該次建置輸出移除 `studio/`。這不是舊版 4322 Studio 殘留，也不代表關閉後仍能連到 Studio；部署矩陣測試會直接檢查最終輸出、首頁卡片與頁尾入口是否一致。
-
-維護 Studio 或部署規則時，可執行：
+或在任何平台執行：
 
 ```bash
+npm run studio
+```
+
+再開啟 `http://localhost:4321/studio/`。本機模式仍使用同一個 Studio 頁面，但會顯示「儲存到專案」按鈕。
+
+儲存前會先：
+
+- 驗證完整設定與圖片格式。
+- 顯示即將新增或更新的檔案清單。
+- 避免同名圖片覆蓋既有檔案。
+- 將內容與圖片視為一次交易；失敗時不留下部分更新。
+- 保留內容未變檔案的 mtime，避免製造假 Git diff。
+
+4322 只是一個 loopback API adapter，不是第二套 Studio UI，也不會被輸出到靜態網站。
+
+### 路徑 C：設定檔、Markdown 或 AI
+
+第一次建立自介時，建議複製範例：
+
+```bash
+cp profile.answers.example.json profile.answers.json
+npm run profile:plan -- profile.answers.json
+npm run profile:apply -- profile.answers.json
+npm run build
+```
+
+Windows PowerShell 可將 `cp` 改為 `Copy-Item`。若系統封鎖 npm 的 `.ps1` shim，請改用 `npm.cmd`。
+
+`profile.answers.json` 已列入 `.gitignore`，適合保存可能含個人資訊的工作檔。真正公開的來源是：
+
+- `src/content/profile/main.md`：基本身份與全站外觀
+- `src/content/links/*.md`：社群與精選連結
+- `src/content/sections/*.md`：About me 卡片
+- `src/content/blocks/*.md`：播放清單、圖片、籤詩與嵌入內容
+- `public/images/`：上傳到專案的圖片
+
+若要請 AI 引導設定，先閱讀 [AI Profile Setup](docs/AI_PROFILE_SETUP.md) 與 [provider-neutral 訪談提示](docs/ai/PROFILE_INTERVIEW_PROMPT.md)。所有個人欄位除了顯示名稱以外都可省略；AI 不應猜測你的地點、email、雇主或私人網址。
+
+## replace 與 merge
+
+答案檔可用 `applyMode` 說明套用方式：
+
+```json
+{
+  "version": 1,
+  "applyMode": "merge",
+  "identity": {
+    "title": "新的短標題"
+  }
+}
+```
+
+- `replace`（預設）：答案檔代表完整狀態；省略的可選欄位會依契約預設重設，而不是保留既有值。適合首次設定、Studio 匯出與完整搬移。
+- `merge`：只更新答案檔明確提供的頂層欄位；沒有提供的社群、連結、區塊與外觀維持原狀。適合小幅自動化更新。
+
+先執行 `npm run profile:plan -- profile.answers.json` 可查看檔案變更，不會寫入專案。CLI 的 `--mode=merge` 或 `--mode=replace` 會覆蓋答案檔內的模式。
+
+完整格式見 [JSON Schema](docs/profile-answers.schema.json) 與 [內容模型](docs/PROFILE_CONTENT_MODEL.md)。
+
+## 圖片與隱私
+
+圖片欄位只接受：
+
+- `/images/` 下的安全專案路徑
+- 公開的 `https://` 圖片網址
+- Studio 上傳的 PNG、JPEG、WebP 或 GIF（單檔最多 5 MB）
+
+獨立 JSON 不含圖片二進位；ZIP 設定包才會攜帶 Studio 上傳的圖片。
+
+執行 build、commit 或發布前，請特別檢查即將公開的地點、email、雇主資訊與私人專案網址。不要把 token、密碼或 API key 放進 Markdown、JSON 或公開環境變數。
+
+## 驗證
+
+一般自介使用者至少執行：
+
+```bash
+npm run build
+```
+
+維護模板或修改 Studio 時執行：
+
+```bash
+npm run check:quality
 npm run check:studio-deployment
 npm run check:browser:install
 npm run check:browser
+npm run check:template-defaults
 ```
 
-第一個指令以實際 Astro 建置驗證 `auto`、精確 allowlist、`public` 與 `off`；後兩個指令安裝測試用 Chromium，並自動驗證 Studio 預覽、互動狀態、HTTPS 圖片、完成設定與 390 px 畫面。
+上游 repository 的 pull request 與 `main` 都有阻擋式 CI；任何 build、契約、部署矩陣、瀏覽器測試或模板預設檢查失敗都不會被當成成功。
 
+## 部署
 
-### 讓 AI 引導建立自介
+### GitHub Pages
 
-若不熟悉程式，可以先 fork／clone 到自己的 repository，再把專案交給 Codex 或其他具備檔案、終端機與 Git 存取能力的 coding agent。若只想建立並檢查內容，輸入：
+1. 在 repository 的 **Settings → Pages → Build and deployment** 選擇 **GitHub Actions**。
+2. 確認 `origin` 是你自己的 fork，不是上游模板。
+3. 將已檢查的公開內容推到 `main`。
+4. 確認 `CI` workflow 成功，並等待 `.github/workflows/deploy.yml` 完成 build 與部署。
+
+workflow 會依 GitHub repository 名稱計算 Astro 的 `site` 與 `base`。如果你的正式網域不同，可設定 repository variable `SITE_URL`。
+
+### Cloudflare Pages
+
+Build command 使用 `npm run build`，輸出目錄使用 `dist`，Node.js 使用 22。詳細設定見 [Cloudflare Pages 指南](docs/CLOUDFLARE_PAGES.md)。
+
+## Profile Studio 部署模式
+
+`ONLINE_STUDIO_MODE` 支援：
+
+- `auto`：本機開發永遠可用；正式 build 只在 repository 或 site 精確符合 allowlist 時輸出 Studio。
+- `public`：正式 build 一律輸出 Studio。
+- `off`：正式 build 不輸出 Studio。
+
+GitHub Actions variables 範例：
 
 ```text
-請依照 AGENTS.md 的個人自介流程訪談我，產生 profile.answers.json、套用內容並執行 build。沒有得到答案的選填資料請留空，不要自行杜撰。
+ONLINE_STUDIO_MODE=auto
+ONLINE_STUDIO_ALLOWED_REPOSITORIES=your-name/your-repository
+ONLINE_STUDIO_ALLOWED_SITES=https://example.com
 ```
 
-若希望由同一個 Agent 一站式處理內容與 GitHub Pages 發布，輸入：
+這是 build 規則，不是身份驗證。公開 Studio 仍只編輯瀏覽器本地草稿，不具備 repository 寫入能力。
 
-```text
-請依照 AGENTS.md 訪談我建立個人自介，完成內容套用與 build。Build 成功後，請列出即將公開的個人資料與 Git 變更摘要並等待我確認；只有得到確認後，才檢查 origin、commit、push 並回報 GitHub Pages 結果。不要提交 profile.answers.json，也不要把個人資料推到上游模板 repository。
-```
+## 專案架構
 
-這個模式仍會在 push 前停下來確認即將公開的姓名、地點、email 與連結；第一次部署所需的 GitHub 設定請見下方部署說明。
+正式 Astro components 與 `src/scripts/profile-renderer.js` 是同一份可見文件的兩個 renderer 入口；Studio iframe 直接載入正式首頁，不維護模擬預覽。
 
-AI 問答、空白填寫模板與完整發布流程請見 [`docs/AI_PROFILE_SETUP.md`](docs/AI_PROFILE_SETUP.md)。只有一般聊天介面、不能存取 repository 的 AI，可使用 [provider-neutral 訪談提示詞](docs/ai/PROFILE_INTERVIEW_PROMPT.md) 產生 JSON，再貼到 Profile Studio。
+答案檔、內容 schema、Studio UI、project writer 與 renderer 共享同一組契約。新增設定欄位時必須同步涵蓋：
 
-不確定 Studio、fork、JSON／ZIP、圖片、AI 或發布該怎麼操作時，先看 [`docs/FAQ.md`](docs/FAQ.md)。
+- Astro content schema
+- 答案驗證與 JSON Schema
+- Studio 編輯控制項
+- 本機 writer 與 preview bridge
+- 正式 renderer
+- UI、工具與瀏覽器回歸測試
 
+更深入的邊界與檔案對照見 [Profile Content Model](docs/PROFILE_CONTENT_MODEL.md)。
 
-## 修改內容
+## 參與開發與安全回報
 
-- 個人資料：`src/content/profile/main.md`
-- 連結：`src/content/links/*.md`
-- 首頁區塊：`src/content/sections/*.md`
-- 自訂區塊：`src/content/blocks/*.md`
-- 圖片：`public/images/`
+- 提交問題或功能需求前，請閱讀 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- 安全問題請依 [SECURITY.md](SECURITY.md) 使用 GitHub 私密漏洞回報，不要把敏感細節放在公開 issue。
+- 版本差異見 [CHANGELOG.md](CHANGELOG.md)。
+- 從 v1.2 升級請見 [v1.3 升級指南](docs/V1_3_UPGRADE.md)。
 
-圖片可以放進 `public/images/` 並使用 `/images/檔名`，也可直接使用公開的 `https://` 圖片網址；外部網站需允許圖片外連。
-
-連結、自訂區塊、圖片板塊、Notion 與黑膠唱盤的欄位和範例，請見 [`docs/CUSTOMIZATION_GUIDE.md`](docs/CUSTOMIZATION_GUIDE.md)。
-
-## GitHub Pages 部署
-
-在 fork 中啟用 **Actions**，並到 **Settings → Pages → Build and deployment** 將 Source 設為 **GitHub Actions**。推送至 `main` 後，`.github/workflows/deploy.yml` 會自動建置並發布；`astro.config.mjs` 會依 repository 擁有者與名稱設定正確的 `site` 與 `base`。
-
-部署只以 `npm run build` 的 Astro 診斷、內容驗證與靜態輸出為硬性條件。Studio matrix、Playwright、UI contracts、Profile tools、模板安全與預設內容屬於上游範本維護檢查：它們仍會在上游 Actions 留下結果，但不會阻擋一份可正常建置的網站部署；fork 也不會執行這組範本專用品質鏈。本機維護範本時可另跑 `npm run check:quality`、`npm run check:studio-deployment`、`npm run check:browser` 與 `npm run check:template-defaults`。
-
-## Cloudflare Pages 部署
-
-Cloudflare Pages 使用 `npm run build`、輸出目錄 `dist`，並建議固定使用 Node.js 22。完整設定、`SITE_URL` 與錯誤排除請見 [`docs/CLOUDFLARE_PAGES.md`](docs/CLOUDFLARE_PAGES.md)。
-
-從 `v1.1.x` 升級到 `v1.2.0` 請見 [`docs/V1_2_UPGRADE.md`](docs/V1_2_UPGRADE.md)；從 `0.1.0` 開發基線升級到 V1 的相容性與復原方式，請見 [`docs/V1_UPGRADE.md`](docs/V1_UPGRADE.md)。
+本專案採用 [MIT License](LICENSE)。

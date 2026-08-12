@@ -1,6 +1,7 @@
 {
   "$schema": "./docs/profile-answers.schema.json",
   "version": 1,
+  "applyMode": "replace",
   "identity": {
     "displayName": "你的名字",
     "title": "Developer / Music Explorer",
@@ -95,6 +96,8 @@
     "bodyFont": "noto-sans-tc",
     "displayFont": "noto-serif-tc",
     "mainColor": "#7A58A6",
+    "fontScale": 1,
+    "smallTextScale": 1,
     "homeOrder": ["about", "links", "turntable", "fortune", "notion"]
   }
 }

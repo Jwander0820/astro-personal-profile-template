@@ -203,6 +203,16 @@ const previewHref = withStudioPreviewQuery(withBase('/'));
                   <option value="lxgw-wenkai-tc">LXGW WenKai TC</option>
                 </select>
               </label>
+              <label class="field">
+                <span>整體字級比例</span>
+                <input type="number" min="0.9" max="1.2" step="0.05" data-bind="appearance.fontScale" data-number />
+                <small>0.9～1.2，預設為 1。</small>
+              </label>
+              <label class="field">
+                <span>小字比例</span>
+                <input type="number" min="0.9" max="1.35" step="0.05" data-bind="appearance.smallTextScale" data-number />
+                <small>調整說明、標籤與頁尾文字，預設為 1。</small>
+              </label>
             </div>
 
             <div class="appearance-card">

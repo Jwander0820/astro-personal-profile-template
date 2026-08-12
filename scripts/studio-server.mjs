@@ -1,34 +1,18 @@
 import { createServer } from 'node:http';
 import { Buffer } from 'node:buffer';
-import { readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import {
-  applyProfileAnswers,
-  createStudioImageBlock,
-  createStudioSection,
-  createStudioLink,
-  loadStudioContent,
-  previewProfileAnswers,
-  saveHomeSettings,
-  saveStudioBlock,
-  saveStudioImageBlock,
-  saveStudioLink,
-  saveStudioSocialOrder,
-  saveStudioProfile,
-  saveStudioSection,
-} from './profile-content.mjs';
-import { FortuneConflictError, loadFortuneBucket, restoreFortuneBucket, saveFortuneBucket } from './fortune-content.mjs';
+import { saveStudioBlock } from './profile-content.mjs';
+import { FortuneConflictError, loadFortuneBucket, saveFortuneBucket } from './fortune-content.mjs';
 import { resolvePackageBin } from './package-bin.mjs';
+import { applyProfileProjectUpdate, planProfileProjectUpdate } from './profile-project.mjs';
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const studioPort = Number(process.env.STUDIO_PORT || 4322);
 const previewPort = Number(process.env.PORT || 4321);
-const MAX_BODY_SIZE = 7 * 1024 * 1024;
-let iconCatalogPromise;
-let fontOptionsPromise;
+const MAX_BODY_SIZE = 70 * 1024 * 1024;
 let contentRevision = 0;
 
 function corsHeaders(request) {
@@ -57,39 +41,12 @@ async function sendMutation(request, response, status, mutation) {
   sendJson(request, response, status, { ...body, contentRevision });
 }
 
-async function loadIconCatalog() {
-  if (!iconCatalogPromise) {
-    iconCatalogPromise = readFile(path.join(projectRoot, 'src', 'lib', 'icons.ts'), 'utf8').then((source) => {
-      const constants = new Map([...source.matchAll(/const\s+(\w+)\s*=\s*'([^']*)';/g)].map((match) => [match[1], match[2]]));
-      const objectSource = source.match(/export const icons:[^{]+\{([\s\S]*?)\n\};/)?.[1] ?? '';
-      const entries = [...objectSource.matchAll(/^\s*([a-z0-9]+):\s*(?:'([^']*)'|(\w+)),?$/gm)]
-        .map((match) => [match[1], match[2] ?? constants.get(match[3])])
-        .filter((entry) => entry[1]);
-      return Object.fromEntries(entries);
-    });
-  }
-  return iconCatalogPromise;
-}
-
-async function loadFontOptions() {
-  if (!fontOptionsPromise) {
-    fontOptionsPromise = readFile(path.join(projectRoot, 'src', 'data', 'font-presets.json'), 'utf8')
-      .then((source) => JSON.parse(source));
-  }
-  return fontOptionsPromise;
-}
-
-function sendSvg(request, response, body) {
-  response.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'no-store', ...corsHeaders(request) });
-  response.end(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" color="#574967" fill="currentColor">${body}</svg>`);
-}
-
 async function readJson(request) {
   const chunks = [];
   let size = 0;
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > MAX_BODY_SIZE) throw new Error('資料超過 7 MB 上限。');
+    if (size > MAX_BODY_SIZE) throw new Error('資料超過 70 MB 上限。');
     chunks.push(chunk);
   }
   try {
@@ -97,27 +54,6 @@ async function readJson(request) {
   } catch {
     throw new Error('送出的 JSON 格式不正確。');
   }
-}
-
-async function saveImage(input) {
-  if (!input || typeof input.name !== 'string' || typeof input.dataUrl !== 'string') throw new Error('圖片資料不完整。');
-  const match = input.dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
-  if (!match) throw new Error('僅支援 PNG、JPG、WebP 或 GIF。');
-  const imageFormats = {
-    'image/png': { extension: '.png', matches: (buffer) => buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
-    'image/jpeg': { extension: '.jpg', matches: (buffer) => buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff },
-    'image/webp': { extension: '.webp', matches: (buffer) => buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP' },
-    'image/gif': { extension: '.gif', matches: (buffer) => ['GIF87a', 'GIF89a'].includes(buffer.toString('ascii', 0, 6)) },
-  };
-  const format = imageFormats[match[1]];
-  const originalBase = path.basename(input.name, path.extname(input.name));
-  const safeBase = originalBase.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'profile-image';
-  const fileName = `${safeBase}${format.extension}`;
-  const buffer = Buffer.from(match[2], 'base64');
-  if (buffer.length > 5 * 1024 * 1024) throw new Error('圖片不可超過 5 MB。');
-  if (!format.matches(buffer)) throw new Error('圖片內容與宣告格式不一致。');
-  await writeFile(path.join(projectRoot, 'public', 'images', fileName), buffer);
-  return `/images/${fileName}`;
 }
 
 const server = createServer(async (request, response) => {
@@ -134,29 +70,8 @@ const server = createServer(async (request, response) => {
       response.end();
       return;
     }
-    if (request.method === 'GET' && url.pathname === '/api/content') {
-      const [content, icons, fontOptions] = await Promise.all([loadStudioContent(projectRoot), loadIconCatalog(), loadFontOptions()]);
-      sendJson(request, response, 200, { ...content, icons: Object.keys(icons), fontOptions, previewUrl: `http://localhost:${previewPort}/`, contentRevision });
-      return;
-    }
-    if (request.method === 'GET' && url.pathname === '/api/answers/project-file') {
-      try {
-        const content = await readFile(path.join(projectRoot, 'profile.answers.json'), 'utf8');
-        sendJson(request, response, 200, { content, file: 'profile.answers.json' });
-      } catch (error) {
-        if (error.code === 'ENOENT') throw new StudioRequestError(404, '專案根目錄找不到 profile.answers.json；可以改用右側選檔或直接貼上 JSON。');
-        throw error;
-      }
-      return;
-    }
-    const iconMatch = url.pathname.match(/^\/api\/icons\/([a-z0-9]+)\.svg$/);
-    if (request.method === 'GET' && iconMatch) {
-      const icon = (await loadIconCatalog())[iconMatch[1]];
-      if (!icon) {
-        sendJson(request, response, 404, { error: '找不到 Icon。' });
-        return;
-      }
-      sendSvg(request, response, icon);
+    if (request.method === 'GET' && url.pathname === '/api/status') {
+      sendJson(request, response, 200, { local: true, previewUrl: `http://localhost:${previewPort}/`, contentRevision });
       return;
     }
     if (request.method === 'GET' && url.pathname === '/api/fortunes') {
@@ -167,75 +82,28 @@ const server = createServer(async (request, response) => {
       await sendMutation(request, response, 200, saveFortuneBucket(projectRoot, await readJson(request)));
       return;
     }
-    if (request.method === 'POST' && url.pathname === '/api/fortunes/restore') {
-      await sendMutation(request, response, 200, restoreFortuneBucket(projectRoot, await readJson(request)));
+    if (request.method === 'PUT' && url.pathname === '/api/blocks/fortune') {
+      await sendMutation(
+        request,
+        response,
+        200,
+        saveStudioBlock(projectRoot, 'fortune', await readJson(request)).then((block) => ({ block })),
+      );
       return;
     }
-    if (request.method === 'PUT' && url.pathname === '/api/profile') {
-      await sendMutation(request, response, 200, saveStudioProfile(projectRoot, await readJson(request)).then((profile) => ({ profile })));
+    if (request.method === 'POST' && url.pathname === '/api/project/plan') {
+      sendJson(request, response, 200, { plan: await planProfileProjectUpdate(projectRoot, await readJson(request)) });
       return;
     }
-    if (request.method === 'PUT' && url.pathname === '/api/home') {
-      await sendMutation(request, response, 200, saveHomeSettings(projectRoot, await readJson(request)).then((home) => ({ home })));
+    if (request.method === 'POST' && url.pathname === '/api/project/apply') {
+      await sendMutation(request, response, 200, applyProfileProjectUpdate(projectRoot, await readJson(request)));
       return;
     }
-    const blockMatch = url.pathname.match(/^\/api\/blocks\/([a-z0-9-]+)$/);
-    if (request.method === 'PUT' && blockMatch) {
-      await sendMutation(request, response, 200, saveStudioBlock(projectRoot, blockMatch[1], await readJson(request)).then((block) => ({ block })));
-      return;
-    }
-    const imageBlockMatch = url.pathname.match(/^\/api\/image-blocks\/([a-z0-9-]+)$/);
-    if (request.method === 'PUT' && imageBlockMatch) {
-      await sendMutation(request, response, 200, saveStudioImageBlock(projectRoot, imageBlockMatch[1], await readJson(request)).then((block) => ({ block })));
-      return;
-    }
-    if (request.method === 'POST' && url.pathname === '/api/image-blocks') {
-      await sendMutation(request, response, 201, createStudioImageBlock(projectRoot, await readJson(request)).then((block) => ({ block })));
-      return;
-    }
-    const sectionMatch = url.pathname.match(/^\/api\/sections\/([a-z0-9-]+)$/);
-    if (request.method === 'PUT' && sectionMatch) {
-      await sendMutation(request, response, 200, saveStudioSection(projectRoot, sectionMatch[1], await readJson(request)).then((section) => ({ section })));
-      return;
-    }
-    if (request.method === 'POST' && url.pathname === '/api/sections') {
-      await sendMutation(request, response, 201, createStudioSection(projectRoot, await readJson(request)).then((section) => ({ section })));
-      return;
-    }
-    const linkMatch = url.pathname.match(/^\/api\/links\/([a-z0-9-]+)$/);
-    if (request.method === 'PUT' && linkMatch) {
-      await sendMutation(request, response, 200, saveStudioLink(projectRoot, linkMatch[1], await readJson(request)).then((link) => ({ link })));
-      return;
-    }
-    if (request.method === 'PUT' && url.pathname === '/api/social-order') {
-      await sendMutation(request, response, 200, saveStudioSocialOrder(projectRoot, await readJson(request)).then((links) => ({ links })));
-      return;
-    }
-    if (request.method === 'POST' && url.pathname === '/api/links') {
-      await sendMutation(request, response, 201, createStudioLink(projectRoot, await readJson(request)).then((link) => ({ link })));
-      return;
-    }
-    if (request.method === 'POST' && url.pathname === '/api/images') {
-      sendJson(request, response, 201, { path: await saveImage(await readJson(request)) });
-      return;
-    }
-    if (request.method === 'POST' && url.pathname === '/api/answers/validate') {
-      sendJson(request, response, 200, previewProfileAnswers(await readJson(request)));
-      return;
-    }
-    if (request.method === 'POST' && (url.pathname === '/api/answers/apply' || url.pathname === '/api/apply')) {
-      await sendMutation(request, response, 200, applyProfileAnswers(projectRoot, await readJson(request)));
-      return;
-    }
-    if (request.method !== 'GET') {
-      sendJson(request, response, 404, { error: '找不到操作。' });
-      return;
-    }
-    sendJson(request, response, 404, { error: '找不到操作。請開啟 /studio/。' });
+    sendJson(request, response, 404, { error: '找不到此本機 Studio API。' });
   } catch (error) {
     if (!(error instanceof StudioRequestError)) console.error(error);
     const status = error instanceof StudioRequestError || error instanceof FortuneConflictError ? error.status : 400;
-    sendJson(request, response, status, { error: error.message || '操作失敗。' });
+    sendJson(request, response, status, { error: error.message || '未知的錯誤。' });
   }
 });
 

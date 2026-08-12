@@ -102,6 +102,19 @@ test('更新無關欄位會保留唱盤節點與抽籤結果', async ({ page }) 
   await expect(fortune).toHaveClass(/is-revealed/);
 });
 
+test('外觀字級控制會同步到正式預覽', async ({ page }) => {
+  await page.goto('/studio/');
+  await page.locator('#tab-appearance').click();
+  await page.locator('[data-bind="appearance.fontScale"]').fill('1.2');
+  await page.locator('[data-bind="appearance.smallTextScale"]').fill('1.35');
+
+  const previewRoot = page.frameLocator('#profile-preview').locator('html');
+  await expect(previewRoot).toHaveCSS('font-size', '19.2px');
+  await expect.poll(() => previewRoot.evaluate((element) => (
+    element.style.getPropertyValue('--small-text-base')
+  ))).toBe('1.35rem');
+});
+
 test('HTTPS 頭像網址會進入正式預覽', async ({ page }) => {
   const imageUrl = 'https://images.example/avatar.png';
   const onePixelPng = Buffer.from(
@@ -203,6 +216,30 @@ test('其它功能可建立網頁內嵌並匯出設定', async ({ page }) => {
       height: 320,
     }),
   ]);
+});
+
+test('匯入 merge 回答檔只更新指定欄位並轉為完整 Studio 草稿', async ({ page }) => {
+  await page.goto('/studio/');
+  await page.locator('#import-answers').setInputFiles({
+    name: 'profile.merge.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({
+      version: 1,
+      applyMode: 'merge',
+      identity: { title: 'Merged in Studio' },
+    })),
+  });
+
+  await expect(page.locator('[data-bind="identity.title"]')).toHaveValue('Merged in Studio');
+  await expect(page.locator('#featured-link-list .collection-item')).toHaveCount(browserFixtureAnswers.links.length);
+  await page.locator('#tab-finish').click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#download-json').click();
+  const download = await downloadPromise;
+  const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
+  expect(exported.applyMode).toBe('replace');
+  expect(exported.identity.title).toBe('Merged in Studio');
+  expect(exported.links).toHaveLength(browserFixtureAnswers.links.length);
 });
 
 test('06 完成設定可下載 JSON、ZIP 並匯入既有回答檔', async ({ page }) => {

@@ -1,0 +1,52 @@
+name: Bug report
+description: 回報可重現的錯誤或回歸
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 請移除 token、私人網址與個人資料。安全問題請依 SECURITY.md 私密回報。
+  - type: input
+    id: version
+    attributes:
+      label: 版本或 commit
+      placeholder: v1.3.0 或 commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: 發生位置
+      options:
+        - 正式首頁
+        - 公開 Profile Studio
+        - 本機 Profile Studio
+        - profile:plan / profile:apply
+        - Build / deployment
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 重現步驟
+      description: 請提供最小、可重複的步驟。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 預期結果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 實際結果與錯誤訊息
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 環境
+      placeholder: Windows 11、Node.js 22.x、Chrome 版本、部署平台

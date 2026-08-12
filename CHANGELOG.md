@@ -6,6 +6,27 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-12
+
+### 新增
+
+- 新增 `npm run profile:plan` 與 `applyMode: merge|replace`，讓完整設定與小幅更新的語意可預測，並能在寫入前檢查檔案計畫。
+- Studio 外觀步驟新增整體字級與小字比例控制，並同步到答案 schema、內容 writer、正式預覽與瀏覽器測試。
+- 新增 pull request / `main` 阻擋式 CI、貢獻指南、安全政策、issue 表單與 PR 模板。
+- 新增 v1.3 升級指南與集中式 profile contract 驗證。
+
+### 修正
+
+- 本機 Studio 先驗證答案與圖片，再以同一份 transaction plan 套用 `src/content` 與 `public/images`，避免驗證失敗留下部分檔案。
+- 圖片同名但內容不同時改用 digest 後綴，不再覆蓋既有資產；提交途中失敗會回復已完成的寫入。
+- 統一內容、答案檔與 Studio 的外觀預設、字級範圍及嵌入 URL 長度契約。
+
+### 變更
+
+- 重寫 README 快速開始，分成公開 Studio、本機 Studio、設定檔／Markdown／AI 三條使用路徑。
+- 4322 本機 adapter 移除未使用的細粒度與相容端點，只保留狀態、交易式專案更新與籤詩編輯介面。
+- 將 Studio 的 IndexedDB／圖片處理與 project plan/apply transport 從主控制器拆成獨立模組。
+
 ## [1.2.0] - 2026-07-26
 
 ### 新增
@@ -133,7 +154,8 @@
 - Profile Studio 僅監聽本機介面，並驗證 Host、Origin、HTTP method 與 JSON content type。
 - AI 流程要求使用者確認個人事實與網址，不自動發布敏感資料。
 
-[Unreleased]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/Jwander0820/astro-personal-profile-template/compare/v1.0.1...v1.0.2

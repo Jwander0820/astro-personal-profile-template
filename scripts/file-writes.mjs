@@ -18,16 +18,17 @@ export async function withFileWriteLock(filePath, operation) {
   }
 }
 
-export async function atomicWriteText(filePath, content) {
+export async function atomicWriteFile(filePath, content) {
+  const next = Buffer.isBuffer(content) ? content : Buffer.from(content);
   try {
-    if (await readFile(filePath, 'utf8') === content) return false;
+    if ((await readFile(filePath)).equals(next)) return false;
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
   }
 
   await mkdir(path.dirname(filePath), { recursive: true });
   const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
-  await writeFile(temporaryPath, content, 'utf8');
+  await writeFile(temporaryPath, next);
   try {
     await rename(temporaryPath, filePath);
   } catch (error) {
@@ -36,10 +37,14 @@ export async function atomicWriteText(filePath, content) {
       throw error;
     }
     try {
-      await writeFile(filePath, content, 'utf8');
+      await writeFile(filePath, next);
     } finally {
       await unlink(temporaryPath).catch(() => {});
     }
   }
   return true;
+}
+
+export async function atomicWriteText(filePath, content) {
+  return atomicWriteFile(filePath, Buffer.from(content, 'utf8'));
 }

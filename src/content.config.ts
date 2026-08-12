@@ -7,6 +7,7 @@ import { contentText, contentTextArray, contentTextMax } from '../scripts/conten
 import { FORTUNE_GRADES } from '../scripts/fortune-content.mjs';
 import { normalizeThemeColor } from '../scripts/theme-color.mjs';
 import { parseYoutubePlaylistId } from '../scripts/youtube-playlist.mjs';
+import { APPEARANCE_DEFAULTS, APPEARANCE_RANGES, EMBED_URL_MAX_LENGTH } from '../scripts/profile-contract.mjs';
 
 const imageSource = z.string().refine(
   isSafeImageSource,
@@ -39,12 +40,12 @@ const profile = defineCollection({
       .default(['about', 'turntable', 'links', 'fortune', 'notion']),
     aboutHeading: contentText.default('About me'),
     linksHeading: contentText.default('Links'),
-    sectionsLayout: z.enum(['list', 'grid']).default('list'),
-    bodyFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default('system'),
-    displayFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default('system'),
-    mainColor: themeColor.default('#7A58A6'),
-    fontScale: z.number().min(0.9).max(1.2).default(1),
-    smallTextScale: z.number().min(0.9).max(1.35).default(1),
+    sectionsLayout: z.enum(['list', 'grid']).default(APPEARANCE_DEFAULTS.sectionsLayout),
+    bodyFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default(APPEARANCE_DEFAULTS.bodyFont),
+    displayFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default(APPEARANCE_DEFAULTS.displayFont),
+    mainColor: themeColor.default(APPEARANCE_DEFAULTS.mainColor),
+    fontScale: z.number().min(APPEARANCE_RANGES.fontScale.minimum).max(APPEARANCE_RANGES.fontScale.maximum).default(APPEARANCE_DEFAULTS.fontScale),
+    smallTextScale: z.number().min(APPEARANCE_RANGES.smallTextScale.minimum).max(APPEARANCE_RANGES.smallTextScale.maximum).default(APPEARANCE_DEFAULTS.smallTextScale),
     tagline: z.union([contentText, contentTextArray]).optional(),
   }),
 });
@@ -87,7 +88,7 @@ const blocks = defineCollection({
     visible: z.boolean().default(true),
     layout: z.enum(['card', 'plain', 'image', 'embed', 'turntable', 'fortune']).default('card'),
     provider: z.enum(['notion', 'website', 'youtube']).optional(),
-    url: z.string().refine(isSafeHttpUrl, 'Embed URL must use http(s).').optional(),
+    url: z.string().max(EMBED_URL_MAX_LENGTH).refine(isSafeHttpUrl, 'Embed URL must use http(s).').optional(),
     embedMode: z.enum(['preview', 'inline']).default('preview'),
     playlistId: youtubePlaylist.optional(),
     continuousPlayback: z.boolean().default(true),

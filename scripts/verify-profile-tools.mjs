@@ -23,8 +23,7 @@ import {
 import { FORTUNE_GRADES, FortuneConflictError, loadFortuneBucket, restoreFortuneBucket, saveFortuneBucket, validateFortuneBucket } from './fortune-content.mjs';
 import { resolvePackageBin } from './package-bin.mjs';
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
-import { createSaveCoordinator, createValueChangeTracker } from './legacy-save-coordinator.mjs';
-import { atomicWriteText } from './file-writes.mjs';
+import { atomicWriteFile, atomicWriteText } from './file-writes.mjs';
 import { buildThemeCss, colorContrast, createThemePalette, normalizeThemeColor } from './theme-color.mjs';
 import {
   createProfileAnswersFromStudioContent,
@@ -43,9 +42,19 @@ import { createSettingsZip, readSettingsZip } from '../src/scripts/settings-pack
 import { resolveOnlineStudioAccess } from './studio-access.mjs';
 import { extractIframeSource, normalizeEmbedSource } from './embed-source.mjs';
 import { contentText, contentTextArray, contentTextMax } from './content-text-schema.mjs';
+import { applyProfileProjectUpdate, planProfileProjectUpdate, prepareProfileProjectUpdate } from './profile-project.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), 'profile-tools-'));
+
+async function createProjectCopy(name) {
+  const root = path.join(temporaryRoot, name);
+  await mkdir(path.join(root, 'src'), { recursive: true });
+  await mkdir(path.join(root, 'public'), { recursive: true });
+  await cp(path.join(projectRoot, 'src', 'content'), path.join(root, 'src', 'content'), { recursive: true });
+  await cp(path.join(projectRoot, 'public', 'images'), path.join(root, 'public', 'images'), { recursive: true });
+  return root;
+}
 
 try {
   assert.equal(contentText.parse(12345), '12345');
@@ -116,6 +125,112 @@ try {
   const sensitiveRefusalAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'sensitive-data-refusal.json'), 'utf8'));
   const invalidUrlAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'invalid-url.json'), 'utf8'));
   const lunaAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'luna-persona.json'), 'utf8'));
+  const pngHeader = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  const pngA = Buffer.from([...pngHeader, 0x01]);
+  const pngB = Buffer.from([...pngHeader, 0x02]);
+  const dataUrl = (buffer) => `data:image/png;base64,${buffer.toString('base64')}`;
+
+  const rejectedProjectRoot = await createProjectCopy('rejected-project-update');
+  const rejectedProfilePath = path.join(rejectedProjectRoot, 'src', 'content', 'profile', 'main.md');
+  const rejectedProfileBefore = await readFile(rejectedProfilePath);
+  await assert.rejects(
+    applyProfileProjectUpdate(rejectedProjectRoot, {
+      answers: { ...minimalAnswers, identity: { ...minimalAnswers.identity, displayName: '' } },
+      images: [{ path: '/images/profile-image.png', dataUrl: dataUrl(pngA) }],
+    }),
+    /顯示名稱/,
+  );
+  assert.deepEqual(await readFile(rejectedProfilePath), rejectedProfileBefore);
+  await assert.rejects(
+    readFile(path.join(rejectedProjectRoot, 'public', 'images', 'profile-image.png')),
+    (error) => error?.code === 'ENOENT',
+  );
+
+  const collisionRoot = await createProjectCopy('collision-project-update');
+  const collisionPath = path.join(collisionRoot, 'public', 'images', 'profile-image.png');
+  await atomicWriteFile(collisionPath, pngA);
+  const collisionProfilePath = path.join(collisionRoot, 'src', 'content', 'profile', 'main.md');
+  const collisionProfileBefore = await readFile(collisionProfilePath);
+  const collisionPayload = {
+    answers: { ...minimalAnswers, media: { ...minimalAnswers.media, avatar: '/images/profile-image.png' } },
+    images: [{ path: '/images/profile-image.png', dataUrl: dataUrl(pngB) }],
+  };
+  const collisionPlan = await planProfileProjectUpdate(collisionRoot, collisionPayload);
+  const resolvedCollisionPath = collisionPlan.imageReplacements['/images/profile-image.png'];
+  assert.match(resolvedCollisionPath, /^\/images\/profile-image-[a-f0-9]{10}\.png$/);
+  assert.deepEqual(await readFile(collisionPath), pngA, 'planning and collision handling must not overwrite an existing image');
+  assert.deepEqual(await readFile(collisionProfilePath), collisionProfileBefore, 'planning must not update content');
+  await assert.rejects(
+    readFile(path.join(collisionRoot, 'public', resolvedCollisionPath)),
+    (error) => error?.code === 'ENOENT',
+  );
+  const collisionResult = await applyProfileProjectUpdate(collisionRoot, collisionPayload);
+  assert.equal(collisionResult.answers.media.avatar, resolvedCollisionPath);
+  assert.deepEqual(await readFile(collisionPath), pngA);
+  assert.deepEqual(await readFile(path.join(collisionRoot, 'public', resolvedCollisionPath)), pngB);
+
+  const mergeRoot = await createProjectCopy('merge-project-update');
+  const preservedLinkPath = path.join(mergeRoot, 'src', 'content', 'links', 'github.md');
+  const preservedEmbedPath = path.join(mergeRoot, 'src', 'content', 'blocks', 'notion-embed.md');
+  const [preservedLink, preservedEmbed] = await Promise.all([
+    readFile(preservedLinkPath),
+    readFile(preservedEmbedPath),
+  ]);
+  const mergeResult = await applyProfileProjectUpdate(mergeRoot, {
+    answers: {
+      version: 1,
+      applyMode: 'merge',
+      identity: { title: 'Merged title' },
+    },
+  });
+  assert.equal(mergeResult.content.profile.title, 'Merged title');
+  assert.deepEqual(await readFile(preservedLinkPath), preservedLink);
+  assert.deepEqual(await readFile(preservedEmbedPath), preservedEmbed);
+  assert.equal(mergeResult.plan.changes.some((change) => change.file.startsWith('src/content/links/')), false);
+  assert.equal(mergeResult.plan.changes.some((change) => change.file === 'src/content/blocks/notion-embed.md'), false);
+  await assert.rejects(
+    planProfileProjectUpdate(mergeRoot, { answers: { version: 1, applyMode: 'merge', inventedField: true } }),
+    /inventedField/,
+  );
+  await assert.rejects(
+    planProfileProjectUpdate(mergeRoot, {
+      answers: { version: 1, applyMode: 'merge', identity: { title: 'No image update' } },
+      images: [{ path: '/images/unreferenced.png', dataUrl: dataUrl(pngA) }],
+    }),
+    /未被這次更新引用/,
+  );
+
+  const planTokenRoot = await createProjectCopy('plan-token-project-update');
+  const tokenPayload = {
+    answers: { version: 1, applyMode: 'merge', identity: { title: 'Confirmed plan' } },
+  };
+  const tokenPlan = await planProfileProjectUpdate(planTokenRoot, tokenPayload);
+  assert.match(tokenPlan.token, /^[a-f0-9]{64}$/);
+  await applyProfileProjectUpdate(planTokenRoot, {
+    answers: { version: 1, applyMode: 'merge', identity: { title: 'Intervening update' } },
+  });
+  await assert.rejects(
+    applyProfileProjectUpdate(planTokenRoot, { ...tokenPayload, expectedPlanToken: tokenPlan.token }),
+    /預覽後改變/,
+  );
+  assert.equal((await loadStudioContent(planTokenRoot)).profile.title, 'Intervening update');
+
+  const conflictRoot = await createProjectCopy('conflicting-project-update');
+  const firstPrepared = await prepareProfileProjectUpdate(conflictRoot, {
+    answers: { version: 1, applyMode: 'merge', identity: { title: 'First plan' } },
+  });
+  const stalePrepared = await prepareProfileProjectUpdate(conflictRoot, {
+    answers: { version: 1, applyMode: 'merge', identity: { title: 'Stale plan' } },
+  });
+  try {
+    await firstPrepared.commit();
+    await assert.rejects(stalePrepared.commit(), /請重新預覽再儲存/);
+    assert.equal((await loadStudioContent(conflictRoot)).profile.title, 'First plan');
+  } finally {
+    await firstPrepared.dispose();
+    await stalePrepared.dispose();
+  }
+
   const answersPreview = previewProfileAnswers(answers);
   const minimalPreview = previewProfileAnswers(minimalAnswers);
   const sensitiveRefusalPreview = previewProfileAnswers(sensitiveRefusalAnswers);
@@ -376,9 +491,11 @@ try {
   assert.equal(result.profile.displayName, '你的名字');
   assert.equal(answersPreview.summary.displayName, '你的名字');
   assert.equal(answersPreview.answers.version, 1);
-  assert.equal(answersSchema.properties.identity.required.includes('bio'), false);
-  assert.equal(answersSchema.properties.identity.required.includes('title'), false);
-  assert.equal(answersSchema.properties.identity.required.includes('tagline'), false);
+  const replaceRequiredIdentity = answersSchema.allOf[0].else.properties.identity.required;
+  assert.equal(replaceRequiredIdentity.includes('displayName'), true);
+  assert.equal(replaceRequiredIdentity.includes('bio'), false);
+  assert.equal(replaceRequiredIdentity.includes('title'), false);
+  assert.equal(replaceRequiredIdentity.includes('tagline'), false);
   assert.equal(answersSchema.properties.appearance.properties.mainColor.default, '#7A58A6');
   assert.ok(answersSchema.properties.identity.properties.displayName.type.includes('number'));
   assert.ok(answersSchema.properties.links.items.properties.title.type.includes('number'));
@@ -759,7 +876,10 @@ try {
   assert.match(onlineStudioPage, /id="ai-answers-json"/);
   assert.ok(onlineStudioApp.includes('createSettingsZip'));
   assert.ok(onlineStudioApp.includes('readSettingsZip'));
-  assert.ok(onlineStudioApp.includes('/api/answers/apply'));
+  assert.ok(onlineStudioApp.includes('requestProjectPlan'));
+  assert.ok(onlineStudioApp.includes('applyProjectPlan'));
+  assert.ok(studioServerSource.includes("url.pathname === '/api/project/plan'"));
+  assert.ok(studioServerSource.includes("url.pathname === '/api/project/apply'"));
   assert.ok(!onlineStudioApp.includes('sim-social'));
   assert.ok(renderer.includes("document.createElementNS('http://www.w3.org/2000/svg', 'svg')"));
   assert.ok(renderer.includes("node('nav', 'socials')"));
@@ -786,216 +906,6 @@ try {
   assert.ok(studioRouteNav.includes('/studio/fortune-poem/'));
   assert.ok(studioRouteNav.includes('/studio/icons/'));
 
-  // Kept as an opt-in migration audit for downstream forks that still carry
-  // the pre-unification Studio assets. The main template no longer runs it.
-  if (process.env.PROFILE_STUDIO_LEGACY_CONTRACTS === '1') {
-  const coordinatorStatuses = [];
-  const coordinatorSaves = [];
-  const coordinatorRefreshes = [];
-  let scheduledCallback = null;
-  let timerId = 0;
-  const coordinator = createSaveCoordinator({
-    delayMs: 5000,
-    save: async ({ key, revision }) => { coordinatorSaves.push({ key, revision }); return { contentRevision: revision }; },
-    refresh: async ({ key, revision }) => { coordinatorRefreshes.push({ key, revision }); },
-    onStatus: (status) => coordinatorStatuses.push(status),
-    setTimeoutFn: (callback) => { scheduledCallback = callback; timerId += 1; return timerId; },
-    clearTimeoutFn: () => { scheduledCallback = null; },
-  });
-  for (let index = 0; index < 20; index += 1) coordinator.markDirty('profile');
-  assert.equal(coordinator.getStatus('profile').status, 'dirty');
-  coordinator.setMode('auto');
-  assert.equal(coordinator.getStatus('profile').status, 'scheduled');
-  assert.equal(typeof scheduledCallback, 'function');
-  await coordinator.submit('profile');
-  assert.deepEqual(coordinatorSaves, [{ key: 'profile', revision: 20 }]);
-  assert.deepEqual(coordinatorRefreshes, [{ key: 'profile', revision: 20 }]);
-  assert.equal(coordinator.hasPending(), false);
-
-  const batchSaves = [];
-  const batchRefreshes = [];
-  const batchCoordinator = createSaveCoordinator({
-    save: async ({ key, revision }) => {
-      batchSaves.push({ key, revision });
-      return { contentRevision: revision, key };
-    },
-    refresh: async ({ results, batch }) => { batchRefreshes.push({ count: results.length, batch }); },
-  });
-  batchCoordinator.markDirty('profile');
-  batchCoordinator.markDirty('home');
-  await batchCoordinator.submitAll();
-  assert.deepEqual(batchSaves.map(({ key }) => key), ['profile', 'home']);
-  assert.deepEqual(batchRefreshes, [{ count: 2, batch: true }]);
-  assert.equal(batchCoordinator.hasPending(), false);
-  batchCoordinator.markDirty('fortunes');
-  batchCoordinator.reset('fortunes');
-  assert.equal(batchCoordinator.hasPending(), false);
-
-  let releasePreviewRefresh;
-  let previewRefreshStarted;
-  const previewRefreshReady = new Promise((resolve) => { previewRefreshStarted = resolve; });
-  const refreshCoordinator = createSaveCoordinator({
-    save: async () => ({ contentRevision: 1 }),
-    refresh: () => new Promise((resolve) => {
-      releasePreviewRefresh = resolve;
-      previewRefreshStarted();
-    }),
-  });
-  refreshCoordinator.markDirty('profile');
-  const refreshSave = refreshCoordinator.submit('profile');
-  await previewRefreshReady;
-  assert.equal(refreshCoordinator.getStatus('profile').status, 'refreshing');
-  assert.equal(refreshCoordinator.hasPending(), false, '已寫入、僅等待預覽更新時不應視為未儲存');
-  releasePreviewRefresh();
-  await refreshSave;
-
-  const slowResolvers = [];
-  const slowRevisions = [];
-  let activeSaves = 0;
-  let maximumActiveSaves = 0;
-  const slowCoordinator = createSaveCoordinator({
-    save: ({ revision }) => new Promise((resolve) => {
-      slowRevisions.push(revision);
-      activeSaves += 1;
-      maximumActiveSaves = Math.max(maximumActiveSaves, activeSaves);
-      slowResolvers.push(() => { activeSaves -= 1; resolve({ contentRevision: revision }); });
-    }),
-  });
-  slowCoordinator.markDirty('home');
-  const firstSlowSave = slowCoordinator.submit('home');
-  slowCoordinator.markDirty('home');
-  const secondSlowSave = slowCoordinator.submit('home');
-  slowResolvers.shift()();
-  await firstSlowSave;
-  await new Promise((resolve) => setImmediate(resolve));
-  slowResolvers.shift()();
-  await secondSlowSave;
-  assert.deepEqual(slowRevisions, [1, 2]);
-  assert.equal(maximumActiveSaves, 1);
-  assert.equal(slowCoordinator.getStatus('home').status, 'clean');
-  assert.ok(coordinatorStatuses.some((status) => status.status === 'scheduled'));
-
-  const valueChanged = createValueChangeTracker('顯示名稱：原值');
-  assert.equal(valueChanged('顯示名稱：測試更新'), true);
-  assert.equal(valueChanged('顯示名稱：測試更新'), false, 'input 後相同值的 change 不應建立第二筆修改');
-  assert.equal(valueChanged('顯示名稱：再次更新'), true);
-
-  const localJsonRequest = (host, origin, method = 'PUT', contentType = 'application/json; charset=utf-8') => ({
-    method,
-    headers: { host, origin, 'content-type': contentType },
-  });
-  assert.doesNotThrow(() => validateStudioRequest({ method: 'GET', headers: { host: 'localhost:4322' } }, 4322));
-  assert.doesNotThrow(() => validateStudioRequest(localJsonRequest('localhost:4322', 'http://localhost:4322'), 4322));
-  assert.doesNotThrow(() => validateStudioRequest(localJsonRequest('127.0.0.1:4322', 'http://127.0.0.1:4322', 'POST'), 4322));
-  const rejectsStudioRequest = (request, status) => assert.throws(
-    () => validateStudioRequest(request, 4322),
-    (error) => error instanceof StudioRequestError && error.status === status,
-  );
-  rejectsStudioRequest({ method: 'GET', headers: { host: 'attacker.example:4322' } }, 403);
-  rejectsStudioRequest(localJsonRequest('localhost:4322', 'http://127.0.0.1:4322'), 403);
-  rejectsStudioRequest(localJsonRequest('localhost:4322', ''), 403);
-  rejectsStudioRequest(localJsonRequest('localhost:4322', 'http://localhost:4322', 'POST', 'text/plain'), 415);
-
-  const [studioCss, studioApp, studioHtml, studioServer, turntablePlayer] = await Promise.all([
-    readFile(path.join(projectRoot, 'studio', 'style.css'), 'utf8'),
-    readFile(path.join(projectRoot, 'studio', 'app.js'), 'utf8'),
-    readFile(path.join(projectRoot, 'studio', 'index.html'), 'utf8'),
-    readFile(path.join(projectRoot, 'scripts', 'studio-server.mjs'), 'utf8'),
-    readFile(path.join(projectRoot, 'src', 'components', 'TurntablePlayer.astro'), 'utf8'),
-  ]);
-  assert.match(studioCss, /body\s*\{[^}]*min-width:\s*1200px/);
-  assert.match(studioCss, /html,\s*body\s*\{[^}]*height:\s*100%;[^}]*overflow:\s*hidden/);
-  assert.match(studioCss, /\.switch-track\s*\{[^}]*width:\s*42px;[^}]*height:\s*24px;[^}]*padding:\s*2px/);
-  assert.match(studioCss, /\.switch-control\s*\{[^}]*position:\s*relative/);
-  assert.match(studioCss, /\.switch-control input\s*\{[^}]*inset:\s*0;[^}]*width:\s*100%;[^}]*height:\s*100%/);
-  assert.match(studioCss, /\.switch-control input\s*\{[^}]*padding:\s*0/);
-  assert.match(studioCss, /\.skip-link:focus\s*\{[^}]*transform:\s*translateY\(0\)/);
-  assert.match(studioCss, /@media \(prefers-reduced-motion: reduce\)/);
-  assert.match(studioCss, /\.ai-actions > button\s*\{[^}]*width:\s*112px;[^}]*min-height:\s*46px/);
-  assert.match(studioHtml, /<a class="skip-link" href="#editor">/);
-  assert.match(studioHtml, /role="tablist"/);
-  assert.equal((studioHtml.match(/role="tab"/g) ?? []).length, 6);
-  assert.equal((studioHtml.match(/role="tabpanel"/g) ?? []).length, 6);
-  assert.match(studioHtml, /data-width="desktop"[^>]*aria-pressed="true"/);
-  assert.match(studioHtml, /data-width="mobile"[^>]*aria-pressed="false"/);
-  assert.match(studioHtml, /id="save-all"[^>]*>儲存並更新<\/button>/);
-  assert.ok(studioHtml.indexOf('id="save-all"') < studioHtml.indexOf('id="save-mode"'));
-  assert.match(studioHtml, /id="save-all"[^>]*aria-keyshortcuts="Control\+S Meta\+S"/);
-  assert.doesNotMatch(studioHtml, /id="save-order"|id="save-fortunes"|>儲存基本資料<\/button>/);
-  assert.match(studioHtml, /id="load-project-answers"[^>]*>.*載入專案回答檔/s);
-  assert.match(studioHtml, /class="actions ai-actions"/);
-  assert.ok(studioApp.indexOf("['facebook', 'Facebook', 'facebook'") < studioApp.indexOf("['instagram', 'Instagram', 'instagram'"));
-  assert.ok(studioApp.indexOf("['instagram', 'Instagram', 'instagram'") < studioApp.indexOf("['threads', 'Threads', 'threads'"));
-  assert.ok(studioApp.indexOf("['threads', 'Threads', 'threads'") < studioApp.indexOf("['github', 'GitHub', 'github'"));
-  assert.ok(studioApp.includes("api('/api/social-order'"));
-  assert.ok(studioApp.includes('data-social-move="up"'));
-  assert.ok(studioApp.includes('social-drag-handle'));
-  assert.ok(studioApp.includes('dragHandle.addEventListener(\'dragstart\''));
-  assert.ok(studioApp.includes('event.dataTransfer.setData(\'text/plain\''));
-  assert.ok(studioApp.includes("saveCoordinator.markDirty('social-order')"));
-  assert.ok(studioCss.includes('.social-order-actions'));
-  assert.ok(studioCss.includes('.social-drag-handle'));
-  assert.ok(studioCss.includes('.topbar-save'));
-  assert.ok(studioApp.includes("$('#add-featured-link').addEventListener"));
-  assert.ok(studioApp.includes("$('#add-image-block').addEventListener"));
-  assert.ok(studioApp.includes("isNew ? '/api/image-blocks' : `/api/image-blocks/${editor.dataset.blockId}`"));
-  assert.ok(studioApp.includes('imagePosition'));
-  assert.ok(!studioApp.includes('toggleOnly'));
-  assert.ok(studioApp.includes("$('.link-editor__meta small', editor).textContent"));
-  assert.ok(studioApp.includes("await api('/api/home'"));
-  assert.ok(studioApp.includes("url.searchParams.set('studioRevision'"));
-  assert.ok(studioApp.includes("frame.addEventListener('load'"));
-  assert.ok(studioApp.includes("await api('/api/fortunes'"));
-  assert.ok(studioApp.includes("await api('/api/fortunes/restore'"));
-  assert.ok(studioApp.includes("window.addEventListener('beforeunload'"));
-  assert.ok(studioApp.includes("createSaveCoordinator"));
-  assert.ok(studioApp.includes("profile-studio-save-mode"));
-  assert.ok(studioApp.includes("ArrowLeft: -1, ArrowRight: 1"));
-  assert.ok(studioApp.includes("if (activateTab(next)) next.focus();"));
-  assert.ok(studioApp.includes("item.setAttribute('aria-pressed', active ? 'true' : 'false')"));
-  assert.ok(studioApp.includes("await api('/api/answers/validate'"));
-  assert.ok(studioApp.includes("await api('/api/answers/apply'"));
-  assert.ok(!studioApp.includes('maximumAttempts = 3'));
-  assert.equal((studioApp.match(/frame\.src = url\.href/g) ?? []).length, 1);
-  assert.ok(studioApp.includes('async function submitAllPending()'));
-  assert.ok(studioApp.includes('saveCoordinator.submitAll()'));
-  assert.ok(studioApp.includes('bindDistinctFormChanges(form, callback)'));
-  assert.ok(studioApp.includes('if (!hasChanged(formValueSnapshot(form))) return;'));
-  assert.ok(studioApp.includes('bindDistinctFormChanges(form, updateDraft)'));
-  assert.ok(studioApp.includes("event.key.toLowerCase() !== 's'"));
-  assert.ok(studioApp.includes("window.addEventListener('keyup'"));
-  assert.ok(studioApp.includes('saveAllButton.click()'));
-  assert.equal((studioApp.match(/await submitAllPending\(\)/g) ?? []).length, 2);
-  assert.ok(studioApp.includes("api('/api/answers/project-file')"));
-  assert.ok(!studioApp.includes("$('#save-order')"));
-  assert.ok(!studioApp.includes("$('#save-fortunes')"));
-  assert.ok(studioApp.includes('assertRerenderSafe('));
-  assert.ok(!studioApp.includes('image/svg+xml'));
-  assert.ok(!studioApp.includes('refreshPreview(650)'));
-  assert.ok(!studioApp.includes('function refreshPreview(delay = 350)'));
-  assert.ok(!studioApp.includes('finally { event.currentTarget.disabled = false; }'));
-  assert.ok(studioApp.includes('const button = event.currentTarget;'));
-  assert.ok(studioServer.includes('previewUrl: `http://localhost:${previewPort}/`'));
-  assert.ok(!studioServer.includes('previewUrl: `http://127.0.0.1:${previewPort}/`'));
-  assert.ok(studioServer.includes('validateStudioRequest(request, studioPort)'));
-  assert.ok(studioServer.includes('let contentRevision = 0;'));
-  assert.ok(studioServer.includes('{ ...body, contentRevision }'));
-  assert.ok(studioServer.includes("url.pathname === '/api/fortunes'"));
-  assert.ok(studioServer.includes("url.pathname === '/api/fortunes/restore'"));
-  assert.ok(studioServer.includes("url.pathname === '/api/answers/validate'"));
-  assert.ok(studioServer.includes("url.pathname === '/api/answers/apply'"));
-  assert.ok(studioServer.includes("url.pathname === '/api/answers/project-file'"));
-  assert.ok(studioServer.includes("path.join(projectRoot, 'profile.answers.json')"));
-  assert.ok(studioServer.includes("url.pathname === '/api/image-blocks'"));
-  assert.ok(studioServer.includes('fontOptions'));
-  assert.ok(!studioServer.includes("'image/svg+xml': { extension"));
-  assert.ok(studioServer.includes('if (!format.matches(buffer))'));
-  assert.ok(studioServer.includes("'image/png': { extension: '.png'"));
-  assert.ok(studioServer.includes("await resolvePackageBin('astro')"));
-  assert.ok(!studioServer.includes("'astro', 'astro.js'"));
-  assert.ok(studioServer.includes("ASTRO_DEV_BACKGROUND: 'studio-managed'"));
-  assert.ok(turntablePlayer.includes('youtubeApiPromise = undefined'));
-  }
 
   console.log('Profile tools check passed (answers, ZIP media, local adapter security, renderer bridge, and Studio writes are valid).');
 } finally {
