@@ -1,7 +1,7 @@
 ---
 import '../styles/global.css';
 import { withBase } from '../lib/paths';
-import { getFontPreset, getGoogleFontsUrl } from '../lib/font-presets';
+import { getProfileFonts } from '../lib/font-presets';
 import { buildThemeCss, DEFAULT_THEME_COLOR } from '../../scripts/theme-color.mjs';
 import {
   STUDIO_PREVIEW_QUERY_PARAM,
@@ -33,15 +33,7 @@ const {
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const socialImage = image ? new URL(withBase(image) ?? '', Astro.site) : undefined;
 const favicon = withBase('/favicon.svg');
-const bodyFontPreset = getFontPreset(bodyFont);
-const displayFontPreset = getFontPreset(displayFont);
-const bodyFontFamily = bodyFont === 'system'
-  ? '"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif'
-  : bodyFontPreset.cssFamily;
-const displayFontFamily = displayFont === 'system'
-  ? '"Noto Serif TC", "Noto Serif JP", "Yu Mincho", "Songti TC", serif'
-  : displayFontPreset.cssFamily;
-const googleFontsUrl = getGoogleFontsUrl(bodyFont, displayFont);
+const { bodyFamily: bodyFontFamily, displayFamily: displayFontFamily, stylesheetUrl: googleFontsUrl } = getProfileFonts(bodyFont, displayFont);
 const themeCss = buildThemeCss(mainColor);
 ---
 <!doctype html>
@@ -80,7 +72,7 @@ const themeCss = buildThemeCss(mainColor);
       <>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link rel="stylesheet" href={googleFontsUrl} />
+        <link id="profile-fonts" rel="stylesheet" href={googleFontsUrl} />
       </>
     )}
     <meta property="og:type" content="website" />

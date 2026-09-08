@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { createSettingsZip, readSettingsZip } from '../../src/scripts/settings-package.js';
 import {
   STUDIO_PREVIEW_QUERY_PARAM,
   STUDIO_PREVIEW_QUERY_VALUE,
@@ -42,6 +43,129 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript((draft) => {
     window.localStorage.setItem('profile-online-studio-draft-v2', JSON.stringify(draft));
   }, browserFixtureAnswers);
+});
+
+test('字型預覽與正式頁一致且切換時載入所選字型', async ({ page }) => {
+  await page.route('https://fonts.googleapis.com/**', (route) => route.fulfill({ contentType: 'text/css', body: '' }));
+  await page.goto('/');
+  const formalFont = await page.locator('html').evaluate((el) => el.style.getPropertyValue('--font-display'));
+  await page.goto('/studio/');
+  const root = page.frameLocator('#profile-preview').locator('html');
+  await page.getByRole('tab', { name: '外觀' }).click();
+  await page.getByRole('combobox', { name: '標題字型', exact: true }).selectOption('system');
+  await expect.poll(() => root.evaluate((el) => el.style.getPropertyValue('--font-display'))).toBe(formalFont);
+  await page.getByRole('combobox', { name: '標題字型', exact: true }).selectOption('lxgw-wenkai-tc');
+  const fonts = page.frameLocator('#profile-preview').locator('link[href*="fonts.googleapis.com/css2"]');
+  await expect(fonts).toHaveAttribute('href', /LXGW(?:\+|%20)WenKai(?:\+|%20)TC/);
+  await page.getByRole('combobox', { name: '內文字型', exact: true }).selectOption('noto-serif-tc');
+  await expect(fonts).toHaveAttribute('href', /Noto(?:\+|%20)Serif(?:\+|%20)TC/);
+  await page.getByRole('combobox', { name: '標題字型', exact: true }).selectOption('system');
+  await expect(fonts).not.toHaveAttribute('href', /LXGW/);
+  await page.getByRole('combobox', { name: '內文字型', exact: true }).selectOption('system');
+  await expect(fonts).toHaveCount(0);
+});
+
+test('Markdown 預覽保留清單、斜體、引用及安全文字', async ({ page }) => {
+  await page.goto('/studio/');
+  await page.getByLabel('自我介紹', { exact: true }).fill('- 第一項\n- 第二項\n\n*斜體*與**粗體**\n\n> 引用\n\n<script>alert(1)</script>\n\n[異常字元連結](https://example.com?q=&#9999999999;)');
+  const bio = page.frameLocator('#profile-preview').locator('.bio');
+  await expect(bio.locator('ul > li')).toHaveText(['第一項', '第二項']);
+  await expect(bio.locator('em')).toHaveText('斜體');
+  await expect(bio.locator('strong')).toHaveText('粗體');
+  await expect(bio.locator('blockquote')).toHaveText('引用');
+  await expect(bio.locator('script')).toHaveCount(0);
+  await expect(bio).toContainText('<script>alert(1)</script>');
+  await expect(bio.getByRole('link', { name: '異常字元連結' })).toBeVisible();
+});
+
+test('Markdown 註腳可來回跳轉且含圖片標題錨點與正式頁一致', async ({ page }) => {
+  await page.route('https://example.com/a.png', (route) => route.fulfill({
+    contentType: 'image/png',
+    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
+  }));
+  await page.goto('/studio/');
+  await page.getByLabel('自我介紹', { exact: true }).fill('### *A* ![Cat](https://example.com/a.png) `x`\n\n[前往標題](#a--x)\n\n第一次[^note]，第二次[^note]。\n\n[^note]: **註腳內容**');
+  const preview = page.frameLocator('#profile-preview');
+  const bio = preview.locator('.bio');
+  await expect(bio.locator('h3')).toHaveAttribute('id', 'a--x');
+  await expect(bio.locator('[data-footnote-ref]')).toHaveCount(2);
+  await expect(bio.locator('[data-footnotes] strong')).toHaveText('註腳內容');
+  await bio.locator('[data-footnote-ref]').nth(1).click();
+  await expect.poll(() => preview.locator('html').evaluate(() => location.hash)).toBe('#user-content-fn-note');
+  await bio.locator('[data-footnote-backref]').nth(1).click();
+  await expect.poll(() => preview.locator('html').evaluate(() => location.hash)).toBe('#user-content-fnref-note-2');
+  await bio.getByRole('link', { name: '前往標題' }).click();
+  await expect.poll(() => preview.locator('html').evaluate(() => location.hash)).toBe('#a--x');
+  await expect(preview.locator('h1')).toHaveText(browserFixtureAnswers.identity.displayName);
+});
+
+test('ZIP 圖片驗證失敗時保留原本草稿與圖片', async ({ page }) => {
+  await page.goto('/studio/');
+  await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText(browserFixtureAnswers.identity.displayName);
+  const draftBefore = await page.evaluate(() => localStorage.getItem('profile-online-studio-draft-v2'));
+  const imported = { ...browserFixtureAnswers, identity: { ...browserFixtureAnswers.identity, displayName: '不可寫入的草稿' } };
+  const bytes = createSettingsZip([
+    { name: 'profile.answers.json', data: Buffer.from(JSON.stringify(imported)) },
+    { name: 'images/first.png', data: Buffer.from('first') },
+    { name: 'images/too-large.png', data: new Uint8Array(5 * 1024 * 1024 + 1) },
+  ]);
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  await page.locator('#import-answers').setInputFiles({ name: 'invalid.zip', mimeType: 'application/zip', buffer: Buffer.from(bytes) });
+  await expect(page.locator('#online-toast')).toContainText('5 MB');
+  await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText(browserFixtureAnswers.identity.displayName);
+  expect(await page.evaluate(() => localStorage.getItem('profile-online-studio-draft-v2'))).toBe(draftBefore);
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#download-answers').click();
+  const download = await downloadPromise;
+  const entries = readSettingsZip(new Uint8Array(await readFile(await download.path())));
+  expect([...entries.keys()]).toEqual(['profile.answers.json']);
+});
+
+test('ZIP 圖片交易中斷會回復資料庫，成功匯入可再次匯出圖片', async ({ page }) => {
+  await page.goto('/studio/');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  await page.locator('[data-image-target="media.avatar"]').setInputFiles({ name: 'kept.png', mimeType: 'image/png', buffer: png });
+  await expect(page.locator('[data-bind="media.avatar"]')).toHaveValue('/images/kept.png');
+  const imported = { ...browserFixtureAnswers, identity: { ...browserFixtureAnswers.identity, displayName: '交易成功' }, media: { ...browserFixtureAnswers.media, avatar: '/images/next.png' } };
+  const files = [
+    { name: 'profile.answers.json', data: Buffer.from(JSON.stringify(imported)) },
+    { name: 'images/kept.png', data: png },
+    { name: 'images/next.png', data: png },
+  ];
+  await page.evaluate(() => {
+    const original = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (entry, ...args) {
+      if (entry.path === '/images/next.png') {
+        IDBObjectStore.prototype.put = original;
+        throw new DOMException('測試交易失敗', 'QuotaExceededError');
+      }
+      return original.call(this, entry, ...args);
+    };
+  });
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  const file = { name: 'settings.zip', mimeType: 'application/zip', buffer: Buffer.from(createSettingsZip(files)) };
+  await page.locator('#import-answers').setInputFiles(file);
+  await expect(page.locator('#online-toast')).toContainText('測試交易失敗');
+  await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText(browserFixtureAnswers.identity.displayName);
+  const storedPaths = await page.evaluate(() => new Promise((resolve, reject) => {
+    const request = indexedDB.open('profile-online-studio-media-v1', 1);
+    request.onsuccess = () => {
+      const database = request.result;
+      const query = database.transaction('media').objectStore('media').getAllKeys();
+      query.onsuccess = () => { database.close(); resolve(query.result); };
+      query.onerror = () => { database.close(); reject(query.error); };
+    };
+    request.onerror = () => reject(request.error);
+  }));
+  expect(storedPaths).toEqual(['/images/kept.png']);
+  await page.locator('#import-answers').setInputFiles(file);
+  await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText('交易成功');
+  await expect.poll(() => page.frameLocator('#profile-preview').locator('.avatar').evaluate((el) => el.complete && el.naturalWidth)).toBeTruthy();
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#download-answers').click();
+  const entries = readSettingsZip(new Uint8Array(await readFile(await (await downloadPromise).path())));
+  expect(Buffer.from(entries.get('images/next.png'))).toEqual(png);
+  expect(JSON.parse(new TextDecoder().decode(entries.get('profile.answers.json'))).media.avatar).toBe('/images/next.png');
 });
 
 test('正式首頁保留入口，但 Studio 預覽只顯示使用者內容', async ({ page }) => {

@@ -1,5 +1,6 @@
 import { isSafeHttpUrl, isSafeProfileUrl } from '../../scripts/content-safety.mjs';
 import { parseYoutubePlaylistId } from '../../scripts/youtube-playlist.mjs';
+import { markdownFragment } from './preview-markdown.js';
 
 const HOME_SECTIONS = ['about', 'turntable', 'links', 'fortune', 'notion'];
 
@@ -8,40 +9,6 @@ function node(tag, className, text) {
   if (className) item.className = className;
   if (text !== undefined) item.textContent = text;
   return item;
-}
-
-function appendTextWithInlineMarkdown(container, source) {
-  const pattern = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g;
-  let offset = 0;
-  for (const match of String(source || '').matchAll(pattern)) {
-    container.append(document.createTextNode(source.slice(offset, match.index)));
-    const token = match[0];
-    if (token.startsWith('**')) container.append(node('strong', '', token.slice(2, -2)));
-    else if (token.startsWith('`')) container.append(node('code', '', token.slice(1, -1)));
-    else {
-      const parts = token.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
-      const link = node('a', '', parts?.[1] || token);
-      if (parts) {
-        link.href = parts[2];
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-      }
-      container.append(link);
-    }
-    offset = (match.index || 0) + token.length;
-  }
-  container.append(document.createTextNode(String(source || '').slice(offset)));
-}
-
-function markdownFragment(source) {
-  const fragment = document.createDocumentFragment();
-  const paragraphs = String(source || '').trim().split(/\n\s*\n/).filter(Boolean);
-  for (const paragraph of paragraphs) {
-    const item = node('p');
-    appendTextWithInlineMarkdown(item, paragraph.replace(/\n/g, ' '));
-    fragment.append(item);
-  }
-  return fragment;
 }
 
 function svgIcon(name, icons, size = 22) {

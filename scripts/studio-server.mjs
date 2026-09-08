@@ -1,17 +1,17 @@
 import { createServer } from 'node:http';
 import { Buffer } from 'node:buffer';
-import { spawn } from 'node:child_process';
+import { dev } from 'astro';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { saveStudioBlock } from './profile-content.mjs';
 import { FortuneConflictError, loadFortuneBucket, saveFortuneBucket } from './fortune-content.mjs';
-import { resolvePackageBin } from './package-bin.mjs';
+import { findLocalPort, listenLocalServer, studioPort as parsePort } from './studio-network.mjs';
 import { applyProfileProjectUpdate, planProfileProjectUpdate } from './profile-project.mjs';
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const studioPort = Number(process.env.STUDIO_PORT || 4322);
-const previewPort = Number(process.env.PORT || 4321);
+let studioPort;
+let previewPort;
 const MAX_BODY_SIZE = 70 * 1024 * 1024;
 let contentRevision = 0;
 
@@ -107,31 +107,52 @@ const server = createServer(async (request, response) => {
   }
 });
 
-const astroCli = await resolvePackageBin('astro');
-const astro = spawn(process.execPath, [astroCli, 'dev', '--host', '127.0.0.1', '--port', String(previewPort)], {
-  cwd: projectRoot,
-  stdio: 'inherit',
-  // Astro 7 auto-backgrounds dev servers in coding-agent environments. The
-  // Studio owns this child process, so suppress auto-detection and keep it attached.
-  env: { ...process.env, ASTRO_DEV_BACKGROUND: 'studio-managed' },
-});
+let astro;
+let isClosing = false;
+async function shutdown(code = 0) {
+  if (isClosing) return;
+  isClosing = true;
+  const timeout = setTimeout(() => process.exit(code), 5_000);
+  timeout.unref();
+  try {
+    await astro?.stop();
+    if (server.listening) {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  } finally {
+    clearTimeout(timeout);
+    process.exit(code);
+  }
+}
 
-astro.on('exit', (code) => {
-  if (code && code !== 0) console.error(`Astro 預覽服務已停止（code ${code}）。`);
-});
+process.on('SIGINT', () => shutdown());
+process.on('SIGTERM', () => shutdown());
 
-server.listen(studioPort, '127.0.0.1', () => {
+const reportFallback = (label) => (preferred, actual, reason) => {
+  console.log(`${label}連接埠 ${preferred} 無法使用（${reason}），改用 ${actual}。`);
+};
+
+try {
+  const requestedStudioPort = parsePort(process.env.STUDIO_PORT, 4322);
+  const requestedPreviewPort = parsePort(process.env.PORT, 4321);
+  studioPort = await listenLocalServer(server, requestedStudioPort, reportFallback('本機寫入服務'));
+  previewPort = await findLocalPort(requestedPreviewPort, reportFallback('網站預覽'));
+  process.env.STUDIO_PORT = String(studioPort);
+  server.on('error', (error) => { console.error(`本機寫入服務失敗：${error.message}`); shutdown(1); });
+  // Own the dev server in this process so startup failure or Ctrl+C cannot
+  // leave an orphaned Astro child. Strict port binding keeps CORS in sync.
+  astro = await dev({
+    root: projectRoot,
+    server: { host: '127.0.0.1', port: previewPort },
+    vite: { server: { strictPort: true } },
+  });
+  previewPort = astro.address.port;
   console.log('');
   console.log(`Profile Studio：http://localhost:${previewPort}/studio/`);
   console.log(`本機寫入服務：http://localhost:${studioPort}（背景使用）`);
   console.log('按 Ctrl+C 停止兩個服務。');
-});
-
-function shutdown() {
-  astro.kill();
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(0), 1000).unref();
+} catch (error) {
+  console.error(`Profile Studio 啟動失敗：${error.message}`);
+  await shutdown(1);
 }
-
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);

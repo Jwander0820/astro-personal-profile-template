@@ -24,14 +24,27 @@ function openMediaDatabase() {
 }
 
 export async function writeStoredMedia(path, blob) {
+  return writeStoredMediaBatch([{ path, blob }]);
+}
+
+export async function writeStoredMediaBatch(entries) {
+  if (entries.length === 0) return;
   const database = await openMediaDatabase();
-  await new Promise((resolve, reject) => {
-    const transaction = database.transaction('media', 'readwrite');
-    transaction.objectStore('media').put({ path, blob });
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error);
-  });
-  database.close();
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction('media', 'readwrite');
+      transaction.oncomplete = resolve;
+      transaction.onabort = () => reject(transaction.error || new Error('圖片草稿儲存已取消。'));
+      try {
+        for (const entry of entries) transaction.objectStore('media').put(entry);
+      } catch (error) {
+        transaction.abort();
+        reject(error);
+      }
+    });
+  } finally {
+    database.close();
+  }
 }
 
 export async function readStoredMedia() {

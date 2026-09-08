@@ -1,16 +1,28 @@
 import { icons } from '../lib/icons';
 import { withBase } from '../lib/paths';
+import { getProfileFonts } from '../lib/font-presets';
 import { buildThemeCss, normalizeThemeColor } from '../../scripts/theme-color.mjs';
 import { isStudioPreviewSearch } from '../../scripts/studio-preview-mode.mjs';
 import { isSafeImageSource } from '../../scripts/content-safety.mjs';
 import { renderProfileDocument } from './profile-renderer.js';
 
-const FONT_FAMILIES = {
-  system: '"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif',
-  'noto-sans-tc': '"Noto Sans TC", sans-serif',
-  'noto-serif-tc': '"Noto Serif TC", serif',
-  'lxgw-wenkai-tc': '"LXGW WenKai TC", cursive',
-};
+function updateFonts(appearance) {
+  const { bodyFamily, displayFamily, stylesheetUrl } = getProfileFonts(appearance.bodyFont, appearance.displayFont);
+  document.documentElement.style.setProperty('--font-body', bodyFamily);
+  document.documentElement.style.setProperty('--font-display', displayFamily);
+  let stylesheet = document.querySelector('#profile-fonts');
+  if (!stylesheetUrl) {
+    stylesheet?.remove();
+    return;
+  }
+  if (!stylesheet) {
+    stylesheet = document.createElement('link');
+    stylesheet.id = 'profile-fonts';
+    stylesheet.rel = 'stylesheet';
+    document.head.append(stylesheet);
+  }
+  if (stylesheet.getAttribute('href') !== stylesheetUrl) stylesheet.setAttribute('href', stylesheetUrl);
+}
 
 if (window.parent !== window) {
   const rendererRoot = document.querySelector('main');
@@ -36,8 +48,7 @@ if (window.parent !== window) {
     if (themeStyle) themeStyle.textContent = buildThemeCss(mainColor);
     document.documentElement.style.fontSize = `${Number(answers.appearance.fontScale || 1) * 100}%`;
     document.documentElement.style.setProperty('--small-text-base', `${Number(answers.appearance.smallTextScale || 1)}rem`);
-    document.documentElement.style.setProperty('--font-body', FONT_FAMILIES[answers.appearance.bodyFont] || FONT_FAMILIES.system);
-    document.documentElement.style.setProperty('--font-display', FONT_FAMILIES[answers.appearance.displayFont] || FONT_FAMILIES.system);
+    updateFonts(answers.appearance);
     renderProfileDocument(rendererRoot, answers, {
       icons,
       assets,

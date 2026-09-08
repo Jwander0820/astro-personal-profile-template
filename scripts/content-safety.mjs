@@ -1,13 +1,20 @@
 const SAFE_PROFILE_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
 const SAFE_HTTP_PROTOCOLS = new Set(['http:', 'https:']);
 
+function decodeNumericEntity(value, radix) {
+  const codePoint = Number.parseInt(value, radix);
+  return codePoint <= 0x10ffff && !(codePoint >= 0xd800 && codePoint <= 0xdfff)
+    ? String.fromCodePoint(codePoint)
+    : '\uFFFD';
+}
+
 function decodeUrlEntities(value) {
   return value
     .replace(/&colon;/gi, ':')
     .replace(/&tab;/gi, '\t')
     .replace(/&newline;/gi, '\n')
-    .replace(/&#x([0-9a-f]+);?/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
-    .replace(/&#([0-9]+);?/g, (_, code) => String.fromCodePoint(Number.parseInt(code, 10)));
+    .replace(/&#x([0-9a-f]+);?/gi, (_, code) => decodeNumericEntity(code, 16))
+    .replace(/&#([0-9]+);?/g, (_, code) => decodeNumericEntity(code, 10));
 }
 
 function compactUrl(value) {

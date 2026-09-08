@@ -5,14 +5,15 @@ import StudioExampleLink from '../components/StudioExampleLink.astro';
 import StudioRouteNav from '../components/StudioRouteNav.astro';
 import { withBase } from '../lib/paths';
 import { withStudioPreviewQuery } from '../../scripts/studio-preview-mode.mjs';
+import { studioApiUrl } from '../../scripts/studio-network.mjs';
 import '../styles/online-studio.css';
 
-const runtime = globalThis as typeof globalThis & { process: { cwd(): string } };
+const runtime = globalThis as typeof globalThis & { process: { cwd(): string; env: Record<string, string | undefined> } };
 const content = await loadStudioContent(runtime.process.cwd());
 const initialAnswers = createProfileAnswersFromStudioContent(content);
 const bootstrap = {
   initialAnswers,
-  localApiUrl: 'http://localhost:4322',
+  localApiUrl: studioApiUrl(import.meta.env.DEV, runtime.process.env),
 };
 const bootstrapJson = JSON.stringify(bootstrap).replace(/</g, '\\u003c');
 const favicon = withBase('/favicon.svg');

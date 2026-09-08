@@ -34,6 +34,8 @@ npm run dev
 
 網頁版只把草稿保存在瀏覽器的 localStorage 與 IndexedDB，不會存取 GitHub 或自動上傳。完成後下載 `profile-settings.zip` 或 `profile.answers.json`。
 
+預覽支援字型切換及 Markdown 清單、斜體、引用與表格。ZIP 匯入會先驗證內容；驗證或圖片儲存失敗時保留原草稿。預覽範圍與外部字型載入需求請見[常見問題](docs/FAQ.md)。
+
 若部署後看不到 Studio，請參考[部署模式說明](#profile-studio-部署模式)；未設定 allowlist 的 fork 在 `auto` 模式下預設不公開 Studio。
 
 ### 路徑 B：本機 Profile Studio 直接寫入專案
@@ -51,6 +53,8 @@ npm run studio
 ```
 
 再開啟 `http://localhost:4321/studio/`。本機模式仍使用同一個 Studio 頁面，但會顯示「儲存到專案」按鈕。
+
+若 `4321` 或 `4322` 被占用或遭 Windows 保留，啟動器會自動改用可用埠；請以終端機列出的 `Profile Studio` 網址為準。按 `Ctrl+C` 可停止預覽與本機寫入服務。
 
 儲存前會先：
 

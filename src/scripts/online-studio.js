@@ -13,7 +13,7 @@ import {
   readStoredMedia,
   registerStudioImage,
   serializeStudioImages,
-  writeStoredMedia,
+  writeStoredMediaBatch,
 } from './studio-media.js';
 import { applyProjectPlan, formatProjectPlan, requestProjectPlan } from './studio-project.js';
 
@@ -541,13 +541,17 @@ export function mountOnlineStudio() {
     toast('圖片已加入草稿並顯示在正式預覽。');
   }
 
-  async function importJsonText(text) {
+  function parseImportedDraft(text) {
     const imported = resolveProfileAnswerUpdate(state, JSON.parse(text)).answers;
-    state = normalizeDraft({
+    return normalizeDraft({
       $schema: './docs/profile-answers.schema.json',
       ...imported,
       applyMode: 'replace',
     }, initialAnswers);
+  }
+
+  async function importJsonText(text) {
+    state = parseImportedDraft(text);
     refreshAll();
   }
 
@@ -560,7 +564,8 @@ export function mountOnlineStudio() {
     const entries = readSettingsZip(new Uint8Array(await file.arrayBuffer()));
     const answersBytes = entries.get('profile.answers.json');
     if (!answersBytes) throw new Error('ZIP 裡找不到 profile.answers.json。');
-    await importJsonText(new TextDecoder().decode(answersBytes));
+    const nextState = parseImportedDraft(new TextDecoder().decode(answersBytes));
+    const media = [];
     for (const [name, bytes] of entries) {
       if (!name.startsWith('images/')) continue;
       const extension = name.toLowerCase().split('.').pop();
@@ -569,11 +574,24 @@ export function mountOnlineStudio() {
       const path = `/${name}`;
       if (bytes.length > 5 * 1024 * 1024) throw new Error(`${name} 超過單張圖片 5 MB 上限。`);
       const blob = new Blob([bytes], { type: types[extension] });
-      imageFiles.set(path, blob);
-      await writeStoredMedia(path, blob);
-      objectUrls.set(path, URL.createObjectURL(blob));
+      media.push({ path, blob });
     }
-    renderPreview();
+    const nextUrls = new Map();
+    try {
+      for (const { path, blob } of media) nextUrls.set(path, URL.createObjectURL(blob));
+      await writeStoredMediaBatch(media);
+    } catch (error) {
+      nextUrls.forEach((url) => URL.revokeObjectURL(url));
+      throw error;
+    }
+    for (const { path, blob } of media) {
+      const oldUrl = objectUrls.get(path);
+      if (oldUrl) URL.revokeObjectURL(oldUrl);
+      imageFiles.set(path, blob);
+      objectUrls.set(path, nextUrls.get(path));
+    }
+    state = nextState;
+    refreshAll();
   }
 
   async function saveToProject() {

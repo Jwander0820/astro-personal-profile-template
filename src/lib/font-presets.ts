@@ -28,3 +28,15 @@ export function getGoogleFontsUrl(...ids: Array<string | undefined>) {
   const query = families.map((family) => `family=${encodeURIComponent(family)}`).join('&');
   return `https://fonts.googleapis.com/css2?${query}&display=swap`;
 }
+
+export function getProfileFonts(bodyFont?: string, displayFont?: string) {
+  const body = getFontPreset(bodyFont);
+  const display = getFontPreset(displayFont);
+  return {
+    bodyFamily: body.cssFamily,
+    displayFamily: display.id === 'system'
+      ? '"Noto Serif TC", "Noto Serif JP", "Yu Mincho", "Songti TC", serif'
+      : display.cssFamily,
+    stylesheetUrl: getGoogleFontsUrl(body.id, display.id),
+  };
+}

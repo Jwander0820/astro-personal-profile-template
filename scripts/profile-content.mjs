@@ -1,5 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
+import { load as loadYaml, JSON_SCHEMA } from 'js-yaml';
 import { isSafeHttpUrl, isSafeImageSource, isSafeProfileUrl } from './content-safety.mjs';
 import { atomicWriteText, withFileWriteLock } from './file-writes.mjs';
 import { loadFortuneBucket, replaceFortuneBucket } from './fortune-content.mjs';
@@ -28,63 +29,12 @@ const STARTER_LINKS = new Set(['github', 'live-archive', 'monthly-playlist', 'pr
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
-function splitInlineList(value) {
-  const items = [];
-  let current = '';
-  let quote = '';
-  for (const character of value) {
-    if ((character === '"' || character === "'") && (!quote || quote === character)) {
-      quote = quote ? '' : character;
-      current += character;
-    } else if (character === ',' && !quote) {
-      items.push(current.trim());
-      current = '';
-    } else {
-      current += character;
-    }
-  }
-  if (current.trim()) items.push(current.trim());
-  return items;
-}
-
-function parseScalar(raw) {
-  const value = raw.trim();
-  if (value === '') return '';
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-  if (value === 'null' || value === '~') return null;
-  if (/^-?\d+(?:\.\d+)?$/.test(value)) return Number(value);
-  if (value.startsWith('[') && value.endsWith(']')) {
-    return splitInlineList(value.slice(1, -1)).map(parseScalar);
-  }
-  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-    if (value.startsWith('"')) {
-      try { return JSON.parse(value); } catch { return value.slice(1, -1); }
-    }
-    return value.slice(1, -1).replace(/''/g, "'");
-  }
-  return value.replace(/\s+#.*$/, '').trim();
-}
-
 export function parseMarkdown(source) {
   const normalized = source.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
   const match = normalized.match(/^---\n([\s\S]*?)\n---(?:\n|$)([\s\S]*)$/);
   if (!match) throw new Error('Markdown 檔案缺少有效的 frontmatter。');
-  const data = {};
-  let activeKey = null;
-  for (const rawLine of match[1].split('\n')) {
-    if (!rawLine.trim() || rawLine.trimStart().startsWith('#')) continue;
-    const listItem = rawLine.match(/^\s+-\s+(.+)$/);
-    if (listItem && activeKey) {
-      if (!Array.isArray(data[activeKey])) data[activeKey] = [];
-      data[activeKey].push(parseScalar(listItem[1]));
-      continue;
-    }
-    const field = rawLine.match(/^([A-Za-z][A-Za-z0-9_-]*):(?:\s*(.*))?$/);
-    if (!field) continue;
-    activeKey = field[1];
-    data[activeKey] = field[2]?.trim() ? parseScalar(field[2]) : [];
-  }
+  const data = loadYaml(match[1], { schema: JSON_SCHEMA });
+  if (!isObject(data)) throw new Error('Markdown frontmatter 必須是欄位物件。');
   return { data, body: match[2].replace(/^\n/, '').replace(/\s+$/, '') };
 }
 
@@ -93,9 +43,11 @@ function formatScalar(value) {
   if (typeof value === 'boolean' || typeof value === 'number') return String(value);
   if (value === null || value === undefined) return '';
   const text = String(value);
-  const resemblesTypedScalar = /^-?\d+(?:\.\d+)?$/.test(text) || ['true', 'false', 'null', '~'].includes(text);
-  if (!text || resemblesTypedScalar || /[:#[\]{},&*!?|>'"%@`]|^[-?]|\s$|^\s/.test(text)) {
-    return JSON.stringify(text);
+  if (!text || /[\u0000-\u001f\u007f-\u009f\u2028\u2029:#[\]{},&*!?|>'"%@`]|^[-?]|\s$|^\s/.test(text)
+    || loadYaml(text) !== text) {
+    return JSON.stringify(text).replace(/[\u007f-\u009f\u2028\u2029]/g, (character) => (
+      `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`
+    ));
   }
   return text;
 }

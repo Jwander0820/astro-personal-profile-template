@@ -3,6 +3,8 @@ import { cp, mkdir, mkdtemp, readFile, rm, stat, utimes } from 'node:fs/promises
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { createServer as createTcpServer } from 'node:net';
+import { EventEmitter } from 'node:events';
 import {
   applyProfileAnswers,
   createStudioImageBlock,
@@ -43,6 +45,11 @@ import { resolveOnlineStudioAccess } from './studio-access.mjs';
 import { extractIframeSource, normalizeEmbedSource } from './embed-source.mjs';
 import { contentText, contentTextArray, contentTextMax } from './content-text-schema.mjs';
 import { applyProfileProjectUpdate, planProfileProjectUpdate, prepareProfileProjectUpdate } from './profile-project.mjs';
+import { createSatteriMarkdownProcessor } from '@astrojs/markdown-satteri';
+import { fromHtml } from 'hast-util-from-html';
+import { toHtml } from 'hast-util-to-html';
+import { renderPreviewMarkdown } from '../src/scripts/preview-markdown.js';
+import { findLocalPort, listenLocalServer, studioApiUrl, studioPort } from './studio-network.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), 'profile-tools-'));
@@ -57,6 +64,80 @@ async function createProjectCopy(name) {
 }
 
 try {
+  assert.equal(studioPort(undefined, 4322), 4322);
+  assert.equal(studioPort('0', 4322), 0);
+  for (const value of ['-1', '65536', 'abc', '4322.5']) assert.throws(() => studioPort(value, 4322), /連接埠/);
+  assert.equal(studioApiUrl(true, { STUDIO_PORT: '54321' }), 'http://localhost:54321');
+  assert.equal(studioApiUrl(false, { STUDIO_PORT: '54321' }), 'http://localhost:4322');
+  assert.equal(studioApiUrl(false, { STUDIO_PORT: 'invalid' }), 'http://localhost:4322');
+  const occupied = createTcpServer();
+  const fallbackServer = createTcpServer();
+  try {
+    const occupiedPort = await listenLocalServer(occupied, 0);
+    let fallbackReason;
+    const actualPort = await listenLocalServer(fallbackServer, occupiedPort, (_, __, reason) => { fallbackReason = reason; });
+    assert.notEqual(actualPort, occupiedPort);
+    assert.equal(fallbackReason, 'EADDRINUSE');
+    assert.equal(fallbackServer.address().address, '127.0.0.1');
+  } finally {
+    await Promise.all([occupied, fallbackServer].filter((server) => server.listening).map((server) => new Promise((resolve) => server.close(resolve))));
+  }
+  // Windows port exclusions report EACCES even though no process is listening.
+  const excluded = new EventEmitter();
+  const attemptedPorts = [];
+  excluded.listen = ({ port }) => {
+    attemptedPorts.push(port);
+    queueMicrotask(() => port === 4322
+      ? excluded.emit('error', Object.assign(new Error('reserved'), { code: 'EACCES' }))
+      : excluded.emit('listening'));
+  };
+  excluded.address = () => ({ port: 54321 });
+  assert.equal(await listenLocalServer(excluded, 4322), 54321);
+  assert.deepEqual(attemptedPorts, [4322, 14322]);
+  const availablePort = await findLocalPort(0);
+  const releasedProbe = createTcpServer();
+  try {
+    assert.equal(await listenLocalServer(releasedProbe, availablePort), availablePort);
+  } finally {
+    if (releasedProbe.listening) await new Promise((resolve) => releasedProbe.close(resolve));
+  }
+  const multilineFields = { displayName: '第一行\n第二行', title: '引號 " 與反斜線 \\ 路徑', tags: ['一\n二', '1e3', 'NULL', '2026-09-08', 'tab\there', 'CR\rLF\nNEL\u0085LS\u2028PS\u2029', 'control\u0080'] };
+  assert.deepEqual(parseMarkdown(stringifyMarkdown(multilineFields)).data, multilineFields);
+  assert.equal(parseMarkdown('---\ntitle: >-\n  第一行\n  第二行\n---\n').data.title, '第一行 第二行');
+  assert.throws(() => parseMarkdown('---\ntitle: [unfinished\n---\n'));
+  const formalMarkdown = await createSatteriMarkdownProcessor({ mdastPlugins: [createContentSafetyMdastPlugin()] });
+  // Compare parsed markup so equivalent HTML entities do not mask real DOM differences.
+  const compactHtml = (html) => toHtml(fromHtml(html, { fragment: true })).trim().replace(/>\s+</g, '><');
+  for (const source of [
+    '- 第一項\n- 第二項\n\n*斜體*與**粗體**\n\n> 引用',
+    '1. 第一項\n2. 第二項\n\n`inline code`\n\n~~刪除~~',
+    '[公開連結](https://example.com/path?q=1) 與 [頁內連結](#about-heading)',
+    '| A | B |\n| --- | --- |\n| 1 | 2 |',
+    '## 標題 &amp; *斜體*\n\n## 標題 &amp; *斜體*\n\n[前往標題](#標題--斜體)',
+    '### *A* ![Cat](https://example.com/a.png) `x`\n\n[前往標題](#a--x)',
+    'A[^1]\n\n[^1]: Footnote',
+    '第一個[^note]，再次引用[^note]。\n\n[^note]: **粗體**註腳\n\n    第二段。',
+    '未知註腳[^missing]。\n\n[^unused]: 不應顯示',
+    '<script>alert(1)</script>',
+    '文字 <img src=x onerror=alert(1)> 後文',
+  ]) {
+    assert.equal(compactHtml(renderPreviewMarkdown(source)), compactHtml((await formalMarkdown.render(source)).code));
+  }
+  for (const source of ['[unsafe](javascript:alert%281%29)', '![unsafe](data:text/html,hello)', '[unsafe](javascript&colon;alert%281%29)']) {
+    assert.doesNotMatch(renderPreviewMarkdown(source), /<(a|img)\b/);
+    await assert.rejects(formalMarkdown.render(source), /blocked or invalid protocol/);
+  }
+  assert.doesNotMatch(renderPreviewMarkdown('<script>alert(1)</script>'), /<script/i);
+  const quotedFootnote = fromHtml(renderPreviewMarkdown('文字[^a"onclick="alert(1)]。\n\n[^a"onclick="alert(1)]: 安全註腳'), { fragment: true });
+  const assertNoEventHandlers = (node) => {
+    for (const name of Object.keys(node.properties || {})) assert.doesNotMatch(name, /^on/i);
+    node.children?.forEach(assertNoEventHandlers);
+  };
+  assertNoEventHandlers(quotedFootnote);
+  for (const url of ['https://example.com?q=&#9999999999;', 'https://example.com?q=&#x110000;']) {
+    assert.doesNotThrow(() => renderPreviewMarkdown(`[連結](${url})`));
+    await assert.doesNotReject(formalMarkdown.render(`[連結](${url})`));
+  }
   assert.equal(contentText.parse(12345), '12345');
   assert.equal(contentText.parse('12345'), '12345');
   assert.deepEqual(contentTextArray.parse([101, '202']), ['101', '202']);
@@ -885,6 +966,8 @@ try {
   assert.ok(renderer.includes("node('nav', 'socials')"));
   assert.ok(previewBridge.includes("event.data?.type !== 'profile-studio:render'"));
   assert.ok(studioServerSource.includes("'Access-Control-Allow-Origin'"));
+  assert.ok(onlineStudioPage.includes('studioApiUrl(import.meta.env.DEV, runtime.process.env)'));
+  assert.ok(fortuneStudioPage.includes('studioApiUrl(import.meta.env.DEV, runtime.process.env)'));
   assert.ok(studioServerSource.includes("Location: `http://localhost:${previewPort}/studio/`"));
   assert.ok(fortuneStudioPage.includes('/studio/fortune-poem/preview/'));
   assert.ok(fortuneStudioPreviewPage.includes('<CustomBlock'));
