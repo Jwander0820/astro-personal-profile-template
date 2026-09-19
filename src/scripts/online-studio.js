@@ -9,15 +9,17 @@ import { normalizeEmbedSource } from '../../scripts/embed-source.mjs';
 import { icons } from '../lib/icons';
 import { createSettingsZip, readSettingsZip } from './settings-package.js';
 import {
-  clearStoredMedia,
   readStoredMedia,
+  referencedStudioImages,
   registerStudioImage,
   serializeStudioImages,
+  storeStudioMedia,
   writeStoredMediaBatch,
 } from './studio-media.js';
 import { applyProjectPlan, formatProjectPlan, requestProjectPlan } from './studio-project.js';
+import { createDraftStore, createDraftHistory } from './studio-draft.js';
+import { showValidationError, clearValidationError } from './studio-validation.js';
 
-const STORAGE_KEY = 'profile-online-studio-draft-v2';
 const HOME_LABELS = {
   about: 'About me',
   turntable: '播放清單',
@@ -201,10 +203,6 @@ function splitList(value, maximum = 20) {
   return [...new Set(String(value || '').split(/[,，\n]/).map((item) => item.trim()).filter(Boolean))].slice(0, maximum);
 }
 
-function safeDraft(value) {
-  return value && typeof value === 'object' && value.version === 1 && value.identity && value.appearance;
-}
-
 function normalizeDraft(value, fallback = {}) {
   const draft = clone(value);
   draft.appearance ||= clone(APPEARANCE_DEFAULTS);
@@ -245,9 +243,14 @@ export function mountOnlineStudio() {
   if (!bootstrapNode) return;
   const bootstrap = JSON.parse(bootstrapNode.textContent);
   const initialAnswers = normalizeDraft(bootstrap.initialAnswers);
+  const draftStore = createDraftStore(bootstrap.draftScope, initialAnswers);
   const imageFiles = new Map();
   const objectUrls = new Map();
-  let state = loadStoredDraft(initialAnswers);
+  let state = normalizeDraft(draftStore.initial, initialAnswers);
+  let history;
+  let busy = false;
+  let saveSequence = 0;
+  let unpersisted = false;
   let toastTimer;
   let localMode = false;
   let mediaRestored = false;
@@ -257,14 +260,54 @@ export function mountOnlineStudio() {
   const preview = document.querySelector('#profile-preview');
   const saveProjectButton = document.querySelector('#save-project');
 
-  function loadStoredDraft(fallback) {
-    try {
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (safeDraft(stored)) return normalizeDraft(stored, fallback);
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
+  function showConflict() {
+    unpersisted = true;
+    document.querySelector('#draft-conflict').hidden = false;
+    status.textContent = '草稿有分頁衝突，請選擇要保留的版本';
+  }
+
+  function syncHistoryButtons() {
+    document.querySelector('#undo-draft').disabled = busy || !history?.canUndo;
+    document.querySelector('#redo-draft').disabled = busy || !history?.canRedo;
+  }
+
+  async function runExclusive(operation) {
+    if (busy) return;
+    busy = true;
+    syncHistoryButtons();
+    const editor = document.querySelector('#online-editor');
+    editor.inert = true;
+    editor.setAttribute('aria-busy', 'true');
+    try { await operation(); }
+    catch (error) { toast(error.message || '操作失敗，原草稿仍保留。', true); }
+    finally {
+      busy = false;
+      editor.inert = false;
+      editor.removeAttribute('aria-busy');
+      syncHistoryButtons();
     }
-    return clone(fallback);
+  }
+
+  function restoreImageMap(images) {
+    objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    objectUrls.clear();
+    imageFiles.clear();
+    for (const [path, blob] of images) {
+      imageFiles.set(path, blob);
+      objectUrls.set(path, URL.createObjectURL(blob));
+    }
+  }
+
+  async function moveHistory(direction) {
+    const entry = history?.peek(direction);
+    if (!entry) return;
+    await writeStoredMediaBatch([...entry.images].map(([path, blob]) => ({ path, blob })), bootstrap.draftScope);
+    history.move(direction);
+    state = clone(entry.answers);
+    restoreImageMap(entry.images);
+    clearValidationError();
+    refreshAll(false);
+    await persist(undefined, false);
   }
 
   function toast(message, isError = false) {
@@ -275,12 +318,23 @@ export function mountOnlineStudio() {
     toastTimer = window.setTimeout(() => toastNode.classList.remove('is-visible'), 3600);
   }
 
-  function persist() {
+  async function persist(group, record = true) {
+    if (record) history?.record(state, imageFiles, group);
+    syncHistoryButtons();
+    const sequence = ++saveSequence;
+    unpersisted = true;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      status.textContent = localMode ? '本機模式 · 草稿尚未儲存' : '草稿已留在這台裝置';
+      const saved = await draftStore.save(state);
+      if (!saved) { showConflict(); return false; }
+      if (sequence === saveSequence) {
+        unpersisted = false;
+        document.querySelector('#draft-conflict').hidden = true;
+        status.textContent = localMode ? '本機模式 · 草稿尚未儲存' : '草稿已留在這台裝置';
+      }
+      return true;
     } catch {
       status.textContent = '瀏覽器無法保存草稿，請記得下載';
+      return false;
     }
   }
 
@@ -448,12 +502,13 @@ export function mountOnlineStudio() {
     }, window.location.origin);
   }
 
-  function refreshAll() {
+  function refreshAll(record = true) {
     syncStaticControls();
     renderCollections();
     renderHomeOrder();
     renderPreview();
-    persist();
+    if (record) persist();
+    syncHistoryButtons();
   }
 
   function addCollectionItem(kind, preset) {
@@ -477,6 +532,7 @@ export function mountOnlineStudio() {
       return { content: serializeProfileAnswers(result.answers), result };
     } catch (error) {
       status.textContent = '設定還有欄位需要修正';
+      showValidationError(error, activateTab);
       toast(error.message || '設定檔格式不正確。', true);
       throw error;
     }
@@ -486,7 +542,7 @@ export function mountOnlineStudio() {
     let exported;
     try { exported = exportAnswers(); } catch { return; }
     const files = [{ name: 'profile.answers.json', data: new TextEncoder().encode(exported.content) }];
-    for (const [path, blob] of imageFiles) {
+    for (const [path, blob] of referencedStudioImages(exported.result.answers, imageFiles)) {
       files.push({ name: path.replace(/^\//, ''), data: new Uint8Array(await blob.arrayBuffer()) });
     }
     const blob = new Blob([createSettingsZip(files)], { type: 'application/zip' });
@@ -532,7 +588,7 @@ export function mountOnlineStudio() {
   }
 
   async function registerImage(file, assign) {
-    const path = await registerStudioImage(file, imageFiles);
+    const path = await registerStudioImage(file, imageFiles, bootstrap.draftScope);
     const previousUrl = objectUrls.get(path);
     if (previousUrl) URL.revokeObjectURL(previousUrl);
     objectUrls.set(path, URL.createObjectURL(file));
@@ -552,6 +608,7 @@ export function mountOnlineStudio() {
 
   async function importJsonText(text) {
     state = parseImportedDraft(text);
+    clearValidationError();
     refreshAll();
   }
 
@@ -565,7 +622,7 @@ export function mountOnlineStudio() {
     const answersBytes = entries.get('profile.answers.json');
     if (!answersBytes) throw new Error('ZIP 裡找不到 profile.answers.json。');
     const nextState = parseImportedDraft(new TextDecoder().decode(answersBytes));
-    const media = [];
+    let media = [];
     for (const [name, bytes] of entries) {
       if (!name.startsWith('images/')) continue;
       const extension = name.toLowerCase().split('.').pop();
@@ -578,8 +635,14 @@ export function mountOnlineStudio() {
     }
     const nextUrls = new Map();
     try {
+      media = await storeStudioMedia(media, bootstrap.draftScope);
+      const replacements = new Map(media.map(({ requestedPath, path }) => [requestedPath, path]));
+      const replace = (source) => replacements.get(source) || source;
+      nextState.media.avatar = replace(nextState.media.avatar);
+      nextState.media.background = replace(nextState.media.background);
+      nextState.sections.forEach((item) => { if (item.image) item.image = replace(item.image); });
+      nextState.imageBlocks.forEach((item) => { item.image = replace(item.image); });
       for (const { path, blob } of media) nextUrls.set(path, URL.createObjectURL(blob));
-      await writeStoredMediaBatch(media);
     } catch (error) {
       nextUrls.forEach((url) => URL.revokeObjectURL(url));
       throw error;
@@ -597,10 +660,11 @@ export function mountOnlineStudio() {
   async function saveToProject() {
     if (!localMode) return;
     try {
+      if (!await persist()) return;
       saveProjectButton.disabled = true;
       const exported = exportAnswers();
       const answers = JSON.parse(exported.content);
-      const payload = { mode: 'replace', answers, images: await serializeStudioImages(imageFiles) };
+      const payload = { mode: 'replace', answers, images: await serializeStudioImages(referencedStudioImages(answers, imageFiles)) };
       status.textContent = '正在建立套用計畫…';
       const plan = await requestProjectPlan(bootstrap.localApiUrl, payload);
       if (plan.changes.length > 0 && !window.confirm(formatProjectPlan(plan))) {
@@ -608,14 +672,22 @@ export function mountOnlineStudio() {
         return;
       }
       status.textContent = '正在一次寫入圖片與設定…';
+      if (!draftStore.isCurrent()) { showConflict(); return; }
       const result = await applyProjectPlan(bootstrap.localApiUrl, { ...payload, expectedPlanToken: plan.token });
+      const renamedMedia = Object.entries(result.plan.imageReplacements || {})
+        .filter(([from]) => imageFiles.has(from))
+        .map(([from, path]) => ({ path, blob: imageFiles.get(from) }));
       state = normalizeDraft(result.answers);
-      imageFiles.clear();
-      await clearStoredMedia();
-      objectUrls.forEach((url) => URL.revokeObjectURL(url));
-      objectUrls.clear();
-      refreshAll();
-      status.textContent = '已儲存到本機專案';
+      // Keep immutable media for undo and subsequent ZIP exports. A cache
+      // failure after a successful project write must not report write failure.
+      for (const { path, blob } of renamedMedia) {
+        imageFiles.set(path, blob);
+        if (!objectUrls.has(path)) objectUrls.set(path, URL.createObjectURL(blob));
+      }
+      try { await writeStoredMediaBatch(renamedMedia, bootstrap.draftScope); }
+      catch { toast('專案已儲存，但瀏覽器圖片備份失敗，請下載設定包。', true); }
+      refreshAll(false);
+      if (await persist()) status.textContent = '已儲存到本機專案';
       toast('已更新 src/content 與 public/images；右側預覽也會跟著重新整理。');
     } catch (error) {
       status.textContent = '本機儲存失敗';
@@ -643,7 +715,7 @@ export function mountOnlineStudio() {
 
   async function restoreStoredImages() {
     try {
-      for (const { path, blob } of await readStoredMedia()) {
+      for (const { path, blob } of await readStoredMedia(bootstrap.draftScope, draftStore.legacyMedia)) {
         imageFiles.set(path, blob);
         objectUrls.set(path, URL.createObjectURL(blob));
       }
@@ -670,6 +742,7 @@ export function mountOnlineStudio() {
   document.addEventListener('input', (event) => {
     const control = event.target.closest('[data-bind]');
     if (!control || control.dataset.array) return;
+    clearValidationError();
     let value = control.dataset.boolean !== undefined
       ? control.checked
       : control.dataset.list !== undefined
@@ -684,13 +757,14 @@ export function mountOnlineStudio() {
       });
     }
     renderPreview();
-    persist();
+    persist(control.dataset.bind);
   });
 
   Object.keys(COLLECTIONS).forEach((kind) => {
     document.querySelector(COLLECTIONS[kind].container).addEventListener('input', (event) => {
       const control = event.target.closest('[data-array]');
       if (!control) return;
+      clearValidationError();
       const index = Number(control.dataset.index);
       const field = control.dataset.field;
       const maximumItems = kind === 'links' ? 6 : 8;
@@ -713,7 +787,7 @@ export function mountOnlineStudio() {
       details.querySelector('.collection-item__title strong').textContent = COLLECTIONS[kind].title(state[kind][index]);
       details.querySelector('.collection-item__title small').textContent = COLLECTIONS[kind].subtitle(state[kind][index]);
       renderPreview();
-      persist();
+      persist(`${kind}.${index}.${field}`);
     });
   });
 
@@ -722,14 +796,11 @@ export function mountOnlineStudio() {
     const arrayImage = event.target.closest('[data-image-array]');
     const file = event.target.files?.[0];
     if (!file || (!media && !arrayImage)) return;
-    const operation = media
+    runExclusive(() => media
       ? registerImage(file, (path) => setPath(state, media.dataset.imageTarget, path))
       : registerImage(file, (path) => {
         state[arrayImage.dataset.imageArray][Number(arrayImage.dataset.index)][arrayImage.dataset.field] = path;
-      });
-    operation.catch((error) => {
-      toast(error.message || '無法讀取圖片。', true);
-    });
+      }));
     event.target.value = '';
   });
 
@@ -841,9 +912,10 @@ export function mountOnlineStudio() {
     const file = input.files?.[0];
     if (!file) return;
     try {
-      await importPackage(file);
-      refreshAll();
-      toast('設定包已匯入，目前只更新草稿與預覽。');
+      await runExclusive(async () => {
+        await importPackage(file);
+        toast('設定包已匯入，目前只更新草稿與預覽；可按撤銷復原。');
+      });
     } catch (error) {
       toast(error.message || '無法讀取這份設定包。', true);
     } finally {
@@ -853,8 +925,10 @@ export function mountOnlineStudio() {
 
   document.querySelector('#import-ai-answers').addEventListener('click', async () => {
     try {
-      await importJsonText(document.querySelector('#ai-answers-json').value);
-      toast('AI 設定已驗證並載入草稿。');
+      await runExclusive(async () => {
+        await importJsonText(document.querySelector('#ai-answers-json').value);
+        toast('AI 設定已驗證並載入草稿；可按撤銷復原。');
+      });
     } catch (error) {
       toast(error.message || 'AI 設定格式不正確。', true);
     }
@@ -871,31 +945,47 @@ export function mountOnlineStudio() {
 
   document.querySelector('#reset-draft').addEventListener('click', async () => {
     if (!window.confirm('要捨棄這台裝置上的草稿，還原成預設內容嗎？')) return;
-    localStorage.removeItem(STORAGE_KEY);
     state = clone(initialAnswers);
-    imageFiles.clear();
-    await clearStoredMedia();
-    objectUrls.forEach((url) => URL.revokeObjectURL(url));
-    objectUrls.clear();
     refreshAll();
-    toast('已還原成預設內容。');
+    toast('已還原成預設內容；可按撤銷復原。');
   });
 
   document.querySelector('#copy-answers').addEventListener('click', copyAnswers);
   document.querySelector('#download-json').addEventListener('click', downloadJson);
-  document.querySelector('#download-answers').addEventListener('click', downloadAnswers);
-  saveProjectButton.addEventListener('click', saveToProject);
+  document.querySelector('#download-answers').addEventListener('click', () => runExclusive(downloadAnswers));
+  saveProjectButton.addEventListener('click', () => runExclusive(saveToProject));
+  document.querySelector('#undo-draft').addEventListener('click', () => runExclusive(() => moveHistory(-1)));
+  document.querySelector('#redo-draft').addEventListener('click', () => runExclusive(() => moveHistory(1)));
+  draftStore.subscribe(showConflict);
+  window.addEventListener('beforeunload', (event) => {
+    if (unpersisted) event.preventDefault();
+  });
+  document.querySelector('#draft-load-latest').addEventListener('click', () => runExclusive(async () => {
+    const latest = await draftStore.reload();
+    const media = await readStoredMedia(bootstrap.draftScope, draftStore.legacyMedia);
+    state = normalizeDraft(latest, initialAnswers);
+    restoreImageMap(new Map(media.map(({ path, blob }) => [path, blob])));
+    document.querySelector('#draft-conflict').hidden = true;
+    refreshAll();
+  }));
+  document.querySelector('#draft-keep-local').addEventListener('click', () => runExclusive(async () => {
+    await draftStore.save(state, { overwrite: true });
+    unpersisted = false;
+    document.querySelector('#draft-conflict').hidden = true;
+    status.textContent = '已保留此分頁草稿';
+  }));
 
   renderSocialPicker();
   syncStaticControls();
   renderCollections();
   renderHomeOrder();
-  persist();
-  restoreStoredImages().finally(() => {
+  runExclusive(async () => {
+    await restoreStoredImages();
+    history = createDraftHistory(state, imageFiles);
+    await persist();
     mediaRestored = true;
     renderPreview();
     window.setTimeout(renderPreview, 500);
   });
   detectLocalAdapter();
-  status.textContent = localStorage.getItem(STORAGE_KEY) ? '草稿已留在這台裝置' : '已載入目前網站內容';
 }

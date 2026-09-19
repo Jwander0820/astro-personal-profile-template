@@ -1,6 +1,6 @@
 import { previewProfileAnswers } from '../../scripts/profile-answers.mjs';
+import { createDraftStore } from './studio-draft.js';
 
-const STORAGE_KEY = 'profile-online-studio-draft-v2';
 const GRADES = ['大吉', '中吉', '小吉', '吉', '末吉', '凶', '大凶'];
 const CATEGORIES = [
   ['blessing', '祝福'],
@@ -16,22 +16,6 @@ function element(tag, className, text) {
   return item;
 }
 
-function loadDraft(initialAnswers) {
-  try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (stored?.version === 1 && stored.identity && stored.appearance) {
-      const draft = clone(stored);
-      if (!draft.fortune || !Array.isArray(draft.fortune.fortunes)) {
-        draft.fortune = clone(initialAnswers.fortune);
-      }
-      return draft;
-    }
-  } catch {
-    localStorage.removeItem(STORAGE_KEY);
-  }
-  return clone(initialAnswers);
-}
-
 function nextFortuneId(fortunes) {
   const used = new Set(fortunes.map((fortune) => fortune.id));
   let index = fortunes.length + 1;
@@ -44,7 +28,10 @@ export function mountFortuneStudio() {
   if (!bootstrapNode) return;
   const bootstrap = JSON.parse(bootstrapNode.textContent);
   const initialAnswers = bootstrap.initialAnswers;
-  let state = loadDraft(initialAnswers);
+  const draftStore = createDraftStore(bootstrap.draftScope, initialAnswers);
+  let state = draftStore.initial;
+  if (!Array.isArray(state.fortune?.fortunes)) state.fortune = clone(initialAnswers.fortune);
+  let saveSequence = 0;
   let fortuneRevision = bootstrap.fortuneRevision;
   let localMode = false;
   let frameReady = false;
@@ -70,12 +57,23 @@ export function mountFortuneStudio() {
     toastTimer = window.setTimeout(() => toastNode.classList.remove('is-visible'), 3600);
   }
 
-  function persist() {
+  function showConflict() {
+    document.querySelector('#draft-conflict').hidden = false;
+    status.textContent = '草稿有分頁衝突，請選擇要保留的版本';
+  }
+
+  async function persist() {
+    const sequence = ++saveSequence;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      status.textContent = localMode ? '本機模式 · 尚未寫回專案' : '草稿已留在這台裝置';
+      if (!await draftStore.save(state)) { showConflict(); return false; }
+      if (sequence === saveSequence) {
+        document.querySelector('#draft-conflict').hidden = true;
+        status.textContent = localMode ? '本機模式 · 尚未寫回專案' : '草稿已留在這台裝置';
+      }
+      return true;
     } catch {
       status.textContent = '瀏覽器無法保存草稿';
+      return false;
     }
   }
 
@@ -286,6 +284,7 @@ export function mountFortuneStudio() {
   }
 
   async function saveToProject() {
+    if (!localMode || !await persist()) return;
     let answers;
     try {
       answers = previewProfileAnswers(state).answers;
@@ -368,6 +367,26 @@ export function mountFortuneStudio() {
     list.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
   saveButton.addEventListener('click', saveToProject);
+  draftStore.subscribe(showConflict);
+  document.querySelector('#draft-load-latest').addEventListener('click', async () => {
+    try {
+      state = await draftStore.reload();
+      if (!Array.isArray(state.fortune?.fortunes)) state.fortune = clone(initialAnswers.fortune);
+      headingInput.value = state.fortune.title;
+      descriptionInput.value = state.fortune.description;
+      document.querySelector('#draft-conflict').hidden = true;
+      renderList();
+      renderPreview();
+      status.textContent = '已載入其他分頁草稿';
+    } catch { toast('無法載入草稿，請先保存此分頁內容。', true); }
+  });
+  document.querySelector('#draft-keep-local').addEventListener('click', async () => {
+    try {
+      await draftStore.save(state, { overwrite: true });
+      document.querySelector('#draft-conflict').hidden = true;
+      status.textContent = '已保留此分頁草稿';
+    } catch { toast('瀏覽器無法保存草稿。', true); }
+  });
 
   window.addEventListener('message', (event) => {
     if (event.origin !== window.location.origin || event.source !== frame.contentWindow) return;

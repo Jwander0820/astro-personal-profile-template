@@ -67,3 +67,7 @@ GitHub Pages 是靜態主機，無法安全地在公開頁面直接改 repositor
 `scripts/profile-project.mjs` 是本機寫入的深模組：它驗證圖片、建立 `src/content` 與 `public/images` 暫存副本、配置不覆蓋的檔名、執行 content writer、輸出帶 token 的唯讀 plan，最後以 project-level queue 和 atomic writes 提交。apply 必須帶回使用者確認的 plan token；若底層內容或套用結果已改變，就要求重新預覽。Studio 只透過 `/api/project/plan` 與 `/api/project/apply` 使用這個介面。
 
 前端 `src/scripts/studio-media.js` 封裝 IndexedDB 與圖片序列化，`src/scripts/studio-project.js` 封裝本機 plan/apply transport；`online-studio.js` 保留編輯狀態與 UI 協調，不再自行逐檔寫入。
+
+`studio-draft.js` 集中管理主 Studio 與籤詩頁的草稿版本、跨分頁寫入鎖與衝突偵測。專案識別由 `scripts/studio-scope.mjs` 產生不含本機路徑的雜湊；IndexedDB 也依相同識別隔離。主 Studio 的撤銷記錄只存於目前分頁，保留 immutable Blob 以復原圖片。輸出前由 `referencedStudioImages()` 篩選目前引用的圖片；同名圖片的配置與圖片交易另受共同鎖保護。
+
+答案驗證的錯誤可附帶 `path`，例如 `links.1.url`。`studio-validation.js` 只負責將該路徑映射到編輯欄位，不另寫一套驗證規則。正式頁只載入小型 `profile-preview-loader.js`；確認是 `?studioPreview=1` iframe 後才載入完整預覽橋接與 renderer。

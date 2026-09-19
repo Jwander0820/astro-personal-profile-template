@@ -975,7 +975,7 @@ try {
   assert.ok(fortuneStudioApp.includes('selectedFortune'));
   assert.ok(fortuneStudioApp.includes('if (frameReady || !frame.contentWindow) return;'));
   assert.ok(fortuneDraw.includes("'fortune-draw:show'"));
-  assert.ok(fortuneStudioApp.includes("localStorage.setItem(STORAGE_KEY"));
+  assert.ok(fortuneStudioApp.includes("draftStore.save(state)"));
   assert.ok(fortuneStudioApp.includes('/api/fortunes'));
   assert.ok(fortuneStudioApp.includes('/api/blocks/fortune'));
   assert.ok(iconStudioPage.includes('data-copy={name}'));

@@ -3,6 +3,8 @@ import { loadStudioContent } from '../../../scripts/profile-content.mjs';
 import { createProfileAnswersFromStudioContent } from '../../../scripts/profile-answers.mjs';
 import StudioExampleLink from '../../components/StudioExampleLink.astro';
 import StudioRouteNav from '../../components/StudioRouteNav.astro';
+import StudioDraftConflict from '../../components/StudioDraftConflict.astro';
+import { studioDraftScope } from '../../../scripts/studio-scope.mjs';
 import { withBase } from '../../lib/paths';
 import { studioApiUrl } from '../../../scripts/studio-network.mjs';
 import '../../styles/online-studio.css';
@@ -11,6 +13,7 @@ import '../../styles/fortune-studio.css';
 const runtime = globalThis as typeof globalThis & { process: { cwd(): string; env: Record<string, string | undefined> } };
 const content = await loadStudioContent(runtime.process.cwd());
 const bootstrap = {
+  draftScope: studioDraftScope(import.meta.env.DEV, runtime.process.cwd(), new URL(import.meta.env.BASE_URL, Astro.site).href),
   initialAnswers: createProfileAnswersFromStudioContent(content),
   fortuneRevision: content.fortuneRevision,
   localApiUrl: studioApiUrl(import.meta.env.DEV, runtime.process.env),
@@ -53,6 +56,7 @@ const favicon = withBase('/favicon.svg');
           </div>
         </div>
 
+        <StudioDraftConflict />
         <section class="fortune-copy-card" aria-labelledby="fortune-copy-heading">
           <div class="panel-heading">
             <div><p class="step-label">DISPLAY COPY</p><h2 id="fortune-copy-heading">今日手氣標題與說明</h2></div>

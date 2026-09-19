@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { createSettingsZip, readSettingsZip } from '../../src/scripts/settings-package.js';
+import { applyProfileProjectUpdate, planProfileProjectUpdate } from '../../scripts/profile-project.mjs';
 import {
   STUDIO_PREVIEW_QUERY_PARAM,
   STUDIO_PREVIEW_QUERY_VALUE,
@@ -41,8 +42,36 @@ const browserFixtureAnswers = {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((draft) => {
-    window.localStorage.setItem('profile-online-studio-draft-v2', JSON.stringify(draft));
+    if (!window.localStorage.getItem('profile-online-studio-draft-v2')) {
+      window.localStorage.setItem('profile-online-studio-draft-v2', JSON.stringify(draft));
+    }
   }, browserFixtureAnswers);
+});
+
+async function storedDraft(page) {
+  return page.evaluate(() => {
+    const bootstrap = JSON.parse(document.querySelector('#online-studio-data, #fortune-studio-data').textContent);
+    return JSON.parse(localStorage.getItem(`profile-studio-draft-v3:${bootstrap.draftScope}`));
+  });
+}
+
+async function downloadSettings(page) {
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  const download = page.waitForEvent('download');
+  await page.locator('#download-answers').click();
+  return readSettingsZip(new Uint8Array(await readFile(await (await download).path())));
+}
+
+test('一般首頁不下載預覽 renderer，Studio iframe 仍能即時更新', async ({ page }) => {
+  const requests = [];
+  page.on('request', (request) => requests.push(request.url()));
+  await page.goto('/');
+  await expect(page.locator('h1')).toBeVisible();
+  expect(requests.some((url) => url.includes('profile-preview-bridge'))).toBe(false);
+  await page.goto('/studio/');
+  await page.locator('[data-bind="identity.displayName"]').fill('動態預覽載入測試');
+  await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText('動態預覽載入測試');
+  expect(requests.some((url) => url.includes('profile-preview-bridge'))).toBe(true);
 });
 
 test('字型預覽與正式頁一致且切換時載入所選字型', async ({ page }) => {
@@ -102,7 +131,7 @@ test('Markdown 註腳可來回跳轉且含圖片標題錨點與正式頁一致',
 test('ZIP 圖片驗證失敗時保留原本草稿與圖片', async ({ page }) => {
   await page.goto('/studio/');
   await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText(browserFixtureAnswers.identity.displayName);
-  const draftBefore = await page.evaluate(() => localStorage.getItem('profile-online-studio-draft-v2'));
+  const draftBefore = await storedDraft(page);
   const imported = { ...browserFixtureAnswers, identity: { ...browserFixtureAnswers.identity, displayName: '不可寫入的草稿' } };
   const bytes = createSettingsZip([
     { name: 'profile.answers.json', data: Buffer.from(JSON.stringify(imported)) },
@@ -113,7 +142,7 @@ test('ZIP 圖片驗證失敗時保留原本草稿與圖片', async ({ page }) =>
   await page.locator('#import-answers').setInputFiles({ name: 'invalid.zip', mimeType: 'application/zip', buffer: Buffer.from(bytes) });
   await expect(page.locator('#online-toast')).toContainText('5 MB');
   await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText(browserFixtureAnswers.identity.displayName);
-  expect(await page.evaluate(() => localStorage.getItem('profile-online-studio-draft-v2'))).toBe(draftBefore);
+  expect(await storedDraft(page)).toEqual(draftBefore);
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#download-answers').click();
   const download = await downloadPromise;
@@ -148,7 +177,8 @@ test('ZIP 圖片交易中斷會回復資料庫，成功匯入可再次匯出圖�
   await expect(page.locator('#online-toast')).toContainText('測試交易失敗');
   await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText(browserFixtureAnswers.identity.displayName);
   const storedPaths = await page.evaluate(() => new Promise((resolve, reject) => {
-    const request = indexedDB.open('profile-online-studio-media-v1', 1);
+    const { draftScope } = JSON.parse(document.querySelector('#online-studio-data').textContent);
+    const request = indexedDB.open(`profile-studio-media-v2:${draftScope}`, 1);
     request.onsuccess = () => {
       const database = request.result;
       const query = database.transaction('media').objectStore('media').getAllKeys();
@@ -185,8 +215,9 @@ test('正式首頁保留入口，但 Studio 預覽只顯示使用者內容', asy
   await expect(preview.locator('.footer-studio-link')).toHaveCount(0);
 });
 
-test('390 px Studio 不會產生水平溢出', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+for (const width of [390, 1440]) {
+test(`${width} px Studio 工具列捲動後仍可撤銷重做且不會水平溢出`, async ({ page }, testInfo) => {
+  await page.setViewportSize({ width, height: 844 });
   await page.goto('/studio/');
   await expect(page.locator('#profile-preview')).toBeVisible();
 
@@ -195,10 +226,35 @@ test('390 px Studio 不會產生水平溢出', async ({ page }) => {
     scrollWidth: document.documentElement.scrollWidth,
     bodyWidth: document.body.scrollWidth,
   }));
-  expect(dimensions.clientWidth).toBe(390);
-  expect(dimensions.scrollWidth).toBe(390);
-  expect(dimensions.bodyWidth).toBe(390);
+  expect(dimensions.clientWidth).toBe(width);
+  expect(dimensions.scrollWidth).toBe(width);
+  expect(dimensions.bodyWidth).toBe(width);
+
+  const undo = page.getByRole('button', { name: '撤銷', exact: true });
+  const redo = page.getByRole('button', { name: '重做', exact: true });
+  await expect(undo).toBeDisabled();
+  await expect(redo).toBeDisabled();
+  const location = page.locator('[data-bind="identity.location"]');
+  const original = await location.inputValue();
+  await location.fill('工具列位置測試');
+  await expect(undo).toBeEnabled();
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await page.screenshot({ path: testInfo.outputPath('toolbar-top.png') });
+  await page.locator('[data-bind="media.background"]').scrollIntoViewIfNeeded();
+  const scrollBefore = await page.evaluate(() => window.scrollY);
+  expect(scrollBefore).toBeGreaterThan(100);
+  await expect(undo).toBeInViewport();
+  await expect(redo).toBeInViewport();
+  await undo.focus();
+  await undo.press('Enter');
+  await expect(location).toHaveValue(original);
+  await expect(redo).toBeEnabled();
+  await redo.click();
+  await expect(location).toHaveValue('工具列位置測試');
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+  await page.screenshot({ path: testInfo.outputPath('toolbar-scrolled.png') });
 });
+}
 
 test('更新無關欄位會保留唱盤節點與抽籤結果', async ({ page }) => {
   await page.goto('/studio/');
@@ -385,4 +441,239 @@ test('06 完成設定可下載 JSON、ZIP 並匯入既有回答檔', async ({ pa
   await page.locator('#import-answers').setInputFiles(minimalAnswers);
   await expect(page.locator('[data-bind="identity.displayName"]')).toHaveValue('林小樹');
   await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText('林小樹');
+});
+
+
+test('多分頁修改不互相覆蓋，載入或覆蓋均由使用者選擇', async ({ page, context }) => {
+  await page.goto('/studio/');
+  await expect(page.locator('#online-editor')).not.toHaveAttribute('inert');
+  const other = await context.newPage();
+  await other.goto('/studio/');
+  await expect(other.locator('#online-editor')).not.toHaveAttribute('inert');
+  await expect(page.locator('#draft-conflict')).toBeHidden();
+  await page.locator('[data-bind="identity.displayName"]').fill('分頁 A 的名稱');
+  await expect.poll(async () => (await storedDraft(page)).answers.identity.displayName).toBe('分頁 A 的名稱');
+  await expect(other.locator('#draft-conflict')).toBeVisible();
+  await other.getByLabel('一句話身分', { exact: true }).fill('分頁 B 的標題');
+  await expect(other.locator('#draft-status')).toContainText('衝突');
+  expect((await storedDraft(page)).answers.identity.title).toBe(browserFixtureAnswers.identity.title);
+  await other.locator('#draft-load-latest').click();
+  await expect(other.locator('[data-bind="identity.displayName"]')).toHaveValue('分頁 A 的名稱');
+  await expect(other.locator('#draft-conflict')).toBeHidden();
+  // The version replaced by an explicit reload remains in local undo history.
+  await other.locator('#undo-draft').click();
+  await expect(other.getByLabel('一句話身分', { exact: true })).toHaveValue('分頁 B 的標題');
+  await expect(page.locator('#draft-conflict')).toBeVisible();
+  await page.locator('#draft-keep-local').click();
+  await expect.poll(async () => (await storedDraft(page)).answers.identity.displayName).toBe('分頁 A 的名稱');
+  await expect(other.locator('#draft-conflict')).toBeVisible();
+  await other.close();
+});
+
+test('籤詩編輯與主 Studio 共用草稿並防止跨頁覆蓋', async ({ page, context }) => {
+  await page.goto('/studio/');
+  await page.locator('[data-bind="identity.displayName"]').fill('保留主頁名稱');
+  await expect.poll(async () => (await storedDraft(page)).answers.identity.displayName).toBe('保留主頁名稱');
+  const fortune = await context.newPage();
+  await fortune.goto('/studio/fortune-poem/');
+  await fortune.locator('#fortune-heading-input').fill('新的籤桶標題');
+  await expect.poll(async () => (await storedDraft(fortune)).answers.fortune.title).toBe('新的籤桶標題');
+  await expect(page.locator('#draft-conflict')).toBeVisible();
+  await page.locator('#draft-load-latest').click();
+  await expect(page.locator('[data-bind="identity.displayName"]')).toHaveValue('保留主頁名稱');
+  await expect(page.frameLocator('#profile-preview').getByRole('heading', { name: '新的籤桶標題' })).toBeVisible();
+  await fortune.close();
+});
+
+test('同網域的另一個專案不沿用已遷移的草稿與圖片', async ({ page, context }) => {
+  await page.goto('/studio/');
+  await page.locator('[data-bind="identity.displayName"]').fill('專案 A');
+  await expect.poll(async () => (await storedDraft(page)).answers.identity.displayName).toBe('專案 A');
+  const other = await context.newPage();
+  await other.route('**/studio/', async (route) => {
+    const response = await route.fetch();
+    const html = (await response.text()).replace(/"draftScope":"[^"]+"/, '"draftScope":"another-project"');
+    await route.fulfill({ response, body: html });
+  });
+  await other.goto('/studio/');
+  await expect(other.locator('[data-bind="identity.displayName"]')).not.toHaveValue('專案 A');
+  await other.locator('[data-bind="identity.displayName"]').fill('專案 B');
+  await expect.poll(async () => (await storedDraft(other)).answers.identity.displayName).toBe('專案 B');
+  expect((await storedDraft(page)).answers.identity.displayName).toBe('專案 A');
+  await expect(page.locator('#draft-conflict')).toBeHidden();
+  await other.close();
+});
+
+test('移除卡片、AI 匯入與重設可撤銷及重做', async ({ page }) => {
+  await page.goto('/studio/');
+  await page.getByRole('tab', { name: '公開連結' }).click();
+  await page.locator('#featured-link-list [data-remove]').first().click();
+  await expect(page.locator('#featured-link-list .collection-item')).toHaveCount(1);
+  await page.locator('#undo-draft').click();
+  await expect(page.locator('#featured-link-list .collection-item__title strong')).toHaveText(['First link', 'Second link']);
+  await page.locator('#redo-draft').click();
+  await expect(page.locator('#featured-link-list .collection-item__title strong')).toHaveText(['Second link']);
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  await page.locator('#ai-answers-json').fill(JSON.stringify({ version: 1, identity: { displayName: '匯入的名字' } }));
+  await page.locator('#import-ai-answers').click();
+  await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText('匯入的名字');
+  await page.locator('#undo-draft').click();
+  await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText(browserFixtureAnswers.identity.displayName);
+  await page.locator('#redo-draft').click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator('#reset-draft').click();
+  await page.locator('#undo-draft').click();
+  await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText('匯入的名字');
+});
+
+test('替換圖片只匯出目前引用的檔案，撤銷可復原圖片', async ({ page }) => {
+  await page.goto('/studio/');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  const upload = page.locator('[data-image-target="media.avatar"]');
+  await upload.setInputFiles({ name: 'first.png', mimeType: 'image/png', buffer: png });
+  await expect(page.locator('[data-bind="media.avatar"]')).toHaveValue('/images/first.png');
+  await upload.setInputFiles({ name: 'second.png', mimeType: 'image/png', buffer: png });
+  await expect(page.locator('[data-bind="media.avatar"]')).toHaveValue('/images/second.png');
+  expect([...(await downloadSettings(page)).keys()]).toEqual(['profile.answers.json', 'images/second.png']);
+  await page.locator('#undo-draft').click();
+  const restored = await downloadSettings(page);
+  expect([...restored.keys()]).toEqual(['profile.answers.json', 'images/first.png']);
+  expect(Buffer.from(restored.get('images/first.png'))).toEqual(png);
+  await expect.poll(() => page.frameLocator('#profile-preview').locator('.avatar').evaluate((image) => image.complete && image.naturalWidth)).toBeTruthy();
+});
+
+test('本機儲存排除舊圖片並保留寫入交易及 ZIP 再匯出', async ({ page }) => {
+  const root = await mkdtemp(path.resolve('.astro', 'browser-project-'));
+  try {
+    await cp('src/content', path.join(root, 'src/content'), { recursive: true });
+    await cp('public/images', path.join(root, 'public/images'), { recursive: true });
+    let savedPayload;
+    let releasePlan;
+    await page.route('http://localhost:4322/api/**', async (route) => {
+      try {
+        const request = route.request();
+        const url = new URL(request.url());
+        if (url.pathname === '/api/status') return route.fulfill({ json: { ok: true } });
+        const payload = request.postDataJSON();
+        if (url.pathname === '/api/project/plan') {
+          await new Promise((resolve) => { releasePlan = resolve; });
+          return route.fulfill({ json: { plan: await planProfileProjectUpdate(root, payload) } });
+        }
+        savedPayload = payload;
+        return route.fulfill({ json: await applyProfileProjectUpdate(root, payload) });
+      } catch (error) { return route.fulfill({ status: 400, json: { error: error.message } }); }
+    });
+    await page.goto('/studio/');
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+    await page.locator('[data-image-target="media.avatar"]').setInputFiles({ name: 'old.png', mimeType: 'image/png', buffer: png });
+    await expect(page.locator('[data-bind="media.avatar"]')).toHaveValue('/images/old.png');
+    await page.locator('[data-image-target="media.avatar"]').setInputFiles({ name: 'current.png', mimeType: 'image/png', buffer: png });
+    await expect(page.locator('[data-bind="media.avatar"]')).toHaveValue('/images/current.png');
+    await page.getByRole('tab', { name: '完成設定' }).click();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#save-project').click();
+    await expect.poll(() => Boolean(releasePlan)).toBe(true);
+    await expect(page.locator('#online-editor')).toHaveAttribute('inert', '');
+    await expect(page.locator('#undo-draft')).toBeDisabled();
+    await expect(page.locator('#redo-draft')).toBeDisabled();
+    releasePlan();
+    await expect(page.locator('#draft-status')).toHaveText('已儲存到本機專案');
+    await expect(page.locator('#undo-draft')).toBeEnabled();
+    expect(savedPayload.images.map((image) => image.path)).toEqual(['/images/current.png']);
+    expect(await readFile(path.join(root, 'public/images/current.png'))).toEqual(png);
+    expect([...(await downloadSettings(page)).keys()]).toEqual(['profile.answers.json', 'images/current.png']);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('驗證失敗定位第二張卡片的網址，修正後可匯出', async ({ page }) => {
+  await page.goto('/studio/');
+  await page.getByRole('tab', { name: '公開連結' }).click();
+  const second = page.locator('#featured-link-list details').nth(1);
+  await second.locator('summary').click();
+  await second.locator('[data-field="url"]').fill('invalid-url');
+  await second.locator('summary').click();
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  await page.locator('#download-answers').click();
+  await expect(page.getByRole('tab', { name: '公開連結' })).toHaveAttribute('aria-selected', 'true');
+  await expect(second).toHaveAttribute('open');
+  await expect(second.locator('[data-field="url"]')).toHaveAttribute('aria-invalid', 'true');
+  await expect(second.locator('[data-field="url"]')).toBeFocused();
+  await expect(page.locator('#validation-summary')).toContainText('精選連結網址');
+  await second.locator('[data-field="url"]').fill('https://example.com/fixed');
+  await expect(page.locator('#validation-summary')).toBeHidden();
+  const entries = await downloadSettings(page);
+  expect(JSON.parse(new TextDecoder().decode(entries.get('profile.answers.json'))).links[1].url).toBe('https://example.com/fixed');
+});
+
+
+test('舊版草稿與圖片可遷移並在重新載入後保留修改', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const legacy = JSON.parse(localStorage.getItem('profile-online-studio-draft-v2'));
+    legacy.identity.displayName = '舊版草稿';
+    legacy.media.avatar = '/images/legacy.png';
+    localStorage.setItem('profile-online-studio-draft-v2', JSON.stringify(legacy));
+    const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='), (char) => char.charCodeAt(0));
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.open('profile-online-studio-media-v1', 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('media', { keyPath: 'path' });
+      request.onsuccess = () => {
+        const database = request.result;
+        const transaction = database.transaction('media', 'readwrite');
+        transaction.objectStore('media').put({ path: '/images/legacy.png', blob: new Blob([bytes], { type: 'image/png' }) });
+        transaction.oncomplete = () => { database.close(); resolve(); };
+        transaction.onabort = () => { database.close(); reject(transaction.error); };
+      };
+      request.onerror = () => reject(request.error);
+    });
+  });
+  await page.goto('/studio/');
+  await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText('舊版草稿');
+  expect([...(await downloadSettings(page)).keys()]).toEqual(['profile.answers.json', 'images/legacy.png']);
+  await page.getByRole('tab', { name: '基本資料' }).click();
+  await page.locator('[data-bind="identity.displayName"]').fill('遷移後的新名稱');
+  await expect.poll(async () => (await storedDraft(page)).answers.identity.displayName).toBe('遷移後的新名稱');
+  await page.reload();
+  await expect(page.frameLocator('#profile-preview').locator('h1')).toHaveText('遷移後的新名稱');
+  expect([...(await downloadSettings(page)).keys()]).toEqual(['profile.answers.json', 'images/legacy.png']);
+});
+
+test('同名不同圖片匯入不破壞撤銷記錄', async ({ page }) => {
+  await page.goto('/studio/');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  const replacement = Buffer.concat([png, Buffer.from([0])]);
+  await page.locator('[data-image-target="media.avatar"]').setInputFiles({ name: 'same.png', mimeType: 'image/png', buffer: png });
+  await expect(page.locator('[data-bind="media.avatar"]')).toHaveValue('/images/same.png');
+  const imported = { ...browserFixtureAnswers, media: { ...browserFixtureAnswers.media, avatar: '/images/same.png' } };
+  const zip = createSettingsZip([
+    { name: 'profile.answers.json', data: Buffer.from(JSON.stringify(imported)) },
+    { name: 'images/same.png', data: replacement },
+  ]);
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  await page.locator('#import-answers').setInputFiles({ name: 'collision.zip', mimeType: 'application/zip', buffer: Buffer.from(zip) });
+  await expect(page.locator('#online-toast')).toContainText('已匯入');
+  const current = await downloadSettings(page);
+  expect(Buffer.from(current.get('images/same-2.png'))).toEqual(replacement);
+  expect(current.has('images/same.png')).toBe(false);
+  await page.locator('#undo-draft').click();
+  const previous = await downloadSettings(page);
+  expect(Buffer.from(previous.get('images/same.png'))).toEqual(png);
+  expect(previous.has('images/same-2.png')).toBe(false);
+});
+
+test('圖片儲存失敗不留下可匯出或寫入的失敗圖片', async ({ page }) => {
+  await page.goto('/studio/');
+  await expect(page.locator('#online-editor')).not.toHaveAttribute('inert');
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function () {
+      IDBObjectStore.prototype.put = put;
+      throw new DOMException('測試空間不足', 'QuotaExceededError');
+    };
+  });
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  await page.locator('[data-image-target="media.avatar"]').setInputFiles({ name: 'failed.png', mimeType: 'image/png', buffer: png });
+  await expect(page.locator('#online-toast')).toContainText('測試空間不足');
+  await expect(page.locator('[data-bind="media.avatar"]')).toHaveValue(browserFixtureAnswers.media.avatar);
+  expect([...(await downloadSettings(page)).keys()]).toEqual(['profile.answers.json']);
 });

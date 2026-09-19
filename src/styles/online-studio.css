@@ -19,6 +19,11 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
+.draft-notice { padding: 1rem; margin-bottom: 1rem; border: 1px solid var(--studio-red); border-radius: .75rem; background: var(--studio-card); overflow-wrap: anywhere; }
+.draft-notice p { margin-top: 0; }
+[aria-invalid="true"] { outline: 2px solid var(--studio-red); outline-offset: 2px; }
+.field-error { color: var(--studio-red); font-size: .85rem; }
+
 html { min-width: 320px; scroll-behavior: smooth; }
 
 body {
@@ -63,6 +68,42 @@ button { color: inherit; }
   background: rgba(250, 248, 252, .92);
   backdrop-filter: blur(18px);
 }
+
+.online-topbar.profile-topbar {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 1rem;
+}
+
+.draft-history {
+  display: flex;
+  align-items: center;
+  padding: .15rem;
+  border: 1px solid var(--studio-line);
+  border-radius: .75rem;
+  background: var(--studio-card);
+}
+
+.history-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  min-width: 44px;
+  min-height: 40px;
+  padding: .45rem .7rem;
+  border: 0;
+  border-radius: .5rem;
+  background: transparent;
+  color: var(--studio-purple-dark);
+  font-size: .78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.history-button svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.history-button:hover:not(:disabled) { background: var(--studio-purple-soft); }
+.history-button:focus-visible { outline: 2px solid var(--studio-purple); outline-offset: 2px; }
+.history-button:disabled { opacity: .4; cursor: default; }
 
 .studio-example-link {
   min-height: 40px;
@@ -1010,6 +1051,13 @@ code {
     justify-content: center;
     flex-wrap: wrap;
   }
+
+  .online-topbar.profile-topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: .6rem;
+  }
+  .profile-topbar .mode-route { grid-column: 1 / -1; }
+  .profile-topbar .topbar-state { flex-wrap: nowrap; }
 }
 
 @media (max-width: 720px) {
@@ -1019,6 +1067,11 @@ code {
     gap: .6rem;
     padding: .7rem .8rem;
   }
+  .online-topbar.profile-topbar { position: sticky; }
+  .profile-topbar .browser-only-badge { display: none; }
+  .profile-topbar .topbar-state { justify-content: flex-start; }
+  .history-button { min-height: 44px; padding: .45rem; }
+  .history-button span { display: none; }
   .studio-example-link {
     min-height: 38px;
     padding-inline: .58rem;
