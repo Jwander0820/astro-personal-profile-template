@@ -211,6 +211,44 @@ try {
   const pngB = Buffer.from([...pngHeader, 0x02]);
   const dataUrl = (buffer) => `data:image/png;base64,${buffer.toString('base64')}`;
 
+  // Link icons survive answer/content round trips and transactional media renaming.
+  assert.equal(answersSchema.properties.links.items.properties.image.$ref, '#/$defs/imageSource');
+  const iconLink = { id: 'custom-icon', title: 'Custom icon', url: 'https://example.com', description: 'Icon fixture', icon: 'github', image: '/images/link-icon.png' };
+  const iconRoot = await createProjectCopy('link-icon-project');
+  const originalIconPath = path.join(iconRoot, 'public/images/link-icon.png');
+  await atomicWriteFile(originalIconPath, pngA);
+  const iconPayload = {
+    answers: { version: 1, applyMode: 'merge', links: [iconLink] },
+    images: [{ path: iconLink.image, dataUrl: dataUrl(pngB) }],
+  };
+  const iconPlan = await planProfileProjectUpdate(iconRoot, iconPayload);
+  const renamedIcon = iconPlan.imageReplacements[iconLink.image];
+  assert.match(renamedIcon, /^\/images\/link-icon-[a-f0-9]{10}\.png$/);
+  const iconResult = await applyProfileProjectUpdate(iconRoot, { ...iconPayload, expectedPlanToken: iconPlan.token });
+  assert.equal(iconResult.answers.links.find((link) => link.id === iconLink.id).image, renamedIcon);
+  assert.deepEqual(await readFile(originalIconPath), pngA);
+  assert.deepEqual(await readFile(path.join(iconRoot, 'public', renamedIcon)), pngB);
+  const iconContentPath = path.join(iconRoot, 'src/content/links/generated-link-custom-icon.md');
+  assert.equal(parseMarkdown(await readFile(iconContentPath, 'utf8')).data.image, renamedIcon);
+  const exportedIcon = createProfileAnswersFromStudioContent(await loadStudioContent(iconRoot)).links.find((link) => link.id === iconLink.id);
+  assert.equal(exportedIcon.image, renamedIcon);
+  assert.equal(exportedIcon.icon, 'github');
+  const iconMtime = (await stat(iconContentPath)).mtimeMs;
+  const iconNoop = await applyProfileProjectUpdate(iconRoot, { answers: { version: 1, applyMode: 'merge', links: [exportedIcon] } });
+  assert.equal(iconNoop.plan.changes.length, 0);
+  assert.equal((await stat(iconContentPath)).mtimeMs, iconMtime);
+
+  const remoteIcon = { ...iconLink, image: 'https://images.example/icon.webp' };
+  await applyProfileProjectUpdate(iconRoot, { answers: { version: 1, applyMode: 'merge', links: [remoteIcon] } });
+  assert.equal(parseMarkdown(await readFile(iconContentPath, 'utf8')).data.image, remoteIcon.image);
+  await applyProfileProjectUpdate(iconRoot, { answers: { version: 1, applyMode: 'merge', links: [{ ...iconLink, image: '' }] } });
+  const clearedIcon = parseMarkdown(await readFile(iconContentPath, 'utf8')).data;
+  assert.equal(clearedIcon.image, undefined);
+  assert.equal(clearedIcon.icon, 'github');
+  for (const image of ['http://images.example/icon.png', '/images/../private.png', 'javascript:alert(1)', 'data:image/png;base64,AAAA']) {
+    assert.throws(() => validateProfileAnswers({ ...minimalAnswers, links: [{ ...iconLink, image }] }), (error) => error.path === 'links.0.image');
+  }
+
   const rejectedProjectRoot = await createProjectCopy('rejected-project-update');
   const rejectedProfilePath = path.join(rejectedProjectRoot, 'src', 'content', 'profile', 'main.md');
   const rejectedProfileBefore = await readFile(rejectedProfilePath);

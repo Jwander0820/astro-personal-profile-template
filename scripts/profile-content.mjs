@@ -547,6 +547,7 @@ export async function applyProfileAnswers(projectRoot, rawInput, options = {}) {
       title: link.title,
       url: link.url,
       icon: link.icon,
+      ...(link.image ? { image: link.image } : {}),
       group: 'featured',
       order: (index + 1) * 10,
       visible: true,

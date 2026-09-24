@@ -314,6 +314,74 @@ test('HTTPS 頭像網址會進入正式預覽', async ({ page }) => {
   await expect.poll(() => avatar.evaluate((image) => image.complete && image.naturalWidth)).toBeTruthy();
 });
 
+test('Links 自訂 icon 支援 HTTPS、等比例顯示與移除後的內建圖示', async ({ page }) => {
+  const imageUrl = 'https://images.example/link-icon.png';
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  await page.route(imageUrl, (route) => route.fulfill({ contentType: 'image/png', body: png }));
+  await page.goto('/studio/');
+  await page.getByRole('tab', { name: '公開連結' }).click();
+  const editor = page.locator('#featured-link-list details').first();
+  await editor.locator('summary').click();
+  const icon = page.frameLocator('#profile-preview').locator('.link-list .link-card').first().locator('.link-icon');
+  await editor.getByRole('textbox', { name: '自訂 icon 圖片網址或路徑' }).fill(imageUrl);
+  await expect(icon.locator('img')).toHaveAttribute('src', imageUrl);
+  await expect.poll(() => icon.locator('img').evaluate((image) => image.complete && image.naturalWidth)).toBeTruthy();
+  await expect(icon.locator('img')).toHaveCSS('object-fit', 'contain');
+  await expect(icon.locator('img')).toHaveCSS('width', '24px');
+  await expect(icon.locator('img')).toHaveCSS('height', '24px');
+  await expect(icon.locator('svg')).toHaveCount(0);
+  const entries = await downloadSettings(page);
+  expect([...entries.keys()]).toEqual(['profile.answers.json']);
+  expect(JSON.parse(new TextDecoder().decode(entries.get('profile.answers.json'))).links[0].image).toBe(imageUrl);
+  await page.getByRole('tab', { name: '公開連結' }).click();
+  await editor.getByRole('button', { name: '移除自訂 icon' }).click();
+  await expect(icon.locator('img')).toHaveCount(0);
+  await expect(icon.locator('svg')).toHaveCount(1);
+  const cleared = await downloadSettings(page);
+  expect(JSON.parse(new TextDecoder().decode(cleared.get('profile.answers.json'))).links[0].image).toBeUndefined();
+});
+
+test('Links 上傳 icon 可重載、匯出，ZIP 同名圖片匯入與撤銷保留各自內容', async ({ page }) => {
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/studio/');
+  await page.getByRole('tab', { name: '公開連結' }).click();
+  const editor = page.locator('#featured-link-list details').first();
+  await editor.locator('summary').click();
+  await editor.getByLabel('上傳自訂 icon', { exact: true }).setInputFiles({ name: 'link-icon.png', mimeType: 'image/png', buffer: png });
+  await expect(editor.getByRole('textbox', { name: '自訂 icon 圖片網址或路徑' })).toHaveValue('/images/link-icon.png');
+  const image = page.frameLocator('#profile-preview').locator('.link-list .link-card').first().locator('.link-icon img');
+  await expect.poll(() => image.evaluate((el) => el.complete && el.naturalWidth)).toBeTruthy();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect.poll(async () => (await storedDraft(page)).answers.links[0].image).toBe('/images/link-icon.png');
+  await page.reload();
+  await expect.poll(() => image.evaluate((el) => el.complete && el.naturalWidth)).toBeTruthy();
+  const entries = await downloadSettings(page);
+  expect(Buffer.from(entries.get('images/link-icon.png'))).toEqual(png);
+  const answers = JSON.parse(new TextDecoder().decode(entries.get('profile.answers.json')));
+  expect(answers.links[0].image).toBe('/images/link-icon.png');
+
+  const replacement = Buffer.concat([png, Buffer.from([0])]);
+  const zip = createSettingsZip([
+    { name: 'profile.answers.json', data: Buffer.from(JSON.stringify(answers)) },
+    { name: 'images/link-icon.png', data: replacement },
+  ]);
+  await page.locator('#import-answers').setInputFiles({ name: 'icons.zip', mimeType: 'application/zip', buffer: Buffer.from(zip) });
+  await expect(page.locator('#online-toast')).toContainText('已匯入');
+  const imported = await downloadSettings(page);
+  expect(JSON.parse(new TextDecoder().decode(imported.get('profile.answers.json'))).links[0].image).toBe('/images/link-icon-2.png');
+  expect(Buffer.from(imported.get('images/link-icon-2.png'))).toEqual(replacement);
+  expect(imported.has('images/link-icon.png')).toBe(false);
+  await page.locator('#undo-draft').click();
+  const restored = await downloadSettings(page);
+  expect(Buffer.from(restored.get('images/link-icon.png'))).toEqual(png);
+  expect(restored.has('images/link-icon-2.png')).toBe(false);
+  await page.getByRole('tab', { name: '公開連結' }).click();
+  if (await editor.getAttribute('open') === null) await editor.locator('summary').click();
+  await editor.getByRole('button', { name: '移除自訂 icon' }).click();
+  expect([...(await downloadSettings(page)).keys()]).toEqual(['profile.answers.json']);
+});
+
 test('Links 卡片可排序並個別選擇樣式', async ({ page }) => {
   await page.goto('/studio/');
   await page.getByRole('tab', { name: '公開連結' }).click();
@@ -569,6 +637,11 @@ test('本機儲存排除舊圖片並保留寫入交易及 ZIP 再匯出', async 
     await expect(page.locator('[data-bind="media.avatar"]')).toHaveValue('/images/old.png');
     await page.locator('[data-image-target="media.avatar"]').setInputFiles({ name: 'current.png', mimeType: 'image/png', buffer: png });
     await expect(page.locator('[data-bind="media.avatar"]')).toHaveValue('/images/current.png');
+    await page.getByRole('tab', { name: '公開連結' }).click();
+    const linkEditor = page.locator('#featured-link-list details').first();
+    await linkEditor.locator('summary').click();
+    await linkEditor.getByLabel('上傳自訂 icon', { exact: true }).setInputFiles({ name: 'saved-icon.png', mimeType: 'image/png', buffer: png });
+    await expect(linkEditor.getByRole('textbox', { name: '自訂 icon 圖片網址或路徑' })).toHaveValue('/images/saved-icon.png');
     await page.getByRole('tab', { name: '完成設定' }).click();
     page.once('dialog', (dialog) => dialog.accept());
     await page.locator('#save-project').click();
@@ -579,9 +652,11 @@ test('本機儲存排除舊圖片並保留寫入交易及 ZIP 再匯出', async 
     releasePlan();
     await expect(page.locator('#draft-status')).toHaveText('已儲存到本機專案');
     await expect(page.locator('#undo-draft')).toBeEnabled();
-    expect(savedPayload.images.map((image) => image.path)).toEqual(['/images/current.png']);
+    expect(savedPayload.images.map((image) => image.path)).toEqual(['/images/current.png', '/images/saved-icon.png']);
     expect(await readFile(path.join(root, 'public/images/current.png'))).toEqual(png);
-    expect([...(await downloadSettings(page)).keys()]).toEqual(['profile.answers.json', 'images/current.png']);
+    expect(await readFile(path.join(root, 'public/images/saved-icon.png'))).toEqual(png);
+    expect(await readFile(path.join(root, 'src/content/links/generated-link-first-link.md'), 'utf8')).toContain('image: /images/saved-icon.png');
+    expect([...(await downloadSettings(page)).keys()]).toEqual(['profile.answers.json', 'images/current.png', 'images/saved-icon.png']);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 

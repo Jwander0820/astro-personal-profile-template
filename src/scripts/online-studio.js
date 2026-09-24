@@ -66,6 +66,7 @@ const COLLECTIONS = {
       ['url', '公開網址', 'text', 'https://example.com', false],
       ['description', '簡短說明', 'textarea', '這個連結想介紹什麼？', true],
       ['icon', 'Icon 名稱', 'text', 'arrow', false],
+      ['image', '自訂 icon（選填）', 'image', 'https://example.com/icon.png', true],
       ['style', '卡片樣式', 'select', [
         ['normal', '一般'],
         ['primary', '主色強調'],
@@ -385,6 +386,19 @@ export function mountOnlineStudio() {
       file.dataset.field = fieldName;
       const hint = element('small', 'image-source-hint', '可貼上公開 HTTPS 網址、使用 /images/ 路徑，或從裝置上傳圖片。');
       group.append(text, file, hint);
+      if (kind === 'links') {
+        text.setAttribute('aria-label', '自訂 icon 圖片網址或路徑');
+        file.setAttribute('aria-label', '上傳自訂 icon');
+        hint.textContent = '上傳 PNG、JPG、WebP 或 GIF（單張上限 5 MB），或貼上公開 HTTPS 圖片網址。自訂圖片優先顯示，移除後恢復內建 icon。';
+        const clear = element('button', 'button button--quiet button--small', '移除自訂 icon');
+        clear.type = 'button';
+        clear.addEventListener('click', () => {
+          text.value = '';
+          file.value = '';
+          text.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        group.append(clear);
+      }
       return group;
     }
     let control;
@@ -452,7 +466,7 @@ export function mountOnlineStudio() {
       summary.append(title, actions);
       const fields = element('div', 'collection-item__fields');
       config.fields.forEach(([fieldName, labelText, inputType, placeholder, wide]) => {
-        const label = element('label', `field${wide ? ' field--wide' : ''}`);
+        const label = element(kind === 'links' && inputType === 'image' ? 'div' : 'label', `field${wide ? ' field--wide' : ''}`);
         label.append(element('span', '', labelText), createInput(kind, index, fieldName, inputType, placeholder));
         fields.append(label);
       });
@@ -587,13 +601,21 @@ export function mountOnlineStudio() {
     toast('JSON 已下載。從裝置上傳的圖片檔不包含在 JSON 中。');
   }
 
-  async function registerImage(file, assign) {
+  async function registerImage(file, assign, sourceInput) {
     const path = await registerStudioImage(file, imageFiles, bootstrap.draftScope);
     const previousUrl = objectUrls.get(path);
     if (previousUrl) URL.revokeObjectURL(previousUrl);
     objectUrls.set(path, URL.createObjectURL(file));
     assign(path);
-    refreshAll();
+    if (sourceInput) {
+      // Keep the current card open while updating its uploaded image.
+      sourceInput.value = path;
+      clearValidationError();
+      renderPreview();
+      persist();
+    } else {
+      refreshAll();
+    }
     toast('圖片已加入草稿並顯示在正式預覽。');
   }
 
@@ -640,6 +662,7 @@ export function mountOnlineStudio() {
       const replace = (source) => replacements.get(source) || source;
       nextState.media.avatar = replace(nextState.media.avatar);
       nextState.media.background = replace(nextState.media.background);
+      nextState.links.forEach((item) => { if (item.image) item.image = replace(item.image); });
       nextState.sections.forEach((item) => { if (item.image) item.image = replace(item.image); });
       nextState.imageBlocks.forEach((item) => { item.image = replace(item.image); });
       for (const { path, blob } of media) nextUrls.set(path, URL.createObjectURL(blob));
@@ -800,7 +823,9 @@ export function mountOnlineStudio() {
       ? registerImage(file, (path) => setPath(state, media.dataset.imageTarget, path))
       : registerImage(file, (path) => {
         state[arrayImage.dataset.imageArray][Number(arrayImage.dataset.index)][arrayImage.dataset.field] = path;
-      }));
+      }, arrayImage.dataset.imageArray === 'links'
+        ? arrayImage.closest('.image-input').querySelector('[data-array]')
+        : undefined));
     event.target.value = '';
   });
 

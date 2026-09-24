@@ -195,13 +195,15 @@ export function validateProfileAnswers(input) {
   const linkInput = input.links === undefined ? [] : assertObjectArray(input.links, '精選連結', 20);
   const links = linkInput.map((item, index) => {
     if (!isObject(item)) throw new Error(`第 ${index + 1} 個精選連結格式不正確。`);
-    assertAllowedKeys(item, ['id', 'title', 'url', 'description', 'icon', 'style', 'tags'], `第 ${index + 1} 個精選連結`);
+    assertAllowedKeys(item, ['id', 'title', 'url', 'description', 'icon', 'image', 'style', 'tags'], `第 ${index + 1} 個精選連結`);
+    const image = atAnswerPath(`links.${index}.image`, () => assertImageSource(item.image, '自訂 icon', { required: false }));
     return {
       id: atAnswerPath(`links.${index}.id`, () => assertSlug(item.id, '精選連結 ID')),
       title: atAnswerPath(`links.${index}.title`, () => assertDisplayText(item.title, '精選連結名稱', { required: true, max: 80 })),
       url: atAnswerPath(`links.${index}.url`, () => assertUrl(item.url, '精選連結網址')),
       description: atAnswerPath(`links.${index}.description`, () => assertDisplayText(item.description, '精選連結說明', { required: true, max: 500 })),
       icon: atAnswerPath(`links.${index}.icon`, () => item.icon === undefined ? 'arrow' : assertSlug(item.icon, '圖示名稱')),
+      ...(image ? { image } : {}),
       style: atAnswerPath(`links.${index}.style`, () => assertOptionalEnum(item.style, LINK_STYLES, '精選連結樣式', 'normal')),
       tags: atAnswerPath(`links.${index}.tags`, () => assertStringArray(item.tags ?? [], '精選連結標籤', { max: 6 })),
     };
@@ -456,6 +458,7 @@ export function createProfileAnswersFromStudioContent(content) {
         url: entry.data.url ?? '',
         description: entry.body ?? '',
         icon: entry.data.icon ?? 'arrow',
+        ...(entry.data.image ? { image: entry.data.image } : {}),
         style: LINK_STYLES.includes(entry.data.style) ? entry.data.style : 'normal',
         tags: Array.isArray(entry.data.tags) ? entry.data.tags : [],
       })),

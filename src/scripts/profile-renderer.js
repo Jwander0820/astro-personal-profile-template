@@ -111,7 +111,7 @@ function renderSectionCard(item, assetHref) {
   return article;
 }
 
-function renderLinkCard(item, icons) {
+function renderLinkCard(item, icons, assetHref) {
   const style = ['primary', 'normal', 'subtle'].includes(item.style) ? item.style : 'normal';
   const link = node('a', `link-card is-${style}`);
   link.href = isSafeProfileUrl(item.url) ? item.url : '#';
@@ -120,7 +120,17 @@ function renderLinkCard(item, icons) {
     link.rel = 'noopener noreferrer';
   }
   const icon = node('span', 'link-icon');
-  icon.append(svgIcon(item.icon, icons, 24));
+  const imageUrl = item.image ? assetHref(item.image) : '';
+  if (imageUrl) {
+    const image = node('img');
+    image.src = imageUrl;
+    image.alt = '';
+    image.width = 24;
+    image.height = 24;
+    icon.append(image);
+  } else {
+    icon.append(svgIcon(item.icon, icons, 24));
+  }
   const copy = node('span', 'link-copy');
   copy.append(node('strong', '', item.title));
   const description = node('span', 'description');
@@ -340,7 +350,7 @@ export function renderProfileDocument(root, answers, options) {
         section.setAttribute('aria-labelledby', 'links-heading');
         section.append(renderHeading('links-heading', 'Links'));
         const list = node('div', 'link-list');
-        answers.links.forEach((item) => list.append(renderLinkCard(item, icons)));
+        answers.links.forEach((item) => list.append(renderLinkCard(item, icons, assetHref)));
         if (studioEnabled) list.append(renderStudioLinkCard(studioHref, icons));
         section.append(list);
         wrapper.append(section);
