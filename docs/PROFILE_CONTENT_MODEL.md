@@ -55,6 +55,8 @@ GitHub Pages 是靜態主機，無法安全地在公開頁面直接改 repositor
 
 ## 擴充原則
 
+情境模板位於 `scripts/profile-presets.mjs`，只更新 `appearance`。`appearance.hiddenSections` 與 `appearance.showImages` 分別寫入 `profile/main.md` 的同名欄位，控制版面而不更改卡片、播放清單或圖片內容。舊回答檔預設不隱藏任何板塊、顯示圖片。正式與預覽 renderer 都讀取這些設定；圖片原錨點被隱藏時移到尾端，除非已關閉圖片板塊。
+
 - 新增一般內容欄位時，同步更新 `src/content.config.ts`、Studio／回答檔執行期驗證與 JSON Schema；URL 欄位應沿用共用的安全協定規則。
 - 新增全新視覺 block 時，才修改 Astro component 與 CSS。
 - 所有寫入路徑必須限制於 `src/content` 或 `public/images`。

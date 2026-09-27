@@ -62,6 +62,29 @@ async function downloadSettings(page) {
   return readSettingsZip(new Uint8Array(await readFile(await (await download).path())));
 }
 
+test('情境模板保留個人資料、可撤銷並把顯示設定帶入 ZIP', async ({ page }) => {
+  await page.goto('/studio/');
+  const preview = page.frameLocator('#profile-preview');
+  await expect(preview.locator('h1')).toHaveText(browserFixtureAnswers.identity.displayName);
+  const before = await storedDraft(page);
+  await page.getByRole('button', { name: /極簡名片/ }).click();
+  await expect(preview.locator('#about-heading')).toHaveCount(0);
+  await expect(preview.locator('[data-turntable-player]')).toHaveCount(0);
+  await expect(preview.locator('.custom-block--image')).toHaveCount(0);
+  await expect.poll(async () => (await storedDraft(page)).answers.appearance.showImages).toBe(false);
+  const after = await storedDraft(page);
+  for (const key of ['identity', 'media', 'links', 'sections', 'playlist', 'imageBlocks']) expect(after.answers[key]).toEqual(before.answers[key]);
+  await page.getByRole('button', { name: '撤銷', exact: true }).click();
+  await expect(preview.locator('#about-heading')).toBeVisible();
+  await page.getByRole('button', { name: /音樂生活/ }).click();
+  await expect(preview.locator('[data-turntable-player]')).toBeVisible();
+  const zip = await downloadSettings(page);
+  const exported = JSON.parse(new TextDecoder().decode(zip.get('profile.answers.json')));
+  expect(exported.appearance.homeOrder[0]).toBe('turntable');
+  expect(exported.appearance.hiddenSections).toEqual([]);
+  expect(exported.identity).toEqual(before.answers.identity);
+});
+
 test('一般首頁不下載預覽 renderer，Studio iframe 仍能即時更新', async ({ page }) => {
   const requests = [];
   page.on('request', (request) => requests.push(request.url()));

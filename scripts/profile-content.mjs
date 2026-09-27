@@ -199,6 +199,8 @@ export async function loadStudioContent(projectRoot) {
 
 export async function saveStudioProfile(projectRoot, input) {
   if (!isObject(input)) throw new Error('個人資料格式不正確。');
+  if (input.hiddenSections !== undefined && (!Array.isArray(input.hiddenSections) || new Set(input.hiddenSections).size !== input.hiddenSections.length || input.hiddenSections.some((id) => !HOME_SECTIONS.includes(id)))) throw new Error('隱藏板塊設定不正確。');
+  if (input.showImages !== undefined && typeof input.showImages !== 'boolean') throw new Error('圖片板塊顯示設定必須是布林值。');
   const contentRoot = safeFile(projectRoot, 'src', 'content');
   const profilePath = safeFile(contentRoot, 'profile', 'main.md');
   return updateMarkdownFile(profilePath, async (current) => {
@@ -223,6 +225,8 @@ export async function saveStudioProfile(projectRoot, input) {
       avatar: assertImageSource(input.avatar, '頭像') || undefined,
       background: assertImageSource(input.background, '背景圖片') || undefined,
       sectionsLayout: ['list', 'grid'].includes(input.sectionsLayout) ? input.sectionsLayout : APPEARANCE_DEFAULTS.sectionsLayout,
+      hiddenSections: input.hiddenSections ?? current.data.hiddenSections ?? [],
+      showImages: input.showImages ?? current.data.showImages ?? true,
       bodyFont,
       displayFont,
       mainColor,
@@ -513,6 +517,8 @@ export async function applyProfileAnswers(projectRoot, rawInput, options = {}) {
     avatar: input.media.avatar,
     background: input.media.background,
     sectionsLayout: input.appearance.sectionsLayout,
+    hiddenSections: input.appearance.hiddenSections,
+    showImages: input.appearance.showImages,
     bodyFont: input.appearance.bodyFont,
     displayFont: input.appearance.displayFont,
     mainColor: input.appearance.mainColor,

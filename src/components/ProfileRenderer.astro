@@ -37,11 +37,11 @@ const turntableBlocks = blocks.filter((block) => block.data.layout === 'turntabl
 const fortuneBlocks = blocks.filter((block) => block.data.layout === 'fortune');
 const embedBlocks = blocks.filter((block) => block.data.layout === 'embed');
 const orderedBlockIds = new Set([...turntableBlocks, ...fortuneBlocks, ...embedBlocks].map((block) => block.id));
-const remainingBlocks = blocks.filter((block) => !orderedBlockIds.has(block.id));
+const remainingBlocks = blocks.filter((block) => !orderedBlockIds.has(block.id) && (block.data.layout !== 'image' || profile.data.showImages));
 const blocksBeforeLinks = remainingBlocks.filter((block) => block.data.placement === 'before-links');
 const blocksAfterLinks = remainingBlocks.filter((block) => block.data.placement === 'between-links-sections');
 const blocksAfterAbout = remainingBlocks.filter((block) => block.data.placement === 'after-sections');
-const visibleHomeSections = profile.data.homeOrder.filter((section) => profile.data.homeVisibility.includes(section));
+const visibleHomeSections = profile.data.homeOrder.filter((section) => profile.data.homeVisibility.includes(section) && !profile.data.hiddenSections.includes(section));
 const fallbackBlocks = remainingBlocks.filter((block) => (
   (block.data.placement === 'before-links' || block.data.placement === 'between-links-sections')
     ? !visibleHomeSections.includes('links')

@@ -221,6 +221,8 @@
       "additionalProperties": false,
       "properties": {
         "sectionsLayout": { "enum": ["grid", "list"], "default": "list" },
+        "hiddenSections": { "type": "array", "maxItems": 5, "uniqueItems": true, "default": [], "items": { "enum": ["about", "turntable", "links", "fortune", "notion"] } },
+        "showImages": { "type": "boolean", "default": true },
         "bodyFont": { "enum": ["system", "noto-sans-tc", "noto-serif-tc", "lxgw-wenkai-tc"], "default": "system" },
         "displayFont": { "enum": ["system", "noto-sans-tc", "noto-serif-tc", "lxgw-wenkai-tc"], "default": "system" },
         "mainColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "default": "#7A58A6" },

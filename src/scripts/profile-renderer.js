@@ -325,7 +325,10 @@ export function renderProfileDocument(root, answers, options) {
   const socials = renderSocials(answers.socials, icons);
   if (socials) wrapper.append(socials);
 
-  const order = Array.isArray(answers.appearance.homeOrder) ? answers.appearance.homeOrder : HOME_SECTIONS;
+  const order = (Array.isArray(answers.appearance.homeOrder) ? answers.appearance.homeOrder : HOME_SECTIONS)
+    .filter((id) => !answers.appearance.hiddenSections?.includes(id));
+  // Image blocks remain attached to their configured anchors, falling back to the end.
+  const imageAnswers = answers.appearance.showImages === false ? { ...answers, imageBlocks: [] } : answers;
   for (const sectionId of order) {
     if (sectionId === 'about' && answers.sections?.length) {
       const section = node('section', 'content-section');
@@ -344,7 +347,7 @@ export function renderProfileDocument(root, answers, options) {
       if (feature) wrapper.append(feature);
     }
     if (sectionId === 'links') {
-      renderPlacedImages(wrapper, answers, 'before-links', assetHref);
+      renderPlacedImages(wrapper, imageAnswers, 'before-links', assetHref);
       if (answers.links?.length || studioEnabled) {
         const section = node('section', 'content-section');
         section.setAttribute('aria-labelledby', 'links-heading');
@@ -355,7 +358,7 @@ export function renderProfileDocument(root, answers, options) {
         section.append(list);
         wrapper.append(section);
       }
-      renderPlacedImages(wrapper, answers, 'between-links-sections', assetHref);
+      renderPlacedImages(wrapper, imageAnswers, 'between-links-sections', assetHref);
     }
     if (sectionId === 'fortune' && answers.features?.fortune) {
       const feature = configureFortuneFeature(
@@ -371,8 +374,13 @@ export function renderProfileDocument(root, answers, options) {
     if (sectionId === 'notion') {
       (answers.embedBlocks || []).forEach((item) => wrapper.append(renderEmbedBlock(item)));
     }
-    if (sectionId === 'about') renderPlacedImages(wrapper, answers, 'after-sections', assetHref);
+    if (sectionId === 'about') renderPlacedImages(wrapper, imageAnswers, 'after-sections', assetHref);
   }
+  if (!order.includes('links')) {
+    renderPlacedImages(wrapper, imageAnswers, 'before-links', assetHref);
+    renderPlacedImages(wrapper, imageAnswers, 'between-links-sections', assetHref);
+  }
+  if (!order.includes('about')) renderPlacedImages(wrapper, imageAnswers, 'after-sections', assetHref);
 
   const footer = node('footer');
   footer.append(node('span', '', `© ${new Date().getFullYear()} ${answers.identity.displayName}`));

@@ -18,6 +18,8 @@ export const APPEARANCE_DEFAULTS = Object.freeze({
   fontScale: 1,
   smallTextScale: 1,
   homeOrder: HOME_SECTIONS,
+  hiddenSections: [],
+  showImages: true,
 });
 
 export const APPEARANCE_RANGES = Object.freeze({

@@ -9,6 +9,7 @@ import { withBase } from '../lib/paths';
 import { withStudioPreviewQuery } from '../../scripts/studio-preview-mode.mjs';
 import { studioApiUrl } from '../../scripts/studio-network.mjs';
 import '../styles/online-studio.css';
+import { PROFILE_PRESETS } from '../../scripts/profile-presets.mjs';
 
 const runtime = globalThis as typeof globalThis & { process: { cwd(): string; env: Record<string, string | undefined> } };
 const content = await loadStudioContent(runtime.process.cwd());
@@ -95,6 +96,19 @@ const previewHref = withStudioPreviewQuery(withBase('/'));
             <div class="panel-heading">
               <div><p class="step-label">STEP 01</p><h2>讓訪客先認識你</h2></div>
             </div>
+            <details class="preset-picker" open>
+              <summary>先選一種情境，之後都能調整</summary>
+              <p>只套用配色、字型、排序與顯示設定，保留姓名、文字、圖片與連結，也能撤銷。隱藏內容仍會留在設定中。</p>
+              <div class="preset-grid">
+                {PROFILE_PRESETS.map((preset) => (
+                  <button type="button" data-profile-preset={preset.id} style={`--preset-color: ${preset.color}`}>
+                    <span class="preset-swatch" aria-hidden="true"></span>
+                    <strong>{preset.name}</strong><small>{preset.description}</small>
+                  </button>
+                ))}
+              </div>
+              <p class="preset-note">非系統字型會從 Google Fonts 載入；音樂生活會顯示你已設定的播放清單，不會代填歌曲。</p>
+            </details>
             <div class="field-grid">
               <label class="field field--wide">
                 <span>顯示名稱 <em>必填</em></span>
@@ -182,6 +196,14 @@ const previewHref = withStudioPreviewQuery(withBase('/'));
             <div class="panel-heading">
               <div><p class="step-label">STEP 04</p><h2>調整網站的節奏與顏色</h2></div>
             </div>
+            <fieldset class="section-visibility">
+              <legend>首頁要顯示哪些內容</legend>
+              <p>取消勾選只隱藏版面，不會刪除內容；這不是私密保護。</p>
+              {Object.entries({ about: 'About me', links: 'Links', turntable: '播放清單', fortune: '今日手氣', notion: '網頁內嵌' }).map(([id, label]) => (
+                <label><input type="checkbox" data-home-visible={id} />{label}</label>
+              ))}
+              <label><input type="checkbox" data-bind="appearance.showImages" data-boolean />圖片板塊</label>
+            </fieldset>
             <div class="appearance-card appearance-card--color">
               <div>
                 <p class="mini-label">MAIN COLOR</p>

@@ -271,7 +271,16 @@ export function validateProfileAnswers(input) {
 
   if (input.appearance !== undefined && !isObject(input.appearance)) throw new Error('appearance 格式不正確。');
   const appearance = input.appearance ?? {};
-  assertAllowedKeys(appearance, ['sectionsLayout', 'bodyFont', 'displayFont', 'mainColor', 'fontScale', 'smallTextScale', 'homeOrder'], 'appearance');
+  assertAllowedKeys(appearance, ['sectionsLayout', 'bodyFont', 'displayFont', 'mainColor', 'fontScale', 'smallTextScale', 'homeOrder', 'hiddenSections', 'showImages'], 'appearance');
+  const hiddenSections = atAnswerPath('appearance.hiddenSections', () => {
+    const value = appearance.hiddenSections ?? [];
+    if (!Array.isArray(value) || value.length > 5 || new Set(value).size !== value.length || value.some((id) => !HOME_SECTIONS.includes(id))) throw new Error('隱藏板塊必須是五個首頁板塊的子集合，不可重複。');
+    return [...value];
+  });
+  const showImages = atAnswerPath('appearance.showImages', () => {
+    if (appearance.showImages !== undefined && typeof appearance.showImages !== 'boolean') throw new Error('圖片板塊顯示設定必須是布林值。');
+    return appearance.showImages !== false;
+  });
   const sectionsLayout = atAnswerPath('appearance.sectionsLayout', () => assertOptionalEnum(appearance.sectionsLayout, ['grid', 'list'], 'sectionsLayout', APPEARANCE_DEFAULTS.sectionsLayout));
   const bodyFont = atAnswerPath('appearance.bodyFont', () => assertOptionalEnum(appearance.bodyFont, FONT_PRESETS, 'bodyFont', APPEARANCE_DEFAULTS.bodyFont));
   const displayFont = atAnswerPath('appearance.displayFont', () => assertOptionalEnum(appearance.displayFont, FONT_PRESETS, 'displayFont', APPEARANCE_DEFAULTS.displayFont));
@@ -319,7 +328,7 @@ export function validateProfileAnswers(input) {
     embedBlocks,
     playlist,
     ...(fortune ? { fortune } : {}),
-    appearance: { sectionsLayout, homeOrder, bodyFont, displayFont, mainColor, fontScale, smallTextScale },
+    appearance: { sectionsLayout, homeOrder, bodyFont, displayFont, mainColor, fontScale, smallTextScale, hiddenSections, showImages },
     features: { fortune: features.fortune !== false },
   };
 }
@@ -506,6 +515,8 @@ export function createProfileAnswersFromStudioContent(content) {
     },
     features: { fortune: fortune?.data?.visible !== false },
     appearance: {
+      hiddenSections: content.profile.hiddenSections ?? [],
+      showImages: content.profile.showImages !== false,
       sectionsLayout: content.profile.sectionsLayout ?? APPEARANCE_DEFAULTS.sectionsLayout,
       bodyFont: content.profile.bodyFont ?? APPEARANCE_DEFAULTS.bodyFont,
       displayFont: content.profile.displayFont ?? APPEARANCE_DEFAULTS.displayFont,

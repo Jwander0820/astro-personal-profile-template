@@ -50,6 +50,7 @@ import { fromHtml } from 'hast-util-from-html';
 import { toHtml } from 'hast-util-to-html';
 import { renderPreviewMarkdown } from '../src/scripts/preview-markdown.js';
 import { findLocalPort, listenLocalServer, studioApiUrl, studioPort } from './studio-network.mjs';
+import { PROFILE_PRESETS, applyProfilePreset } from './profile-presets.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), 'profile-tools-'));
@@ -64,6 +65,19 @@ async function createProjectCopy(name) {
 }
 
 try {
+  const presetRoot = await createProjectCopy('presets');
+  const presetSource = createProfileAnswersFromStudioContent(await loadStudioContent(presetRoot));
+  for (const preset of PROFILE_PRESETS) {
+    const next = validateProfileAnswers(applyProfilePreset(presetSource, preset.id));
+    for (const key of ['identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features']) assert.deepEqual(next[key], presetSource[key], `${preset.id} preserves ${key}`);
+    await applyProfileAnswers(presetRoot, next);
+    const restored = createProfileAnswersFromStudioContent(await loadStudioContent(presetRoot));
+    assert.deepEqual(restored.appearance, next.appearance);
+    assert.deepEqual(restored.playlist, next.playlist);
+    assert.deepEqual(restored.imageBlocks, next.imageBlocks);
+  }
+  assert.throws(() => validateProfileAnswers({ ...presetSource, appearance: { hiddenSections: ['about', 'about'] } }), /隱藏板塊/);
+  assert.throws(() => validateProfileAnswers({ ...presetSource, appearance: { showImages: 'false' } }), /布林/);
   assert.equal(studioPort(undefined, 4322), 4322);
   assert.equal(studioPort('0', 4322), 0);
   for (const value of ['-1', '65536', 'abc', '4322.5']) assert.throws(() => studioPort(value, 4322), /連接埠/);

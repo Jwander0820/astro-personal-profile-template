@@ -1139,3 +1139,13 @@ code {
   html { scroll-behavior: auto; }
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .001ms !important; }
 }
+/* Presentation presets keep their choices compact on mobile. */
+.preset-picker, .section-visibility { margin: 0 0 1.5rem; padding: 1rem; border: 1px solid var(--line, #d8dce3); border-radius: 16px; }
+.preset-picker summary { cursor: pointer; font-weight: 700; }
+.preset-picker p, .section-visibility p { font-size: .85rem; line-height: 1.65; }
+.preset-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+.preset-grid button { display: grid; gap: .4rem; padding: .9rem; text-align: left; color: inherit; background: #fff; border: 1px solid #d8dce3; border-radius: 12px; cursor: pointer; }
+.preset-grid button:hover, .preset-grid button:focus-visible { border-color: var(--preset-color); outline-color: var(--preset-color); }
+.preset-swatch { width: 2rem; height: .4rem; border-radius: 4px; background: var(--preset-color); }
+.preset-grid small { line-height: 1.5; color: #536171; }
+.section-visibility label { display: inline-flex; align-items: center; gap: .4rem; margin: .4rem .8rem .4rem 0; }

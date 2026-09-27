@@ -41,6 +41,9 @@ const profile = defineCollection({
     aboutHeading: contentText.default('About me'),
     linksHeading: contentText.default('Links'),
     sectionsLayout: z.enum(['list', 'grid']).default(APPEARANCE_DEFAULTS.sectionsLayout),
+    hiddenSections: z.array(z.enum(['about', 'turntable', 'links', 'fortune', 'notion']))
+      .max(5).refine((items) => new Set(items).size === items.length, 'hiddenSections cannot contain duplicates.').default([]),
+    showImages: z.boolean().default(true),
     bodyFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default(APPEARANCE_DEFAULTS.bodyFont),
     displayFont: z.enum(['system', 'noto-sans-tc', 'noto-serif-tc', 'lxgw-wenkai-tc']).default(APPEARANCE_DEFAULTS.displayFont),
     mainColor: themeColor.default(APPEARANCE_DEFAULTS.mainColor),

@@ -19,6 +19,7 @@ import {
 import { applyProjectPlan, formatProjectPlan, requestProjectPlan } from './studio-project.js';
 import { createDraftStore, createDraftHistory } from './studio-draft.js';
 import { showValidationError, clearValidationError } from './studio-validation.js';
+import { applyProfilePreset, PROFILE_PRESETS } from '../../scripts/profile-presets.mjs';
 
 const HOME_LABELS = {
   about: 'About me',
@@ -209,6 +210,8 @@ function normalizeDraft(value, fallback = {}) {
   draft.appearance ||= clone(APPEARANCE_DEFAULTS);
   draft.appearance.fontScale ??= APPEARANCE_DEFAULTS.fontScale;
   draft.appearance.smallTextScale ??= APPEARANCE_DEFAULTS.smallTextScale;
+  draft.appearance.hiddenSections ??= [];
+  draft.appearance.showImages ??= true;
   draft.media ||= { avatar: '/images/avatar.svg', background: '/images/background.svg' };
   draft.media.avatar ||= '/images/avatar.svg';
   draft.media.background ||= '/images/background.svg';
@@ -350,6 +353,9 @@ export function mountOnlineStudio() {
   }
 
   function syncStaticControls() {
+    document.querySelectorAll('[data-home-visible]').forEach((control) => {
+      control.checked = !state.appearance.hiddenSections.includes(control.dataset.homeVisible);
+    });
     document.querySelectorAll('[data-bind]').forEach((control) => {
       if (control.dataset.array) return;
       const value = getPath(state, control.dataset.bind);
@@ -815,6 +821,16 @@ export function mountOnlineStudio() {
   });
 
   document.addEventListener('change', (event) => {
+    const visibility = event.target.closest('[data-home-visible]');
+    if (visibility) {
+      const hidden = new Set(state.appearance.hiddenSections);
+      if (visibility.checked) hidden.delete(visibility.dataset.homeVisible);
+      else hidden.add(visibility.dataset.homeVisible);
+      state.appearance.hiddenSections = [...hidden];
+      renderPreview();
+      persist();
+      return;
+    }
     const media = event.target.closest('[data-image-target]');
     const arrayImage = event.target.closest('[data-image-array]');
     const file = event.target.files?.[0];
@@ -830,6 +846,14 @@ export function mountOnlineStudio() {
   });
 
   document.addEventListener('click', (event) => {
+    const preset = event.target.closest('[data-profile-preset]');
+    if (preset && !busy) {
+      state = applyProfilePreset(state, preset.dataset.profilePreset);
+      clearValidationError();
+      refreshAll();
+      toast(`已套用「${PROFILE_PRESETS.find((item) => item.id === preset.dataset.profilePreset).name}」，個人內容已保留。`);
+      return;
+    }
     const addButton = event.target.closest('[data-add]');
     if (addButton) {
       if (addButton.dataset.add === 'socials') document.querySelector('#social-picker').showModal();
