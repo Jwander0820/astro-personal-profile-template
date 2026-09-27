@@ -32,7 +32,7 @@ const studioEnabled = resolveOnlineStudioAccess({
 <BaseLayout
   title={pageTitle}
   description={description}
-  image={profile.data.background}
+  image={profile.data.socialImage || profile.data.background}
   fontScale={profile.data.fontScale}
   smallTextScale={profile.data.smallTextScale}
   bodyFont={profile.data.bodyFont}

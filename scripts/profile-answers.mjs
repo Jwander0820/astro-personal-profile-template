@@ -4,6 +4,7 @@ import { assertThemeColor } from './theme-color.mjs';
 import { coerceDisplayText } from './text-values.mjs';
 import { parseYoutubePlaylistId } from './youtube-playlist.mjs';
 import { normalizeEmbedSource } from './embed-source.mjs';
+import { validateSharing } from './profile-sharing.mjs';
 import {
   APPEARANCE_DEFAULTS,
   APPEARANCE_RANGES,
@@ -158,7 +159,7 @@ export function extractYoutubePlaylistId(value) {
 export function validateProfileAnswers(input) {
   if (!isObject(input) || input.version !== PROFILE_ANSWER_VERSION) throw new Error('回答檔 version 必須為 1。');
   if (!isObject(input.identity)) throw new Error('回答檔缺少 identity。');
-  assertAllowedKeys(input, ['$schema', 'version', 'applyMode', 'identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features', 'appearance'], '回答檔');
+  assertAllowedKeys(input, ['$schema', 'version', 'applyMode', 'identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features', 'appearance', 'sharing'], '回答檔');
   if (input.$schema !== undefined && typeof input.$schema !== 'string') throw new Error('$schema 格式不正確。');
   const applyMode = assertOptionalEnum(input.applyMode, APPLY_MODES, 'applyMode', 'replace');
   assertAllowedKeys(input.identity, ['displayName', 'title', 'location', 'tagline', 'bio'], 'identity');
@@ -173,10 +174,11 @@ export function validateProfileAnswers(input) {
   };
   if (input.media !== undefined && !isObject(input.media)) throw new Error('media 格式不正確。');
   const mediaInput = input.media ?? {};
-  assertAllowedKeys(mediaInput, ['avatar', 'background'], 'media');
+  assertAllowedKeys(mediaInput, ['avatar', 'background', 'socialImage'], 'media');
   const media = {
     avatar: atAnswerPath('media.avatar', () => assertImageSource(mediaInput.avatar ?? '/images/avatar.svg', '頭像')),
     background: atAnswerPath('media.background', () => assertImageSource(mediaInput.background ?? '/images/background.svg', '背景圖片')),
+    ...(mediaInput.socialImage !== undefined && mediaInput.socialImage !== '' ? { socialImage: atAnswerPath('media.socialImage', () => assertImageSource(mediaInput.socialImage, '社群封面')) } : {}),
   };
 
   const socialInput = input.socials === undefined ? [] : assertObjectArray(input.socials, '社群連結', 20);
@@ -330,6 +332,7 @@ export function validateProfileAnswers(input) {
     ...(fortune ? { fortune } : {}),
     appearance: { sectionsLayout, homeOrder, bodyFont, displayFont, mainColor, fontScale, smallTextScale, hiddenSections, showImages },
     features: { fortune: features.fortune !== false },
+    sharing: atAnswerPath('sharing.publicUrl', () => validateSharing(input.sharing)),
   };
 }
 
@@ -337,20 +340,20 @@ export function resolveProfileAnswerUpdate(currentInput, rawInput, requestedMode
   if (!isObject(rawInput) || rawInput.version !== PROFILE_ANSWER_VERSION) {
     throw new Error('回答檔 version 必須為 1。');
   }
-  assertAllowedKeys(rawInput, ['$schema', 'version', 'applyMode', 'identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features', 'appearance'], '回答檔');
+  assertAllowedKeys(rawInput, ['$schema', 'version', 'applyMode', 'identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features', 'appearance', 'sharing'], '回答檔');
   const mode = requestedMode ?? rawInput.applyMode ?? 'replace';
   if (!APPLY_MODES.includes(mode)) throw new Error('applyMode 必須為 merge 或 replace。');
   if (mode === 'replace') {
     return {
       mode,
       answers: { ...validateProfileAnswers({ ...rawInput, applyMode: mode }), applyMode: mode },
-      updateKeys: new Set(['identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features', 'appearance']),
+      updateKeys: new Set(['identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features', 'appearance', 'sharing']),
     };
   }
 
   const current = validateProfileAnswers(currentInput);
   const merged = structuredClone(current);
-  for (const key of ['identity', 'media', 'appearance', 'features']) {
+  for (const key of ['identity', 'media', 'appearance', 'features', 'sharing']) {
     if (rawInput[key] !== undefined) {
       if (!isObject(rawInput[key])) throw new Error(`${key} 格式不正確。`);
       merged[key] = { ...merged[key], ...rawInput[key] };
@@ -452,6 +455,7 @@ export function createProfileAnswersFromStudioContent(content) {
     media: {
       avatar: content.profile.avatar ?? '/images/avatar.svg',
       background: content.profile.background ?? '/images/background.svg',
+      ...(content.profile.socialImage ? { socialImage: content.profile.socialImage } : {}),
     },
     socials: orderedVisible(content.links, (entry) => entry.data.group === 'social' && entry.data.layout === 'icon')
       .map((entry) => ({
@@ -514,6 +518,7 @@ export function createProfileAnswersFromStudioContent(content) {
       fortunes: Array.isArray(content.fortunes) ? content.fortunes : [],
     },
     features: { fortune: fortune?.data?.visible !== false },
+    sharing: validateSharing(content.profile.sharing),
     appearance: {
       hiddenSections: content.profile.hiddenSections ?? [],
       showImages: content.profile.showImages !== false,

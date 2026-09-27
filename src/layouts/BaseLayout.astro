@@ -8,6 +8,7 @@ import {
   STUDIO_PREVIEW_QUERY_VALUE,
 } from '../../scripts/studio-preview-mode.mjs';
 import ThemeToggle from '../components/ThemeToggle.astro';
+import ProfileShare from '../components/ProfileShare.astro';
 interface Props {
   title: string;
   description: string;
@@ -80,12 +81,15 @@ const themeCss = buildThemeCss(mainColor);
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     {socialImage && <meta property="og:image" content={socialImage} />}
+    {socialImage && <meta property="og:image:alt" content={title} />}
+    {socialImage && <meta name="twitter:image" content={socialImage} />}
     <meta name="twitter:card" content={socialImage ? 'summary_large_image' : 'summary'} />
     <title>{title}</title>
   </head>
   <body class={pageClass}>
     <a class="skip-link" href="#main-content">跳到主要內容</a>
     <ThemeToggle />
+    <ProfileShare />
     <main id="main-content" tabindex="-1"><slot /></main>
     <script>
       import '../scripts/profile-preview-loader.js';

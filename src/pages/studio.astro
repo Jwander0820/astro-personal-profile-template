@@ -10,6 +10,7 @@ import { withStudioPreviewQuery } from '../../scripts/studio-preview-mode.mjs';
 import { studioApiUrl } from '../../scripts/studio-network.mjs';
 import '../styles/online-studio.css';
 import { PROFILE_PRESETS } from '../../scripts/profile-presets.mjs';
+import ShareCardPanel from '../components/ShareCardPanel.astro';
 
 const runtime = globalThis as typeof globalThis & { process: { cwd(): string; env: Record<string, string | undefined> } };
 const content = await loadStudioContent(runtime.process.cwd());
@@ -317,6 +318,23 @@ const previewHref = withStudioPreviewQuery(withBase('/'));
             </section>
 
             <div id="privacy-summary" class="privacy-summary" aria-live="polite"></div>
+
+            <section class="completion-card share-studio-card">
+              <p class="mini-label">YOUR PROFILE, READY TO SHARE</p>
+              <h3>名片與社群分享圖</h3>
+              <p>把自介製作成方形名片、直式分享圖或橫式封面。首頁亮暗模式按鈕下方也能直接展示名片。</p>
+              <label class="field"><span>正式網站網址</span><input type="url" aria-label="正式網站網址" aria-describedby="share-url-hint" data-bind="sharing.publicUrl" maxlength="500" placeholder="https://yourname.github.io/profile/" /><small id="share-url-hint">包含你的專案路徑。這是 QR Code 的目的地，不會修改部署設定。</small></label>
+              <label class="share-setting"><input type="checkbox" data-bind="sharing.enabled" data-boolean />首頁顯示名片按鈕</label>
+              <label class="share-setting"><input type="checkbox" data-bind="sharing.showTemplateCredit" data-boolean />分享圖附上開源模板 GitHub 連結</label>
+              <ShareCardPanel studio />
+              <details class="social-image-settings">
+                <summary>目前的社群封面</summary>
+                <p>已產生的封面是一張保存的圖片；修改姓名、文字或配色後，請重新按「設為網站社群封面」。</p>
+                <label class="field"><span>社群封面圖片網址或路徑</span><input type="text" data-bind="media.socialImage" maxlength="2048" placeholder="/images/profile-social-cover.png" /><small>清空後回到原本的背景圖片。單獨 JSON 不包含產生的圖片檔。</small></label>
+                <label class="field"><span>或上傳自製社群封面</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-image-target="media.socialImage" /></label>
+                <img id="studio-social-image" alt="目前保存的社群封面" hidden />
+              </details>
+            </section>
 
             <div class="completion-grid">
               <section class="completion-card">

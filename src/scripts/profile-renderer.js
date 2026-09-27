@@ -1,6 +1,7 @@
 import { isSafeHttpUrl, isSafeProfileUrl } from '../../scripts/content-safety.mjs';
 import { parseYoutubePlaylistId } from '../../scripts/youtube-playlist.mjs';
 import { markdownFragment } from './preview-markdown.js';
+import { createShareProfile } from '../../scripts/profile-sharing.mjs';
 
 const HOME_SECTIONS = ['about', 'turntable', 'links', 'fortune', 'notion'];
 
@@ -319,6 +320,7 @@ export function renderProfileDocument(root, answers, options) {
   const retainedFortune = root.querySelector('[data-fortune-draw]');
   const wrapper = node('div');
   wrapper.dataset.profileRenderer = '';
+  wrapper.dataset.shareProfile = JSON.stringify(createShareProfile(answers, assetHref));
   wrapper.dataset.studioEnabled = String(studioEnabled);
   wrapper.dataset.studioHref = studioHref;
   wrapper.append(renderProfileHeader(answers, assetHref, assets));

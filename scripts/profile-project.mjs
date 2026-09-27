@@ -102,6 +102,7 @@ function replaceImageReferences(answers, replacements) {
   const replace = (value) => replacements.get(value) ?? value;
   answers.media.avatar = replace(answers.media.avatar);
   answers.media.background = replace(answers.media.background);
+  if (answers.media.socialImage) answers.media.socialImage = replace(answers.media.socialImage);
   answers.links.forEach((item) => { if (item.image) item.image = replace(item.image); });
   answers.sections.forEach((item) => { if (item.image) item.image = replace(item.image); });
   answers.imageBlocks.forEach((item) => { item.image = replace(item.image); });
@@ -112,6 +113,7 @@ function updatedImageReferences(answers, updateKeys) {
   if (updateKeys.has('media')) {
     references.add(answers.media.avatar);
     references.add(answers.media.background);
+    if (answers.media.socialImage) references.add(answers.media.socialImage);
   }
   if (updateKeys.has('links')) {
     answers.links.forEach((item) => { if (item.image) references.add(item.image); });

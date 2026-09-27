@@ -1,0 +1,32 @@
+---
+import { TEMPLATE_REPOSITORY } from '../../scripts/profile-sharing.mjs';
+import '../styles/share-card.css';
+interface Props { studio?: boolean; }
+const { studio = false } = Astro.props;
+---
+<div class="share-card-panel" data-share-card data-studio-share={studio ? '' : undefined}>
+  <div class="share-card-tools">
+    <label>分享圖尺寸
+      <select data-share-format>
+        <option value="square">方形名片 · 1080 × 1080</option>
+        <option value="portrait">直式分享圖 · 1080 × 1440</option>
+        <option value="landscape">橫式社群封面 · 1200 × 630</option>
+      </select>
+    </label>
+    <button type="button" data-share-refresh>重新產生</button>
+  </div>
+  <div class="share-card-stage" data-share-stage aria-busy="false"></div>
+  <p class="share-card-status" data-share-status role="status" aria-live="polite">選好尺寸，即可產生你的名片。</p>
+  <div class="share-card-actions">
+    <button type="button" data-share-download disabled>下載 PNG</button>
+    <button type="button" data-share-native disabled hidden>分享圖片</button>
+    <button type="button" data-share-copy disabled>複製名片網址</button>
+    {studio && <button type="button" data-share-save disabled>設為網站社群封面</button>}
+  </div>
+  {studio && <p class="share-card-help">「設為網站社群封面」會產生橫式 PNG 並加入草稿；儲存到專案或帶走 ZIP 後發布才會生效。更新自介後請重新產生。</p>}
+  <div class="share-card-links">
+    <a data-share-visit target="_blank" rel="noopener noreferrer" hidden>開啟個人首頁 ↗</a>
+    <a data-share-github target="_blank" rel="noopener noreferrer" hidden>個人 GitHub ↗</a>
+    <a href={TEMPLATE_REPOSITORY} target="_blank" rel="noopener noreferrer">使用這個開源名片模板 ↗</a>
+  </div>
+</div>

@@ -1149,3 +1149,8 @@ code {
 .preset-swatch { width: 2rem; height: .4rem; border-radius: 4px; background: var(--preset-color); }
 .preset-grid small { line-height: 1.5; color: #536171; }
 .section-visibility label { display: inline-flex; align-items: center; gap: .4rem; margin: .4rem .8rem .4rem 0; }
+.share-studio-card { margin: 1rem 0; }
+.share-setting { display: flex; gap: .5rem; align-items: center; font-size: .85rem; margin: 1rem 0; }
+.social-image-settings { margin-top: 1.2rem; font-size: .85rem; }
+.social-image-settings summary { cursor: pointer; }
+#studio-social-image { width: 100%; height: auto; border-radius: 12px; }

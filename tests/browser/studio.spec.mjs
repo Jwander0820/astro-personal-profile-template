@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
+import jsQR from 'jsqr';
+import { PNG } from 'pngjs';
 import { createSettingsZip, readSettingsZip } from '../../src/scripts/settings-package.js';
 import { applyProfileProjectUpdate, planProfileProjectUpdate } from '../../scripts/profile-project.mjs';
 import {
@@ -83,6 +85,80 @@ test('情境模板保留個人資料、可撤銷並把顯示設定帶入 ZIP', a
   expect(exported.appearance.homeOrder[0]).toBe('turntable');
   expect(exported.appearance.hiddenSections).toEqual([]);
   expect(exported.identity).toEqual(before.answers.identity);
+});
+
+test('名片三種 PNG 尺寸與 QR 網址正確，OG 封面可隨 ZIP 搬移', async ({ page }, testInfo) => {
+  await page.route('https://fonts.googleapis.com/**', (route) => route.fulfill({ contentType: 'text/css', body: '' }));
+  await page.goto('/studio/');
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  const card = page.locator('[data-studio-share]');
+  const publicUrl = 'https://cards.example/my-profile/';
+  await page.getByLabel('正式網站網址', { exact: true }).fill(publicUrl);
+  for (const [format, width, height] of [['square', 1080, 1080], ['portrait', 1080, 1440], ['landscape', 1200, 630]]) {
+    await card.locator('[data-share-format]').selectOption(format);
+    await expect(card.locator('[data-share-download]')).toBeEnabled({ timeout: 15000 });
+    const pending = page.waitForEvent('download');
+    await card.locator('[data-share-download]').click();
+    const download = await pending;
+    const bytes = await readFile(await download.path());
+    const png = PNG.sync.read(bytes);
+    expect([png.width, png.height]).toEqual([width, height]);
+    expect(jsQR(new Uint8ClampedArray(png.data), width, height)?.data).toBe(publicUrl);
+    await download.saveAs(testInfo.outputPath(`share-${format}.png`));
+  }
+  await card.locator('[data-share-save]').click();
+  await expect.poll(async () => (await storedDraft(page)).answers.media.socialImage).toMatch(/^\/images\/profile-social-cover/);
+  const entries = await downloadSettings(page);
+  const answers = JSON.parse(new TextDecoder().decode(entries.get('profile.answers.json')));
+  const socialPng = entries.get(answers.media.socialImage.replace(/^\//, ''));
+  expect(PNG.sync.read(Buffer.from(socialPng)).width).toBe(1200);
+  await page.locator('#import-answers').setInputFiles({ name: 'share.zip', mimeType: 'application/zip', buffer: Buffer.from(createSettingsZip([...entries].map(([name, data]) => ({ name, data })))) });
+  await expect.poll(async () => (await storedDraft(page)).answers.sharing.publicUrl).toBe(publicUrl);
+  await page.reload();
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  await page.locator('.social-image-settings summary').click();
+  await expect(page.locator('#studio-social-image')).toBeVisible();
+  await expect.poll(() => page.locator('#studio-social-image').evaluate((image) => image.naturalWidth)).toBe(1200);
+  await expect(page.frameLocator('#profile-preview').locator('meta[property="og:image"]')).toHaveAttribute('content', /^blob:/);
+});
+
+test('首頁名片支援鍵盤關閉、預覽更新與 390px 行動版', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  const button = page.getByRole('button', { name: '展示個人名片' });
+  await button.click();
+  await expect(page.getByRole('dialog', { name: '把這張名片帶走' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(button).toBeFocused();
+  await page.goto('/studio/');
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  await page.getByLabel('正式網站網址', { exact: true }).fill('https://cards.example/profile/');
+  const preview = page.frameLocator('#profile-preview');
+  await page.locator('#profile-preview').evaluate((frame) => frame.scrollIntoView({ block: 'start' }));
+  await preview.getByRole('button', { name: '展示個人名片' }).click();
+  await expect(preview.locator('[data-share-download]')).toBeEnabled({ timeout: 15000 });
+  await expect(preview.locator('[data-share-stage] canvas')).toHaveAttribute('aria-label', /QR Code 指向 https:\/\/cards.example\/profile\//);
+  await expect(preview.getByRole('link', { name: '使用這個開源名片模板' })).toHaveAttribute('href', 'https://github.com/jwander0820/astro-personal-profile-template');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await preview.locator('html').evaluate((el) => el.scrollWidth <= innerWidth)).toBe(true);
+  await preview.getByRole('button', { name: '關閉名片' }).click();
+  await page.getByLabel('首頁顯示名片按鈕').uncheck();
+  await expect(preview.locator('#profile-share-toggle')).toBeHidden();
+});
+
+test('無效正式網址禁止下載，跨站頭像失敗仍可產生名片', async ({ page }) => {
+  await page.route('https://no-cors.example/avatar.png', (route) => route.abort());
+  await page.route('https://fonts.googleapis.com/**', (route) => route.fulfill({ contentType: 'text/css', body: '' }));
+  await page.goto('/studio/');
+  await page.locator('[data-bind="media.avatar"]').fill('https://no-cors.example/avatar.png');
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  const card = page.locator('[data-studio-share]');
+  await page.getByLabel('正式網站網址', { exact: true }).fill('https://localhost:4321/');
+  await expect(card.locator('[data-share-status]')).toContainText('不能使用本機網址', { timeout: 15000 });
+  await expect(card.locator('[data-share-download]')).toBeDisabled();
+  await page.getByLabel('正式網站網址', { exact: true }).fill('https://cards.example/');
+  await expect(card.locator('[data-share-download]')).toBeEnabled({ timeout: 15000 });
+  await expect(card.locator('[data-share-status]')).toContainText('已改用名字首字');
 });
 
 test('一般首頁不下載預覽 renderer，Studio iframe 仍能即時更新', async ({ page }) => {

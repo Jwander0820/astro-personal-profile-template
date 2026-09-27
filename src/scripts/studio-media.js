@@ -115,7 +115,7 @@ export async function serializeStudioImages(imageFiles) {
 
 export function referencedStudioImages(answers, imageFiles) {
   const paths = new Set([
-    answers.media?.avatar, answers.media?.background,
+    answers.media?.avatar, answers.media?.background, answers.media?.socialImage,
     ...(answers.links || []).map((item) => item.image),
     ...(answers.sections || []).map((item) => item.image),
     ...(answers.imageBlocks || []).map((item) => item.image),

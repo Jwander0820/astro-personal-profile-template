@@ -1,11 +1,12 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
-import { load as loadYaml, JSON_SCHEMA } from 'js-yaml';
+import { load as loadYaml, dump as dumpYaml, JSON_SCHEMA } from 'js-yaml';
 import { isSafeHttpUrl, isSafeImageSource, isSafeProfileUrl } from './content-safety.mjs';
 import { atomicWriteText, withFileWriteLock } from './file-writes.mjs';
 import { loadFortuneBucket, replaceFortuneBucket } from './fortune-content.mjs';
 import { coerceDisplayText } from './text-values.mjs';
 import { assertThemeColor } from './theme-color.mjs';
+import { validateSharing } from './profile-sharing.mjs';
 import {
   APPEARANCE_DEFAULTS,
   APPEARANCE_RANGES,
@@ -64,6 +65,8 @@ export function stringifyMarkdown(data, body = '') {
         lines.push(`${key}:`);
         value.forEach((item) => lines.push(`  - ${formatScalar(item)}`));
       }
+    } else if (isObject(value)) {
+      lines.push(dumpYaml({ [key]: value }, { schema: JSON_SCHEMA, noRefs: true, lineWidth: -1, quotingType: '"', forceQuotes: true }).trimEnd());
     } else {
       lines.push(`${key}: ${formatScalar(value)}`);
     }
@@ -224,6 +227,8 @@ export async function saveStudioProfile(projectRoot, input) {
       location: assertDisplayText(input.location, '地點', { max: 100 }) || undefined,
       avatar: assertImageSource(input.avatar, '頭像') || undefined,
       background: assertImageSource(input.background, '背景圖片') || undefined,
+      socialImage: assertImageSource(input.socialImage ?? current.data.socialImage, '社群封面') || undefined,
+      sharing: validateSharing(input.sharing ?? current.data.sharing),
       sectionsLayout: ['list', 'grid'].includes(input.sectionsLayout) ? input.sectionsLayout : APPEARANCE_DEFAULTS.sectionsLayout,
       hiddenSections: input.hiddenSections ?? current.data.hiddenSections ?? [],
       showImages: input.showImages ?? current.data.showImages ?? true,
@@ -507,7 +512,7 @@ export async function applyProfileAnswers(projectRoot, rawInput, options = {}) {
     : resolveProfileAnswerUpdate(createProfileAnswersFromStudioContent(current), rawInput, options.mode);
   const input = resolved.answers;
   const updates = resolved.updateKeys;
-  if (updates.has('identity') || updates.has('media') || updates.has('appearance')) await saveStudioProfile(projectRoot, {
+  if (updates.has('identity') || updates.has('media') || updates.has('appearance') || updates.has('sharing')) await saveStudioProfile(projectRoot, {
     ...current.profile,
     displayName: input.identity.displayName,
     title: input.identity.title,
@@ -516,6 +521,8 @@ export async function applyProfileAnswers(projectRoot, rawInput, options = {}) {
     bio: input.identity.bio,
     avatar: input.media.avatar,
     background: input.media.background,
+    socialImage: input.media.socialImage || '',
+    sharing: input.sharing,
     sectionsLayout: input.appearance.sectionsLayout,
     hiddenSections: input.appearance.hiddenSections,
     showImages: input.appearance.showImages,

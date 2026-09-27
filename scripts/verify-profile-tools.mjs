@@ -51,6 +51,7 @@ import { toHtml } from 'hast-util-to-html';
 import { renderPreviewMarkdown } from '../src/scripts/preview-markdown.js';
 import { findLocalPort, listenLocalServer, studioApiUrl, studioPort } from './studio-network.mjs';
 import { PROFILE_PRESETS, applyProfilePreset } from './profile-presets.mjs';
+import { normalizePublicUrl, validateSharing } from './profile-sharing.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), 'profile-tools-'));
@@ -78,6 +79,20 @@ try {
   }
   assert.throws(() => validateProfileAnswers({ ...presetSource, appearance: { hiddenSections: ['about', 'about'] } }), /隱藏板塊/);
   assert.throws(() => validateProfileAnswers({ ...presetSource, appearance: { showImages: 'false' } }), /布林/);
+  assert.equal(normalizePublicUrl('https://cards.example/my-profile/'), 'https://cards.example/my-profile/');
+  for (const url of ['javascript:alert(1)', 'http://cards.example', 'https://localhost:4321/', 'https://127.0.0.1/', 'https://user:password@cards.example/', 'https://cards.example/?private=1']) assert.throws(() => normalizePublicUrl(url));
+  assert.throws(() => validateSharing({ enabled: 'false' }), /布林/);
+  const shareAnswers = { ...presetSource, sharing: { enabled: false, publicUrl: 'https://cards.example/my-profile/', showTemplateCredit: false }, media: { ...presetSource.media, socialImage: 'https://cdn.example/cover.png' } };
+  await applyProfileAnswers(presetRoot, shareAnswers);
+  const shareContent = await loadStudioContent(presetRoot);
+  assert.equal(shareContent.profile.socialImage, shareAnswers.media.socialImage);
+  const shareRestored = createProfileAnswersFromStudioContent(shareContent);
+  assert.deepEqual(shareRestored.sharing, shareAnswers.sharing);
+  assert.equal(shareRestored.media.socialImage, shareAnswers.media.socialImage);
+  await applyProfileAnswers(presetRoot, { version: 1, applyMode: 'merge', sharing: { enabled: true } });
+  assert.deepEqual((await loadStudioContent(presetRoot)).profile.sharing, { ...shareAnswers.sharing, enabled: true });
+  await applyProfileAnswers(presetRoot, { version: 1, applyMode: 'merge', media: { socialImage: '' } });
+  assert.equal((await loadStudioContent(presetRoot)).profile.socialImage, undefined);
   assert.equal(studioPort(undefined, 4322), 4322);
   assert.equal(studioPort('0', 4322), 0);
   for (const value of ['-1', '65536', 'abc', '4322.5']) assert.throws(() => studioPort(value, 4322), /連接埠/);
@@ -224,6 +239,21 @@ try {
   const pngA = Buffer.from([...pngHeader, 0x01]);
   const pngB = Buffer.from([...pngHeader, 0x02]);
   const dataUrl = (buffer) => `data:image/png;base64,${buffer.toString('base64')}`;
+  const socialRoot = await createProjectCopy('social-cover-project');
+  await atomicWriteFile(path.join(socialRoot, 'public/images/social.png'), pngA);
+  const socialPayload = { answers: { version: 1, applyMode: 'merge', media: { socialImage: '/images/social.png' }, sharing: { publicUrl: 'https://cards.example/profile/' } }, images: [{ path: '/images/social.png', dataUrl: dataUrl(pngB) }] };
+  const socialPlan = await planProfileProjectUpdate(socialRoot, socialPayload);
+  const socialResult = await applyProfileProjectUpdate(socialRoot, { ...socialPayload, expectedPlanToken: socialPlan.token });
+  const socialPath = socialResult.answers.media.socialImage;
+  assert.notEqual(socialPath, '/images/social.png');
+  assert.deepEqual(await readFile(path.join(socialRoot, 'public', socialPath)), pngB);
+  assert.deepEqual(await readFile(path.join(socialRoot, 'public/images/social.png')), pngA);
+  assert.equal((await loadStudioContent(socialRoot)).profile.socialImage, socialPath);
+  const socialProfilePath = path.join(socialRoot, 'src/content/profile/main.md');
+  const socialMtime = (await stat(socialProfilePath)).mtimeMs;
+  const socialNoop = await applyProfileProjectUpdate(socialRoot, { answers: { version: 1, applyMode: 'merge', media: { socialImage: socialPath } } });
+  assert.equal(socialNoop.plan.changes.length, 0);
+  assert.equal((await stat(socialProfilePath)).mtimeMs, socialMtime);
 
   // Link icons survive answer/content round trips and transactional media renaming.
   assert.equal(answersSchema.properties.links.items.properties.image.$ref, '#/$defs/imageSource');

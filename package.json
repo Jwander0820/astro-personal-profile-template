@@ -20,6 +20,7 @@
     "check:ui": "node scripts/verify-ui-contracts.mjs",
     "check:studio-preview": "node scripts/verify-studio-preview-mode.mjs",
     "check:studio-deployment": "node scripts/verify-studio-deployment.mjs",
+    "check:share-build": "node scripts/verify-share-build.mjs",
     "check:browser": "playwright test",
     "check:browser:install": "playwright install --no-shell chromium",
     "check:profile-tools": "node scripts/verify-profile-tools.mjs",
@@ -40,10 +41,13 @@
     "mdast-util-gfm": "3.1.0",
     "mdast-util-to-hast": "13.2.1",
     "micromark-extension-gfm": "3.0.0",
+    "qrcode": "^1.5.4",
     "typescript": "^5.7.2"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.0",
-    "hast-util-from-html": "2.0.3"
+    "hast-util-from-html": "2.0.3",
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0"
   }
 }

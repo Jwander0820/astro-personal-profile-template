@@ -20,6 +20,10 @@ import { applyProjectPlan, formatProjectPlan, requestProjectPlan } from './studi
 import { createDraftStore, createDraftHistory } from './studio-draft.js';
 import { showValidationError, clearValidationError } from './studio-validation.js';
 import { applyProfilePreset, PROFILE_PRESETS } from '../../scripts/profile-presets.mjs';
+import { createShareProfile, SHARING_DEFAULTS } from '../../scripts/profile-sharing.mjs';
+import { withBase } from '../lib/paths';
+import { mountShareCard } from './profile-share.js';
+import { isSafeImageSource } from '../../scripts/content-safety.mjs';
 
 const HOME_LABELS = {
   about: 'About me',
@@ -212,6 +216,7 @@ function normalizeDraft(value, fallback = {}) {
   draft.appearance.smallTextScale ??= APPEARANCE_DEFAULTS.smallTextScale;
   draft.appearance.hiddenSections ??= [];
   draft.appearance.showImages ??= true;
+  draft.sharing = { ...SHARING_DEFAULTS, ...draft.sharing };
   draft.media ||= { avatar: '/images/avatar.svg', background: '/images/background.svg' };
   draft.media.avatar ||= '/images/avatar.svg';
   draft.media.background ||= '/images/background.svg';
@@ -256,6 +261,7 @@ export function mountOnlineStudio() {
   let saveSequence = 0;
   let unpersisted = false;
   let toastTimer;
+  let shareTabTimer;
   let localMode = false;
   let mediaRestored = false;
 
@@ -263,6 +269,14 @@ export function mountOnlineStudio() {
   const toastNode = document.querySelector('#online-toast');
   const preview = document.querySelector('#profile-preview');
   const saveProjectButton = document.querySelector('#save-project');
+  const shareCard = mountShareCard(document.querySelector('[data-studio-share]'), {
+    getProfile: () => createShareProfile(state, (path) => isSafeImageSource(path) ? (objectUrls.get(path) || withBase(path)) : ''),
+    onSave: async (file) => {
+      let saved = false;
+      await runExclusive(async () => { await registerImage(file, (path) => { state.media.socialImage = path; }); saved = true; });
+      if (!saved) throw new Error('封面未能保存，請稍後再試；原本的封面仍保留。');
+    },
+  });
 
   function showConflict() {
     unpersisted = true;
@@ -507,6 +521,11 @@ export function mountOnlineStudio() {
   }
 
   function renderPreview() {
+    shareCard.schedule();
+    const socialImage = document.querySelector('#studio-social-image');
+    socialImage.hidden = !isSafeImageSource(state.media.socialImage);
+    if (!socialImage.hidden) socialImage.src = objectUrls.get(state.media.socialImage) || withBase(state.media.socialImage);
+    else socialImage.removeAttribute('src');
     updatePrivacySummary();
     const displayNameInput = document.querySelector('[data-bind="identity.displayName"]');
     displayNameInput?.setAttribute('aria-invalid', String(!String(state.identity.displayName || '').trim()));
@@ -668,6 +687,7 @@ export function mountOnlineStudio() {
       const replace = (source) => replacements.get(source) || source;
       nextState.media.avatar = replace(nextState.media.avatar);
       nextState.media.background = replace(nextState.media.background);
+      if (nextState.media.socialImage) nextState.media.socialImage = replace(nextState.media.socialImage);
       nextState.links.forEach((item) => { if (item.image) item.image = replace(item.image); });
       nextState.sections.forEach((item) => { if (item.image) item.image = replace(item.image); });
       nextState.imageBlocks.forEach((item) => { item.image = replace(item.image); });
@@ -921,6 +941,7 @@ export function mountOnlineStudio() {
   });
 
   function activateTab(name) {
+    clearTimeout(shareTabTimer);
     document.querySelectorAll('[data-tab]').forEach((tab) => {
       const active = tab.dataset.tab === name;
       tab.classList.toggle('is-active', active);
@@ -932,6 +953,7 @@ export function mountOnlineStudio() {
       panel.classList.toggle('is-active', active);
       panel.hidden = !active;
     });
+    if (name === 'finish') shareTabTimer = setTimeout(() => shareCard.refresh(), 0);
   }
 
   document.querySelectorAll('[data-preview-width]').forEach((button) => {

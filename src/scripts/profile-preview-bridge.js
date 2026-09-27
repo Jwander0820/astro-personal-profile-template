@@ -49,6 +49,18 @@ if (window.parent !== window) {
     document.documentElement.style.fontSize = `${Number(answers.appearance.fontScale || 1) * 100}%`;
     document.documentElement.style.setProperty('--small-text-base', `${Number(answers.appearance.smallTextScale || 1)}rem`);
     updateFonts(answers.appearance);
+    const imageSource = answers.media?.socialImage || answers.media?.background;
+    const socialImage = isSafeImageSource(imageSource) ? (assets.objectUrls?.[imageSource] || withBase(imageSource)) : '';
+    let imageMeta = document.querySelector('meta[property="og:image"]');
+    if (socialImage) {
+      if (!imageMeta) { imageMeta = document.createElement('meta'); imageMeta.setAttribute('property', 'og:image'); document.head.append(imageMeta); }
+      imageMeta.content = new URL(socialImage, location.href).href;
+    } else imageMeta?.remove();
+    let twitterImage = document.querySelector('meta[name="twitter:image"]');
+    if (socialImage) {
+      if (!twitterImage) { twitterImage = document.createElement('meta'); twitterImage.name = 'twitter:image'; document.head.append(twitterImage); }
+      twitterImage.content = new URL(socialImage, location.href).href;
+    } else twitterImage?.remove();
     renderProfileDocument(rendererRoot, answers, {
       icons,
       assets,

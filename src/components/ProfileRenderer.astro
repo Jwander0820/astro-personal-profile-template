@@ -7,6 +7,8 @@ import SectionCard from './SectionCard.astro';
 import Footer from './Footer.astro';
 import CustomBlock from './CustomBlock.astro';
 import StudioLinkCard from './StudioLinkCard.astro';
+import { createShareProfile } from '../../scripts/profile-sharing.mjs';
+import { withBase } from '../lib/paths';
 
 interface Props {
   profile: CollectionEntry<'profile'>;
@@ -50,6 +52,7 @@ const fallbackBlocks = remainingBlocks.filter((block) => (
 ---
 <div
   data-profile-renderer
+  data-share-profile={JSON.stringify(createShareProfile({ identity: { ...profile.data, bio: profile.body }, media: profile.data, appearance: profile.data, sharing: profile.data.sharing, socials: iconLinks.map((item) => item.data) }, withBase))}
   data-studio-enabled={String(studioEnabled)}
   data-studio-href={studioHref}
 >

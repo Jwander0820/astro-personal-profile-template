@@ -7,6 +7,7 @@ import { contentText, contentTextArray, contentTextMax } from '../scripts/conten
 import { FORTUNE_GRADES } from '../scripts/fortune-content.mjs';
 import { normalizeThemeColor } from '../scripts/theme-color.mjs';
 import { parseYoutubePlaylistId } from '../scripts/youtube-playlist.mjs';
+import { validateSharing } from '../scripts/profile-sharing.mjs';
 import { APPEARANCE_DEFAULTS, APPEARANCE_RANGES, EMBED_URL_MAX_LENGTH } from '../scripts/profile-contract.mjs';
 
 const imageSource = z.string().refine(
@@ -27,6 +28,10 @@ const profile = defineCollection({
     title: contentText.optional(),
     avatar: imageSource.optional(),
     background: imageSource.optional(),
+    socialImage: imageSource.optional(),
+    sharing: z.object({ enabled: z.boolean().default(true), publicUrl: z.string().default(''), showTemplateCredit: z.boolean().default(true) })
+      .strict().default({ enabled: true, publicUrl: '', showTemplateCredit: true })
+      .superRefine((value, ctx) => { try { validateSharing(value); } catch (error) { ctx.addIssue({ code: 'custom', message: String(error) }); } }),
     location: contentText.optional(),
     // Backward compatibility only. Profiles created before the cover-label removal may still contain it.
     archiveLabel: contentText.optional(),

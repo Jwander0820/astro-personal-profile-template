@@ -1,0 +1,14 @@
+---
+import ShareCardPanel from './ShareCardPanel.astro';
+---
+<button id="profile-share-toggle" class="profile-share-toggle" type="button" aria-label="展示個人名片" title="展示個人名片" aria-haspopup="dialog" aria-controls="profile-share-dialog" hidden>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="3"/><circle cx="8" cy="10" r="2"/><path d="M5 16c0-3 6-3 6 0m3-7h5m-5 4h5m-5 4h3"/></svg>
+</button>
+<dialog id="profile-share-dialog" class="profile-share-dialog" aria-labelledby="profile-share-title" closedby="any">
+  <div class="share-dialog-heading"><div><p>TAKE A CARD</p><h2 id="profile-share-title">把這張名片帶走</h2></div><form method="dialog"><button type="submit" autofocus aria-label="關閉名片">關閉 ✕</button></form></div>
+  <ShareCardPanel />
+</dialog>
+<script>
+  import { mountProfileShare } from '../scripts/profile-share.js';
+  mountProfileShare();
+</script>

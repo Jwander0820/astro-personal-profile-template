@@ -67,7 +67,16 @@
       "additionalProperties": false,
       "properties": {
         "avatar": { "$ref": "#/$defs/imageSource" },
-        "background": { "$ref": "#/$defs/imageSource" }
+        "background": { "$ref": "#/$defs/imageSource" },
+        "socialImage": { "anyOf": [{ "$ref": "#/$defs/imageSource" }, { "const": "" }], "description": "Studio 產生或自行指定的社群封面；空字串清除" }
+      }
+    },
+    "sharing": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "publicUrl": { "type": "string", "maxLength": 500, "default": "", "description": "公開 HTTPS 正式網址，不含查詢、錨點、帳密或本機位址；空白時正式頁使用目前網址", "anyOf": [{ "const": "" }, { "format": "uri", "pattern": "^https://[^?#]+$" }] },
+        "showTemplateCredit": { "type": "boolean", "default": true }
       }
     },
     "socials": {
