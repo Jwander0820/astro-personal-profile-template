@@ -31,8 +31,5 @@ export function createShareProfile(answers, assetHref = (value) => value) {
     tags: answers.identity?.tagline || [], avatar: assetHref(answers.media?.avatar || ''),
     mainColor: answers.appearance?.mainColor || '#7A58A6', bodyFont: answers.appearance?.bodyFont || 'system', displayFont: answers.appearance?.displayFont || 'system',
     sharing: { ...SHARING_DEFAULTS, ...answers.sharing },
-    github: (answers.socials || []).find((item) => {
-      try { return new URL(item.url).hostname.toLowerCase() === 'github.com' && isSafeHttpUrl(item.url); } catch { return false; }
-    })?.url || '',
   };
 }

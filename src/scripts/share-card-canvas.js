@@ -149,7 +149,6 @@ export async function renderShareCard(profile, format, publicUrl) {
   const infoWidth = wide ? 236 : 672;
   textBlock(ctx, '掃描，認識更多', infoX, infoY, infoWidth, 24, fonts.bodyFamily, 1, 700);
   textBlock(ctx, urlLabel, infoX, infoY + 48, infoWidth, wide ? 18 : 24, fonts.bodyFamily, 2, 400, '#536171');
-  if (profile.github) textBlock(ctx, profile.github.replace(/^https?:\/\//, ''), infoX, infoY + 125, infoWidth, 18, fonts.bodyFamily, 1, 400, '#536171');
   ctx.fillStyle = '#dce3eb'; ctx.fillRect(margin, h - 70, w - margin * 2, 1);
   if (profile.sharing.showTemplateCredit) textBlock(ctx, `以開源模板製作 · ${TEMPLATE_REPOSITORY.replace('https://', '')}`, margin, h - 51, w - margin * 2, wide ? 16 : 17, fonts.bodyFamily, 1, 400, '#536171');
   else textBlock(ctx, 'PERSONAL PROFILE', margin, h - 51, w - margin * 2, 17, fonts.bodyFamily, 1, 500, '#536171');

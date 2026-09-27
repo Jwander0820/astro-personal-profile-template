@@ -39,8 +39,6 @@ export function mountShareCard(panel, { getProfile, fallbackUrl = () => '', onSa
       for (const button of [download, nativeShare, copy, save]) if (button) button.disabled = !publicUrl || !profile.name.trim() || saving;
       const visit = panel.querySelector('[data-share-visit]');
       visit.hidden = !publicUrl; visit.href = publicUrl || '#';
-      const github = panel.querySelector('[data-share-github]');
-      github.hidden = !profile.github; github.href = profile.github || '#';
       status.textContent = [!profile.name.trim() ? '請先填入顯示名稱。' : urlError || (!publicUrl ? '請先在「06 完成設定」填入公開 HTTPS 正式網址，才能下載與分享。' : '名片已就緒，QR Code 連到你的正式首頁。'), ...result.warnings].join(' ');
     } catch (error) {
       if (request !== sequence) return;

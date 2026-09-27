@@ -34,6 +34,9 @@ const [
   fortuneStudioPreviewPage,
   fortuneStudioApp,
   iconStudioPage,
+  shareCardPanel,
+  shareCardCanvas,
+  shareProfile,
 ] = await Promise.all([
   readFile(new URL('../src/styles/global.css', import.meta.url), 'utf8'),
   readFile(new URL('../src/pages/index.astro', import.meta.url), 'utf8'),
@@ -67,6 +70,9 @@ const [
   readFile(new URL('../src/pages/studio/fortune-poem/preview.astro', import.meta.url), 'utf8'),
   readFile(new URL('../src/scripts/fortune-studio.js', import.meta.url), 'utf8'),
   readFile(new URL('../src/pages/studio/icons.astro', import.meta.url), 'utf8'),
+  readFile(new URL('../src/components/ShareCardPanel.astro', import.meta.url), 'utf8'),
+  readFile(new URL('../src/scripts/share-card-canvas.js', import.meta.url), 'utf8'),
+  readFile(new URL('./profile-sharing.mjs', import.meta.url), 'utf8'),
 ]);
 
 const fortunes = JSON.parse(fortuneContent);
@@ -128,6 +134,8 @@ const contracts = [
   ['Links cards expose ordering and per-card style without first-card hardcoding', onlineStudioApp.includes("['style', '卡片樣式', 'select'") && onlineStudioApp.includes('dataset.moveCollection') && profileContract.includes("LINK_STYLES = ['primary', 'normal', 'subtle']") && liveRenderer.includes('item.style') && !liveRenderer.includes("index === 0 ? 'primary'")],
   ['answer contract carries avatar, background and social cover', answersModule.includes("assertAllowedKeys(mediaInput, ['avatar', 'background', 'socialImage']") && answersModule.includes('media: {') && indexPage.includes('image={profile.data.socialImage || profile.data.background}')],
   ['formal and live renderers share the card data contract', profileRenderer.includes('data-share-profile={JSON.stringify(createShareProfile(') && liveRenderer.includes('wrapper.dataset.shareProfile = JSON.stringify(createShareProfile(answers, assetHref))') && baseLayout.includes('<ProfileShare />') && onlineStudioPage.includes('<ShareCardPanel studio />')],
+  ['shared card panel and exported image omit automatic personal GitHub links', shareCardPanel.includes('data-share-visit') && shareCardPanel.includes('href={TEMPLATE_REPOSITORY}') && !shareCardPanel.includes('data-share-github') && !shareCardCanvas.includes('profile.github') && !shareProfile.includes('github:')],
+  ['Studio clearly exposes the public profile card visibility setting', onlineStudioPage.includes('data-bind="sharing.enabled"') && onlineStudioPage.includes('在公開首頁顯示個人名片') && onlineStudioPage.includes('aria-describedby="share-enabled-hint"')],
   ['answer contract carries fortune copy and the editable bucket', answersModule.includes("assertAllowedKeys(input.fortune, ['title', 'description', 'fortunes']") && answersModule.includes('validateFortuneBucket(input.fortune.fortunes)') && liveRenderer.includes('answers.fortune?.title')],
   ['answer contract carries validated web embed blocks', answersModule.includes("'embedBlocks'") && answersModule.includes('isSafeHttpUrl') && answersModule.includes('EMBED_BLOCK_MODES') && liveRenderer.includes('answers.embedBlocks')],
   ['fortune title and description are editable from the main Studio', onlineStudioPage.includes('data-bind="fortune.title"') && onlineStudioPage.includes('data-bind="fortune.description"') && onlineStudioPage.includes('/studio/fortune-poem/')],

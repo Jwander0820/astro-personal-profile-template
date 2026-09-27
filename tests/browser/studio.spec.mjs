@@ -142,8 +142,18 @@ test('首頁名片支援鍵盤關閉、預覽更新與 390px 行動版', async (
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(await preview.locator('html').evaluate((el) => el.scrollWidth <= innerWidth)).toBe(true);
   await preview.getByRole('button', { name: '關閉名片' }).click();
-  await page.getByLabel('首頁顯示名片按鈕').uncheck();
+  await page.getByLabel('在公開首頁顯示個人名片').uncheck();
   await expect(preview.locator('#profile-share-toggle')).toBeHidden();
+  await expect.poll(async () => (await storedDraft(page)).answers.sharing.enabled).toBe(false);
+  const entries = await downloadSettings(page);
+  expect(JSON.parse(new TextDecoder().decode(entries.get('profile.answers.json'))).sharing.enabled).toBe(false);
+  await page.reload();
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  await expect(page.getByLabel('在公開首頁顯示個人名片')).not.toBeChecked();
+  await expect(preview.locator('#profile-share-toggle')).toBeHidden();
+  await expect(page.locator('[data-studio-share] [data-share-download]')).toBeEnabled({ timeout: 15000 });
+  await page.getByLabel('在公開首頁顯示個人名片').check();
+  await expect(preview.locator('#profile-share-toggle')).toBeVisible();
 });
 
 test('無效正式網址禁止下載，跨站頭像失敗仍可產生名片', async ({ page }) => {
