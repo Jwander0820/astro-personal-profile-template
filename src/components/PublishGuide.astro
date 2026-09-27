@@ -1,0 +1,42 @@
+---
+import { TEMPLATE_REPOSITORY } from '../../scripts/profile-sharing.mjs';
+---
+<section class="completion-card publish-guide" data-publish-guide>
+  <p class="mini-label">FROM DRAFT TO YOUR OWN SITE</p>
+  <h3>發布完成助手</h3>
+  <p>跟著清單把名片放到自己的網站。勾選只記錄你在這個瀏覽器的進度，不會代為登入、推送或發布。</p>
+  <label class="field"><span>發布平台</span><select id="publish-provider"><option value="github">GitHub Pages</option><option value="cloudflare">Cloudflare Pages</option></select></label>
+  <ol class="publish-steps">
+    <li><strong>建立你自己的儲存庫</strong><p>從 <a href={TEMPLATE_REPOSITORY} target="_blank" rel="noopener noreferrer">模板 GitHub</a> 選擇 Use this template 或 Fork。確認擁有者是你自己的帳號。</p><label><input type="checkbox" data-publish-check="repository" />我已建立自己的儲存庫</label></li>
+    <li><strong>把草稿保存成專案</strong><p>本機 Studio 可按「儲存到專案」。網頁版請下載 ZIP，解壓後將 <code>profile.answers.json</code> 放到專案根目錄、<code>images/</code> 中的圖片放進 <code>public/images/</code>，再執行以下指令。需要 Node.js 22.12 以上。</p><pre><code>npm install
+npm run profile:apply -- profile.answers.json
+npm run build</code></pre><p>已使用本機 Studio 儲存者，只需要執行最後的 build。Windows 如遇執行原則限制，將 npm 改成 npm.cmd。</p><label><input type="checkbox" data-publish-check="build" />設定已存進專案，而且本機建置成功</label></li>
+    <li><strong>檢查即將公開的資料</strong><p>查看 Git diff，確認名字、地區、Email、圖片與每個連結都願意公開。執行 <code>git remote -v</code> 確認 origin 是自己的儲存庫；不要提交私人回答檔或憑證。</p><label><input type="checkbox" data-publish-check="review" />我已檢查公開內容與自己的 origin</label></li>
+  </ol>
+  <div data-publish-platform="github">
+    <h4>部署到 GitHub Pages</h4>
+    <ol class="publish-steps" start="4">
+      <li><strong>選擇 GitHub Actions</strong><p>在自己儲存庫的 Settings → Pages → Build and deployment，將 Source 設為 GitHub Actions。若 Fork 的 Actions 尚未啟用，依 GitHub 畫面提示啟用。</p><label><input type="checkbox" data-publish-check="github-settings" />我已完成 Pages 設定</label></li>
+      <li><strong>提交到自己的 main，確認部署結果</strong><p>自行 commit 並 push 想公開的內容至 main。到 Actions 查看「Deploy to GitHub Pages」的建置與部署都成功，再從 Pages 或部署紀錄取得網址。</p><label><input type="checkbox" data-publish-check="github-deployed" />我已確認 GitHub Pages 部署成功</label></li>
+    </ol>
+    <p>一般專案網址包含儲存庫路徑，例如 <code>https://你的帳號.github.io/儲存庫/</code>。自訂網域需另外設定 DNS、Pages 網域與 repository variable <code>SITE_URL</code>。</p>
+    <a href="https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages" target="_blank" rel="noopener noreferrer">GitHub 官方部署說明 ↗</a>
+  </div>
+  <div data-publish-platform="cloudflare" hidden>
+    <h4>部署到 Cloudflare Pages</h4>
+    <ol class="publish-steps" start="4">
+      <li><strong>連接自己的儲存庫</strong><p>先把確認過的內容 commit、push 到自己的 main。在 Cloudflare Workers &amp; Pages 建立 Pages 專案，連接該 Git repository。</p><label><input type="checkbox" data-publish-check="cloudflare-repository" />我已連接自己的儲存庫</label></li>
+      <li><strong>填入建置設定並部署</strong><dl><dt>Production branch</dt><dd>main</dd><dt>Build command</dt><dd><code>npm run build</code></dd><dt>Build output directory</dt><dd>dist</dd><dt>NODE_VERSION</dt><dd>22（至少 22.12）</dd><dt>SITE_URL</dt><dd>你的完整正式 HTTPS 網址</dd></dl><p>若第一次才取得 pages.dev 網址，補上 SITE_URL 後重新部署。正式網域改變時也需要更新。完成後確認 deployment 成功，並開啟正式網址。</p><label><input type="checkbox" data-publish-check="cloudflare-deployed" />我已確認 Cloudflare Pages 部署成功</label></li>
+    </ol>
+    <a href="https://developers.cloudflare.com/pages/framework-guides/deploy-an-astro-site/" target="_blank" rel="noopener noreferrer">Cloudflare 官方 Astro 部署說明 ↗</a>
+  </div>
+  <p class="publish-studio-note">新 Fork 在預設 auto 模式下不公開 Studio；這不影響名片首頁。仍可用 <code>npm run studio</code> 在本機編輯。</p>
+  <div class="publish-confirm">
+    <h4>最後，親自開啟正式網站</h4>
+    <p>使用上方「正式網站網址」，確認圖片、名片 QR 與連結都正確。若剛填入新網址或產生新社群封面，記得再儲存並部署一次。</p>
+    <a class="button button--quiet" id="publish-open-site" target="_blank" rel="noopener noreferrer" hidden>開啟正式網站 ↗</a>
+    <p id="publish-url-status" role="status"></p>
+    <label><input type="checkbox" id="publish-confirm-site" disabled />我已在正式網址確認名片與連結正確</label>
+  </div>
+  <p id="publish-progress" role="status" aria-live="polite"></p>
+</section>

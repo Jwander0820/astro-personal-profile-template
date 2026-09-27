@@ -11,6 +11,7 @@ import { studioApiUrl } from '../../scripts/studio-network.mjs';
 import '../styles/online-studio.css';
 import { PROFILE_PRESETS } from '../../scripts/profile-presets.mjs';
 import ShareCardPanel from '../components/ShareCardPanel.astro';
+import PublishGuide from '../components/PublishGuide.astro';
 
 const runtime = globalThis as typeof globalThis & { process: { cwd(): string; env: Record<string, string | undefined> } };
 const content = await loadStudioContent(runtime.process.cwd());
@@ -376,6 +377,8 @@ const previewHref = withStudioPreviewQuery(withBase('/'));
                 </div>
               </section>
             </div>
+
+            <PublishGuide />
 
             <div class="finish-card">
               <p class="mini-label">AI PROFILE IMPORT</p>

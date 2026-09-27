@@ -161,6 +161,41 @@ test('無效正式網址禁止下載，跨站頭像失敗仍可產生名片', as
   await expect(card.locator('[data-share-status]')).toContainText('已改用名字首字');
 });
 
+test('發布助手切換平台、保存本地進度並開啟正式網址確認', async ({ page, context }) => {
+  await context.route('https://cards.example/**', (route) => route.fulfill({ contentType: 'text/html', body: '<title>Published fixture</title><h1>Published fixture</h1>' }));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/studio/');
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  const guide = page.locator('[data-publish-guide]');
+  await expect(guide.locator('[data-publish-platform="github"]')).toBeVisible();
+  await expect(guide.locator('#publish-open-site')).toBeHidden();
+  await expect(guide.locator('#publish-confirm-site')).toBeDisabled();
+  for (const id of ['repository', 'build', 'review', 'github-settings', 'github-deployed']) await guide.locator(`[data-publish-check="${id}"]`).check();
+  await expect(guide.locator('#publish-progress')).toContainText('5 / 6');
+  await page.getByLabel('正式網站網址', { exact: true }).fill('https://cards.example/profile/');
+  await expect(guide.locator('#publish-open-site')).toHaveAttribute('href', 'https://cards.example/profile/');
+  const popupPromise = page.waitForEvent('popup');
+  await guide.locator('#publish-open-site').click();
+  const popup = await popupPromise;
+  await expect(popup).toHaveTitle('Published fixture');
+  await popup.close();
+  await guide.locator('#publish-confirm-site').check();
+  await expect(guide.locator('#publish-progress')).toContainText('你已手動確認');
+  await guide.locator('#publish-provider').selectOption('cloudflare');
+  await expect(guide.locator('[data-publish-platform="github"]')).toBeHidden();
+  await expect(guide.locator('[data-publish-platform="cloudflare"]')).toContainText('SITE_URL');
+  await page.reload();
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  await expect(guide.locator('#publish-provider')).toHaveValue('cloudflare');
+  await expect(guide.locator('[data-publish-check="build"]')).toBeChecked();
+  await page.getByLabel('正式網站網址', { exact: true }).fill('https://cards.example/another/');
+  await expect(guide.locator('#publish-confirm-site')).not.toBeChecked();
+  await page.getByLabel('正式網站網址', { exact: true }).fill('javascript:alert(1)');
+  await expect(guide.locator('#publish-open-site')).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect((await storedDraft(page)).answers.publishGuide).toBeUndefined();
+});
+
 test('一般首頁不下載預覽 renderer，Studio iframe 仍能即時更新', async ({ page }) => {
   const requests = [];
   page.on('request', (request) => requests.push(request.url()));

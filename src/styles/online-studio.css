@@ -1154,3 +1154,15 @@ code {
 .social-image-settings { margin-top: 1.2rem; font-size: .85rem; }
 .social-image-settings summary { cursor: pointer; }
 #studio-social-image { width: 100%; height: auto; border-radius: 12px; }
+.publish-guide { margin: 1.2rem 0; }
+.publish-guide a { overflow-wrap: anywhere; }
+.publish-steps { padding-left: 1.4rem; }
+.publish-steps li { padding: .5rem 0 1rem .35rem; }
+.publish-steps p, .publish-confirm p, .publish-studio-note { font-size: .85rem; line-height: 1.75; }
+.publish-guide label:has(input[type="checkbox"]) { display: flex; align-items: start; gap: .5rem; font-size: .85rem; }
+.publish-guide input[type="checkbox"] { flex: 0 0 auto; margin-top: .25rem; }
+.publish-guide pre { max-width: 100%; overflow-x: auto; padding: .8rem; border-radius: 10px; background: #eef1f6; font-size: .78rem; }
+.publish-guide dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .5rem; font-size: .82rem; }
+.publish-guide dd { margin: 0; overflow-wrap: anywhere; }
+.publish-confirm { margin-top: 1rem; padding-top: .7rem; border-top: 1px solid var(--studio-line); }
+#publish-progress, #publish-url-status { font-size: .82rem; line-height: 1.6; overflow-wrap: anywhere; }

@@ -24,6 +24,7 @@ import { createShareProfile, SHARING_DEFAULTS } from '../../scripts/profile-shar
 import { withBase } from '../lib/paths';
 import { mountShareCard } from './profile-share.js';
 import { isSafeImageSource } from '../../scripts/content-safety.mjs';
+import { mountPublishGuide } from './publish-guide.js';
 
 const HOME_LABELS = {
   about: 'About me',
@@ -269,6 +270,7 @@ export function mountOnlineStudio() {
   const toastNode = document.querySelector('#online-toast');
   const preview = document.querySelector('#profile-preview');
   const saveProjectButton = document.querySelector('#save-project');
+  const publishGuide = mountPublishGuide(document.querySelector('[data-publish-guide]'), { draftScope: bootstrap.draftScope, getPublicUrl: () => state.sharing.publicUrl });
   const shareCard = mountShareCard(document.querySelector('[data-studio-share]'), {
     getProfile: () => createShareProfile(state, (path) => isSafeImageSource(path) ? (objectUrls.get(path) || withBase(path)) : ''),
     onSave: async (file) => {
@@ -521,6 +523,7 @@ export function mountOnlineStudio() {
   }
 
   function renderPreview() {
+    publishGuide.refresh();
     shareCard.schedule();
     const socialImage = document.querySelector('#studio-social-image');
     socialImage.hidden = !isSafeImageSource(state.media.socialImage);

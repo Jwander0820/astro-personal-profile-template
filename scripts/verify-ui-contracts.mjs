@@ -79,6 +79,7 @@ const ruleBody = (selector) => {
 };
 
 const contracts = [
+  ['deployment helper stays in the final Studio step', onlineStudioPage.indexOf('<PublishGuide />') > onlineStudioPage.indexOf('id="panel-finish"') && onlineStudioApp.includes('mountPublishGuide(')],
   ['presets preserve content while both renderers honor presentation visibility', onlineStudioApp.includes('applyProfilePreset(state,') && onlineStudioPage.includes('data-profile-preset') && onlineStudioPage.includes('data-home-visible') && profileRenderer.includes('profile.data.hiddenSections.includes(section)') && profileRenderer.includes('profile.data.showImages') && liveRenderer.includes('answers.appearance.hiddenSections?.includes(id)') && liveRenderer.includes('answers.appearance.showImages === false')],
   ['desktop content width remains 880px', /main\s*\{[^}]*880px/.test(css)],
   ['desktop grids remain two columns', css.includes('@media (min-width: 720px)') && css.includes('repeat(2, minmax(0, 1fr))')],
