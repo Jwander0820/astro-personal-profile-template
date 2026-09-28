@@ -3,6 +3,8 @@ import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import jsQR from 'jsqr';
 import { PNG } from 'pngjs';
+import { fromHtml } from 'hast-util-from-html';
+import { toHtml } from 'hast-util-to-html';
 import { createSettingsZip, readSettingsZip } from '../../src/scripts/settings-package.js';
 import { applyProfileProjectUpdate, planProfileProjectUpdate } from '../../scripts/profile-project.mjs';
 import {
@@ -122,12 +124,59 @@ test('名片三種 PNG 尺寸與 QR 網址正確，OG 封面可隨 ZIP 搬移', 
   await expect(page.frameLocator('#profile-preview').locator('meta[property="og:image"]')).toHaveAttribute('content', /^blob:/);
 });
 
-test('首頁名片支援鍵盤關閉、預覽更新與 390px 行動版', async ({ page }) => {
+test('Studio 預填專案部署網址，可產生名片並保留自訂網址', async ({ page }, testInfo) => {
+  const defaultUrl = 'https://someuser.github.io/astro-personal-profile-template/';
+  await page.route('**/studio/', async (route) => {
+    const response = await route.fetch();
+    const document = fromHtml(await response.text());
+    function setDefault(node) {
+      if (node.properties?.id === 'online-studio-data') {
+        const bootstrap = JSON.parse(node.children[0].value);
+        bootstrap.defaultPublicUrl = defaultUrl;
+        node.children[0].value = JSON.stringify(bootstrap).replace(/</g, '\\u003c');
+      }
+      node.children?.forEach(setDefault);
+    }
+    setDefault(document);
+    await route.fulfill({ response, body: toHtml(document) });
+  });
+  await page.goto('/studio/');
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  const urlInput = page.getByLabel('正式網站網址', { exact: true });
+  const card = page.locator('[data-studio-share]');
+  await expect(urlInput).toHaveValue(defaultUrl);
+  await expect(card.locator('[data-share-download]')).toBeEnabled();
+  const initialCanvas = PNG.sync.read(Buffer.from(await card.locator('canvas').evaluate((canvas) => canvas.toDataURL().split(',')[1]), 'base64'));
+  expect(jsQR(new Uint8ClampedArray(initialCanvas.data), initialCanvas.width, initialCanvas.height)?.data).toBe(defaultUrl);
+  await urlInput.fill('https://jwander.net');
+  await expect(card.locator('canvas')).toHaveAttribute('aria-label', /QR Code 指向 https:\/\/jwander.net\//);
+  const downloadEvent = page.waitForEvent('download');
+  await card.locator('[data-share-download]').click();
+  const download = await downloadEvent;
+  const png = PNG.sync.read(await readFile(await download.path()));
+  expect(jsQR(new Uint8ClampedArray(png.data), png.width, png.height)?.data).toBe('https://jwander.net/');
+  await download.saveAs(testInfo.outputPath('jwander-card.png'));
+  await card.screenshot({ path: testInfo.outputPath('jwander-card-preview.png') });
+  const entries = await downloadSettings(page);
+  expect(JSON.parse(new TextDecoder().decode(entries.get('profile.answers.json'))).sharing.publicUrl).toBe('https://jwander.net/');
+  await page.reload();
+  await page.getByRole('tab', { name: '完成設定' }).click();
+  await expect(urlInput).toHaveValue('https://jwander.net');
+  await page.getByRole('button', { name: '使用預設網址' }).click();
+  await expect(urlInput).toHaveValue(defaultUrl);
+  await page.getByRole('button', { name: '撤銷', exact: true }).click();
+  await expect(urlInput).toHaveValue('https://jwander.net');
+});
+
+test('首頁僅顯示 QR Code，支援鍵盤關閉、預覽更新與 390px 行動版', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
-  const button = page.getByRole('button', { name: '展示個人名片' });
+  const button = page.getByRole('button', { name: '顯示網站 QR Code' });
   await button.click();
-  await expect(page.getByRole('dialog', { name: '把這張名片帶走' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '網站 QR Code' })).toBeVisible();
+  await expect(page.locator('[data-share-card], [data-share-download], [data-share-format], [data-share-native]')).toHaveCount(0);
+  await expect(page.locator('[data-profile-qr-status]')).toContainText('公開 HTTPS');
+  await expect(page.locator('[data-profile-qr-stage] canvas')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(button).toBeFocused();
   await page.goto('/studio/');
@@ -135,25 +184,54 @@ test('首頁名片支援鍵盤關閉、預覽更新與 390px 行動版', async (
   await page.getByLabel('正式網站網址', { exact: true }).fill('https://cards.example/profile/');
   const preview = page.frameLocator('#profile-preview');
   await page.locator('#profile-preview').evaluate((frame) => frame.scrollIntoView({ block: 'start' }));
-  await preview.getByRole('button', { name: '展示個人名片' }).click();
-  await expect(preview.locator('[data-share-download]')).toBeEnabled({ timeout: 15000 });
-  await expect(preview.locator('[data-share-stage] canvas')).toHaveAttribute('aria-label', /QR Code 指向 https:\/\/cards.example\/profile\//);
-  await expect(preview.getByRole('link', { name: '使用這個開源名片模板' })).toHaveAttribute('href', 'https://github.com/jwander0820/astro-personal-profile-template');
+  await preview.getByRole('button', { name: '顯示網站 QR Code' }).click();
+  const qr = preview.locator('[data-profile-qr-stage] canvas');
+  await expect(qr).toHaveAttribute('aria-label', 'QR Code 指向 https://cards.example/profile/');
+  const png = PNG.sync.read(Buffer.from(await qr.evaluate((canvas) => canvas.toDataURL().split(',')[1]), 'base64'));
+  expect(jsQR(new Uint8ClampedArray(png.data), png.width, png.height)?.data).toBe('https://cards.example/profile/');
+  await expect(preview.locator('[data-share-card], [data-share-download], [data-share-format], [data-share-native]')).toHaveCount(0);
+  await expect(preview.locator('[data-profile-qr-link]')).toHaveAttribute('href', 'https://cards.example/profile/');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(await preview.locator('html').evaluate((el) => el.scrollWidth <= innerWidth)).toBe(true);
-  await preview.getByRole('button', { name: '關閉名片' }).click();
-  await page.getByLabel('在公開首頁顯示個人名片').uncheck();
+  await page.screenshot({ path: testInfo.outputPath('qr-mobile.png'), fullPage: true });
+  await page.getByLabel('正式網站網址', { exact: true }).fill('https://cards.example/updated/');
+  await expect(qr).toHaveAttribute('aria-label', 'QR Code 指向 https://cards.example/updated/');
+  await page.getByLabel('正式網站網址', { exact: true }).fill('');
+  await expect(preview.locator('[data-profile-qr-status]')).toHaveText('尚未設定正式網站網址。');
+  await expect(qr).toHaveCount(0);
+  await expect(preview.locator('[data-profile-qr-link]')).toBeHidden();
+  await page.getByLabel('正式網站網址', { exact: true }).fill('https://cards.example/profile/');
+  await expect(qr).toBeVisible();
+  await page.getByLabel('在公開首頁顯示 QR Code').uncheck();
+  await expect(preview.locator('#profile-share-dialog')).not.toBeVisible();
   await expect(preview.locator('#profile-share-toggle')).toBeHidden();
   await expect.poll(async () => (await storedDraft(page)).answers.sharing.enabled).toBe(false);
   const entries = await downloadSettings(page);
   expect(JSON.parse(new TextDecoder().decode(entries.get('profile.answers.json'))).sharing.enabled).toBe(false);
   await page.reload();
   await page.getByRole('tab', { name: '完成設定' }).click();
-  await expect(page.getByLabel('在公開首頁顯示個人名片')).not.toBeChecked();
+  await expect(page.getByLabel('在公開首頁顯示 QR Code')).not.toBeChecked();
   await expect(preview.locator('#profile-share-toggle')).toBeHidden();
   await expect(page.locator('[data-studio-share] [data-share-download]')).toBeEnabled({ timeout: 15000 });
-  await page.getByLabel('在公開首頁顯示個人名片').check();
+  await page.getByLabel('在公開首頁顯示 QR Code').check();
   await expect(preview.locator('#profile-share-toggle')).toBeVisible();
+});
+
+test('公開 HTTPS 首頁未填正式網址時，QR 使用目前路徑且不載入名片產圖程式', async ({ page, baseURL }, testInfo) => {
+  const scripts = [];
+  page.on('request', (request) => { if (request.resourceType() === 'script') scripts.push(request.url()); });
+  await page.route('https://public.example/**', async (route) => {
+    const url = new URL(route.request().url());
+    await route.fulfill({ response: await route.fetch({ url: `${baseURL}${url.pathname}${url.search}` }) });
+  });
+  await page.goto('https://public.example/?source=test#about');
+  await page.getByRole('button', { name: '顯示網站 QR Code' }).click();
+  const qr = page.locator('[data-profile-qr-stage] canvas');
+  await expect(qr).toHaveAttribute('aria-label', 'QR Code 指向 https://public.example/');
+  const png = PNG.sync.read(Buffer.from(await qr.evaluate((canvas) => canvas.toDataURL().split(',')[1]), 'base64'));
+  expect(jsQR(new Uint8ClampedArray(png.data), png.width, png.height)?.data).toBe('https://public.example/');
+  expect(scripts.some((url) => /share-card-canvas|\/profile-share\.js/.test(url))).toBe(false);
+  await page.screenshot({ path: testInfo.outputPath('qr-desktop.png') });
 });
 
 test('無效正式網址禁止下載，跨站頭像失敗仍可產生名片', async ({ page }) => {

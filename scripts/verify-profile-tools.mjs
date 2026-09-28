@@ -52,6 +52,7 @@ import { renderPreviewMarkdown } from '../src/scripts/preview-markdown.js';
 import { findLocalPort, listenLocalServer, studioApiUrl, studioPort } from './studio-network.mjs';
 import { PROFILE_PRESETS, applyProfilePreset } from './profile-presets.mjs';
 import { normalizePublicUrl, validateSharing } from './profile-sharing.mjs';
+import { githubPagesUrlFromRemote, resolveStudioPublicUrl } from './studio-public-url.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), 'profile-tools-'));
@@ -80,6 +81,18 @@ try {
   assert.throws(() => validateProfileAnswers({ ...presetSource, appearance: { hiddenSections: ['about', 'about'] } }), /隱藏板塊/);
   assert.throws(() => validateProfileAnswers({ ...presetSource, appearance: { showImages: 'false' } }), /布林/);
   assert.equal(normalizePublicUrl('https://cards.example/my-profile/'), 'https://cards.example/my-profile/');
+  for (const remote of ['https://github.com/SomeUser/profile.git', 'git@github.com:SomeUser/profile.git', 'ssh://git@github.com/SomeUser/profile.git']) {
+    assert.equal(githubPagesUrlFromRemote(remote), 'https://someuser.github.io/profile/');
+  }
+  assert.equal(githubPagesUrlFromRemote('https://github.com/SomeUser/SomeUser.github.io.git'), 'https://someuser.github.io/');
+  assert.equal(githubPagesUrlFromRemote('https://github.com/SomeUser/astro-personal-profile-template.git'), 'https://someuser.github.io/astro-personal-profile-template/');
+  for (const remote of ['', '/local/repo', 'https://gitlab.com/user/profile', 'https://github.com/user/profile/extra', 'https://github.com/user/profile?secret=1']) {
+    assert.equal(githubPagesUrlFromRemote(remote), '');
+  }
+  assert.equal(await resolveStudioPublicUrl({ isDev: false, projectRoot, site: 'https://someuser.github.io', base: '/profile' }), 'https://someuser.github.io/profile/');
+  assert.equal(await resolveStudioPublicUrl({ isDev: true, projectRoot, site: 'https://custom.example', base: '/' }), 'https://custom.example/');
+  assert.equal(await resolveStudioPublicUrl({ isDev: false, projectRoot, site: 'http://localhost:4321' }), '');
+  assert.equal(await resolveStudioPublicUrl({ isDev: true, projectRoot: temporaryRoot, site: 'http://localhost:4321' }), '');
   for (const url of ['javascript:alert(1)', 'http://cards.example', 'https://localhost:4321/', 'https://127.0.0.1/', 'https://user:password@cards.example/', 'https://cards.example/?private=1']) assert.throws(() => normalizePublicUrl(url));
   assert.throws(() => validateSharing({ enabled: 'false' }), /布林/);
   const shareAnswers = { ...presetSource, sharing: { enabled: false, publicUrl: 'https://cards.example/my-profile/', showTemplateCredit: false }, media: { ...presetSource.media, socialImage: 'https://cdn.example/cover.png' } };

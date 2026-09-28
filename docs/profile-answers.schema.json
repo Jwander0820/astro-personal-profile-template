@@ -74,7 +74,7 @@
     "sharing": {
       "type": "object", "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean", "default": true, "description": "是否在公開首頁顯示個人名片入口；關閉後仍可在 Studio 製作與下載名片" },
+        "enabled": { "type": "boolean", "default": true, "description": "是否在公開首頁顯示 QR Code 入口；名片製作與下載僅在 Studio 提供" },
         "publicUrl": { "type": "string", "maxLength": 500, "default": "", "description": "公開 HTTPS 正式網址，不含查詢、錨點、帳密或本機位址；空白時正式頁使用目前網址", "anyOf": [{ "const": "" }, { "format": "uri", "pattern": "^https://[^?#]+$" }] },
         "showTemplateCredit": { "type": "boolean", "default": true }
       }

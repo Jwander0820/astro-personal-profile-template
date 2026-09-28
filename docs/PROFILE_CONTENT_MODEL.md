@@ -55,7 +55,7 @@ GitHub Pages 是靜態主機，無法安全地在公開頁面直接改 repositor
 
 ## 擴充原則
 
-`sharing`（`enabled`、`publicUrl`、`showTemplateCredit`）寫入 `profile/main.md` 的同名物件，由 `scripts/profile-sharing.mjs` 共用驗證。`media.socialImage` 寫入 `socialImage`，使用既有圖片驗證、交易式寫入、去重命名與 ZIP 引用篩選。嵌套 frontmatter 使用 YAML serializer 保持型別。`ProfileRenderer` 與動態 renderer 都透過 `createShareProfile()` 提供相同名片資料，`ProfileShare` 在 renderer 更新時同步。圖片在瀏覽器 Canvas 產生，QR 在本機編碼；長文字省略、外部圖片／字型失敗有明確退回提示。OG 封面由使用者明確產生保存，build 不連線抓圖或重新產圖。
+`sharing`（`enabled`、`publicUrl`、`showTemplateCredit`）寫入 `profile/main.md` 的同名物件，由 `scripts/profile-sharing.mjs` 共用驗證。`enabled` 控制公開首頁 QR Code 入口，不限制 Studio 名片製作；`showTemplateCredit` 僅控制分享圖署名。`scripts/studio-public-url.mjs` 從 Astro site/base 推算 Studio 的 `defaultPublicUrl`，只有開發模式才可讀取 GitHub origin 作為備援；靜態建置不使用本機 origin，也不輸出原始 remote、憑證或專案路徑。Studio 初始化時只補空白網址，手動值優先；預設值進入既有 `sharing.publicUrl` 草稿、ZIP 與明確的本機儲存流程，沒有新增內容欄位。`media.socialImage` 寫入 `socialImage`，使用既有圖片驗證、交易式寫入、去重命名與 ZIP 引用篩選。嵌套 frontmatter 使用 YAML serializer 保持型別。`ProfileRenderer` 與動態 renderer 都透過 `createShareProfile()` 提供相同資料，`ProfileShare` 使用獨立的 `profile-qr.js` 在 renderer 更新時同步 QR Code 與網站連結。正式首頁與 iframe 預覽均不載入名片產圖面板；名片 Canvas 產生、下載、圖片分享與 OG 封面保存僅由 Studio 提供。QR 在本機編碼；名片長文字省略、外部圖片／字型失敗有明確退回提示。OG 封面由使用者明確產生保存，build 不連線抓圖或重新產圖。
 
 情境模板位於 `scripts/profile-presets.mjs`，只更新 `appearance`。`appearance.hiddenSections` 與 `appearance.showImages` 分別寫入 `profile/main.md` 的同名欄位，控制版面而不更改卡片、播放清單或圖片內容。舊回答檔預設不隱藏任何板塊、顯示圖片。正式與預覽 renderer 都讀取這些設定；圖片原錨點被隱藏時移到尾端，除非已關閉圖片板塊。
 

@@ -253,10 +253,13 @@ export function mountOnlineStudio() {
   if (!bootstrapNode) return;
   const bootstrap = JSON.parse(bootstrapNode.textContent);
   const initialAnswers = normalizeDraft(bootstrap.initialAnswers);
+  const defaultPublicUrl = bootstrap.defaultPublicUrl || '';
+  if (!String(initialAnswers.sharing.publicUrl || '').trim()) initialAnswers.sharing.publicUrl = defaultPublicUrl;
   const draftStore = createDraftStore(bootstrap.draftScope, initialAnswers);
   const imageFiles = new Map();
   const objectUrls = new Map();
   let state = normalizeDraft(draftStore.initial, initialAnswers);
+  if (!String(state.sharing.publicUrl || '').trim()) state.sharing.publicUrl = initialAnswers.sharing.publicUrl;
   let history;
   let busy = false;
   let saveSequence = 0;
@@ -270,6 +273,15 @@ export function mountOnlineStudio() {
   const toastNode = document.querySelector('#online-toast');
   const preview = document.querySelector('#profile-preview');
   const saveProjectButton = document.querySelector('#save-project');
+  const defaultUrlButton = document.querySelector('#use-default-public-url');
+  defaultUrlButton.hidden = !defaultPublicUrl;
+  defaultUrlButton.title = defaultPublicUrl;
+  defaultUrlButton.addEventListener('click', () => {
+    state.sharing.publicUrl = defaultPublicUrl;
+    syncStaticControls();
+    renderPreview();
+    persist();
+  });
   const publishGuide = mountPublishGuide(document.querySelector('[data-publish-guide]'), { draftScope: bootstrap.draftScope, getPublicUrl: () => state.sharing.publicUrl });
   const shareCard = mountShareCard(document.querySelector('[data-studio-share]'), {
     getProfile: () => createShareProfile(state, (path) => isSafeImageSource(path) ? (objectUrls.get(path) || withBase(path)) : ''),

@@ -12,13 +12,18 @@ import '../styles/online-studio.css';
 import { PROFILE_PRESETS } from '../../scripts/profile-presets.mjs';
 import ShareCardPanel from '../components/ShareCardPanel.astro';
 import PublishGuide from '../components/PublishGuide.astro';
+import { resolveStudioPublicUrl } from '../../scripts/studio-public-url.mjs';
 
 const runtime = globalThis as typeof globalThis & { process: { cwd(): string; env: Record<string, string | undefined> } };
 const content = await loadStudioContent(runtime.process.cwd());
 const initialAnswers = createProfileAnswersFromStudioContent(content);
+const defaultPublicUrl = await resolveStudioPublicUrl({
+  isDev: import.meta.env.DEV, projectRoot: runtime.process.cwd(), site: Astro.site, base: import.meta.env.BASE_URL,
+});
 const bootstrap = {
   draftScope: studioDraftScope(import.meta.env.DEV, runtime.process.cwd(), new URL(import.meta.env.BASE_URL, Astro.site).href),
   initialAnswers,
+  defaultPublicUrl,
   localApiUrl: studioApiUrl(import.meta.env.DEV, runtime.process.env),
 };
 const bootstrapJson = JSON.stringify(bootstrap).replace(/</g, '\\u003c');
@@ -323,10 +328,11 @@ const previewHref = withStudioPreviewQuery(withBase('/'));
             <section class="completion-card share-studio-card">
               <p class="mini-label">YOUR PROFILE, READY TO SHARE</p>
               <h3>名片與社群分享圖</h3>
-              <p>把自介製作成方形名片、直式分享圖或橫式封面。首頁亮暗模式按鈕下方也能直接展示名片。</p>
-              <label class="field"><span>正式網站網址</span><input type="url" aria-label="正式網站網址" aria-describedby="share-url-hint" data-bind="sharing.publicUrl" maxlength="500" placeholder="https://yourname.github.io/profile/" /><small id="share-url-hint">包含你的專案路徑。這是 QR Code 的目的地，不會修改部署設定。</small></label>
-              <label class="share-setting"><input type="checkbox" data-bind="sharing.enabled" data-boolean aria-describedby="share-enabled-hint" />在公開首頁顯示個人名片</label>
-              <p id="share-enabled-hint" class="share-card-help">不想向訪客展示名片時，取消勾選即可隱藏首頁的名片入口。你仍可在 Studio 製作與下載名片；儲存設定並重新發布後，正式網站才會套用。</p>
+              <p>把自介製作成方形名片、直式分享圖或橫式封面。</p>
+              <label class="field"><span>正式網站網址</span><input type="url" aria-label="正式網站網址" aria-describedby="share-url-hint" data-bind="sharing.publicUrl" maxlength="500" placeholder="https://yourname.github.io/profile/" /><small id="share-url-hint">包含專案路徑，可改成自訂網域。請確認與實際部署網址一致。</small></label>
+              <button type="button" id="use-default-public-url" class="button button--small button--ghost" hidden>使用預設網址</button>
+              <label class="share-setting"><input type="checkbox" data-bind="sharing.enabled" data-boolean aria-describedby="share-enabled-hint" />在公開首頁顯示 QR Code</label>
+              <p id="share-enabled-hint" class="share-card-help">儲存設定並重新發布後生效。</p>
               <label class="share-setting"><input type="checkbox" data-bind="sharing.showTemplateCredit" data-boolean />分享圖附上開源模板 GitHub 連結</label>
               <ShareCardPanel studio />
               <details class="social-image-settings">

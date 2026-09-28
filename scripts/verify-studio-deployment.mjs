@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { resolvePackageBin } from './package-bin.mjs';
+import { fromHtml } from 'hast-util-from-html';
 
 const execFileAsync = promisify(execFile);
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -125,6 +126,16 @@ async function verifyCase(testCase) {
   );
   assert.equal(hasStudioCard, testCase.enabled, `${testCase.name} 的首頁 Studio 卡片狀態不正確。`);
   assert.equal(hasStudioFooter, testCase.enabled, `${testCase.name} 的頁尾 Studio 入口狀態不正確。`);
+  if (testCase.enabled) {
+    const document = fromHtml(await readFile(path.join(outputDirectory, 'studio/index.html'), 'utf8'));
+    let bootstrap;
+    function readBootstrap(node) {
+      if (node.properties?.id === 'online-studio-data') bootstrap = JSON.parse(node.children[0].value);
+      node.children?.forEach(readBootstrap);
+    }
+    readBootstrap(document);
+    assert.equal(bootstrap.defaultPublicUrl, testCase.env.SITE_URL ? 'https://profile.example/' : 'https://someone.github.io/profile/');
+  }
   console.log(`✓ ${testCase.name}: Studio ${testCase.enabled ? 'enabled' : 'disabled'}`);
 }
 

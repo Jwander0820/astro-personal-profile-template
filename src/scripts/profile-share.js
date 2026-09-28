@@ -83,27 +83,3 @@ export function mountShareCard(panel, { getProfile, fallbackUrl = () => '', onSa
   });
   return { refresh, schedule };
 }
-
-export function mountProfileShare() {
-  const button = document.querySelector('#profile-share-toggle');
-  const dialog = document.querySelector('#profile-share-dialog');
-  if (!button || !dialog) return;
-  const getProfile = () => JSON.parse(document.querySelector('[data-share-profile]')?.dataset.shareProfile || '{}');
-  const controller = mountShareCard(dialog.querySelector('[data-share-card]'), {
-    getProfile,
-    fallbackUrl: () => window.parent === window ? `${location.origin}${location.pathname}` : '',
-  });
-  const sync = () => {
-    button.hidden = getProfile().sharing?.enabled === false;
-    if (button.hidden && dialog.open) dialog.close();
-    else if (dialog.open) controller.schedule();
-  };
-  button.addEventListener('click', () => { dialog.showModal(); controller.refresh(); });
-  if (!('closedBy' in HTMLDialogElement.prototype)) dialog.addEventListener('click', (event) => {
-    if (event.target !== dialog) return;
-    const box = dialog.getBoundingClientRect();
-    if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close();
-  });
-  document.addEventListener('profile-renderer:updated', sync);
-  sync();
-}

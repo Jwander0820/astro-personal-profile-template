@@ -1,9 +1,13 @@
 .profile-share-toggle { position: fixed; top: 4.65rem; right: 1.25rem; z-index: var(--z-floating, 30); display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line, #dce3eb); background: var(--card, #fff); color: var(--ink, #253344); cursor: pointer; box-shadow: 0 8px 22px #13233312; }
 .profile-share-toggle[hidden], .share-card-panel [hidden] { display: none; }
-.profile-share-dialog { width: min(760px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid #dce3eb; border-radius: 22px; background: var(--card, #fff); color: var(--ink, #253344); box-sizing: border-box; overflow: auto; }
+.profile-share-dialog { width: min(420px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid #dce3eb; border-radius: 8px; background: var(--card, #fff); color: var(--ink, #253344); box-sizing: border-box; overflow: auto; }
+.profile-qr-stage { display: grid; place-items: center; }
+.profile-qr-stage canvas { display: block; width: 320px; max-width: 100%; height: auto; aspect-ratio: 1; }
+.profile-qr-link { display: block; overflow-wrap: anywhere; color: inherit; font-size: .85rem; }
+.profile-qr-link[hidden] { display: none; }
 .profile-share-dialog::backdrop { background: #132333a8; }
 .share-dialog-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; }
-.share-dialog-heading p { font: 600 .7rem system-ui; letter-spacing: .14em; margin: 0 0 .4rem; }
+.share-dialog-heading p { font: 600 .7rem system-ui; letter-spacing: 0; margin: 0 0 .4rem; }
 .share-dialog-heading h2 { font-size: 1.4rem; margin: 0; }
 .share-dialog-heading button, .share-card-panel button, .share-card-panel select { font: inherit; color: inherit; background: transparent; border: 1px solid #95a3b5; border-radius: 9px; padding: .65rem .8rem; min-height: 44px; cursor: pointer; }
 .share-card-panel button:disabled { opacity: .45; cursor: default; }
