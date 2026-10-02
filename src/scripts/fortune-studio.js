@@ -1,5 +1,6 @@
 import { previewProfileAnswers } from '../../scripts/profile-answers.mjs';
 import { createDraftStore } from './studio-draft.js';
+import { createStudioApiClient } from './studio-project.js';
 
 const GRADES = ['大吉', '中吉', '小吉', '吉', '末吉', '凶', '大凶'];
 const CATEGORIES = [
@@ -27,6 +28,7 @@ export function mountFortuneStudio() {
   const bootstrapNode = document.querySelector('#fortune-studio-data');
   if (!bootstrapNode) return;
   const bootstrap = JSON.parse(bootstrapNode.textContent);
+  const localApi = createStudioApiClient(bootstrap.localApiUrl);
   const initialAnswers = bootstrap.initialAnswers;
   const draftStore = createDraftStore(bootstrap.draftScope, initialAnswers);
   let state = draftStore.initial;
@@ -296,7 +298,7 @@ export function mountFortuneStudio() {
     saveButton.disabled = true;
     saveButton.textContent = '正在儲存…';
     try {
-      const fortuneResponse = await fetch(`${bootstrap.localApiUrl}/api/fortunes`, {
+      const fortuneResponse = await localApi.request('/api/fortunes', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fortunes: answers.fortune.fortunes, expectedRevision: fortuneRevision }),
@@ -304,7 +306,7 @@ export function mountFortuneStudio() {
       const fortuneResult = await fortuneResponse.json();
       if (!fortuneResponse.ok) throw new Error(fortuneResult.error || '籤桶儲存失敗。');
       fortuneRevision = fortuneResult.revision;
-      const blockResponse = await fetch(`${bootstrap.localApiUrl}/api/blocks/fortune`, {
+      const blockResponse = await localApi.request('/api/blocks/fortune', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -327,8 +329,9 @@ export function mountFortuneStudio() {
 
   async function detectLocalAdapter() {
     if (!['localhost', '127.0.0.1'].includes(window.location.hostname)) return;
+    if (!localApi) return;
     try {
-      const response = await fetch(`${bootstrap.localApiUrl}/api/fortunes`, { cache: 'no-store' });
+      const response = await localApi.request('/api/fortunes', { cache: 'no-store' });
       if (!response.ok) return;
       const current = await response.json();
       localMode = true;

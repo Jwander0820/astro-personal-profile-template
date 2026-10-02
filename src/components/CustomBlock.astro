@@ -3,6 +3,7 @@ import { render, type CollectionEntry } from 'astro:content';
 import { withBase } from '../lib/paths';
 import FortuneDraw from './FortuneDraw.astro';
 import TurntablePlayer from './TurntablePlayer.astro';
+import { isSafeInlineEmbedUrl } from '../../scripts/content-safety.mjs';
 
 interface Props {
   block: CollectionEntry<'blocks'>;
@@ -46,7 +47,7 @@ const imagePosition = block.data.imagePosition.replace('-', ' ');
       />
     )}
     {isFortune && <FortuneDraw fortunes={fortunes} />}
-    {isEmbed && embedUrl && block.data.embedMode === 'inline' && (
+    {isEmbed && embedUrl && block.data.embedMode === 'inline' && isSafeInlineEmbedUrl(embedUrl) && (
       <>
         <div class="custom-block__embed">
           <iframe

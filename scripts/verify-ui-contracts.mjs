@@ -80,6 +80,9 @@ const [
 ]);
 
 const fortunes = JSON.parse(fortuneContent);
+const youtubePlayer = await readFile(new URL('../src/scripts/youtube-player.ts', import.meta.url), 'utf8');
+const studioProject = await readFile(new URL('../src/scripts/studio-project.js', import.meta.url), 'utf8');
+const customBlock = await readFile(new URL('../src/components/CustomBlock.astro', import.meta.url), 'utf8');
 let fortuneBucketIsValid = true;
 try { validateFortuneBucket(fortunes); } catch { fortuneBucketIsValid = false; }
 
@@ -89,6 +92,8 @@ const ruleBody = (selector) => {
 };
 
 const contracts = [
+  ['formal and live inline embeds share the public destination guard', contentConfig.includes('isSafeInlineEmbedUrl(data.url)') && answersModule.includes('isSafeInlineEmbedUrl(embedSource.url)') && liveRenderer.includes('isSafeInlineEmbedUrl(url)') && customBlock.includes('isSafeInlineEmbedUrl(embedUrl)')],
+  ['both Studio editors use launch credentials without exposing them in bootstrap', onlineStudioApp.includes('createStudioApiClient(bootstrap.localApiUrl)') && fortuneStudioApp.includes('createStudioApiClient(bootstrap.localApiUrl)') && studioProject.includes('window.history.replaceState') && studioProject.includes('sessionStorage') && studioProject.includes("headers.set('Authorization'") && !onlineStudioPage.includes('launchCapability') && !fortuneStudioPage.includes('launchCapability')],
   ['deployment helper stays in the final Studio step', onlineStudioPage.indexOf('<PublishGuide />') > onlineStudioPage.indexOf('id="panel-finish"') && onlineStudioApp.includes('mountPublishGuide(')],
   ['presets preserve content while both renderers honor presentation visibility', onlineStudioApp.includes('applyProfilePreset(state,') && onlineStudioPage.includes('data-profile-preset') && onlineStudioPage.includes('data-home-visible') && profileRenderer.includes('profile.data.hiddenSections.includes(section)') && profileRenderer.includes('profile.data.showImages') && liveRenderer.includes('answers.appearance.hiddenSections?.includes(id)') && liveRenderer.includes('answers.appearance.showImages === false')],
   ['desktop content width remains 880px', /main\s*\{[^}]*880px/.test(css)],
@@ -109,7 +114,8 @@ const contracts = [
   ['link cards remain unnumbered', !linkCard.includes('link-track') && !linkCard.includes('position?:')],
   ['Studio entry is a gated Links card with matching formal and preview copy', profileRenderer.includes('<StudioLinkCard') && studioLinkCard.includes('data-studio-link-card') && studioLinkCard.includes('建立你的自介網站') && liveRenderer.includes('建立你的自介網站') && !studioLinkCard.includes('免安裝') && !liveRenderer.includes("node('small', '', '免安裝')")],
   ['theme toggle synchronizes pressed state', themeToggle.includes('aria-pressed="false"') && themeToggle.includes('syncToggleState')],
-  ['turntable keeps responsive geometry and API retry', css.includes('--tonearm-length') && turntablePlayer.includes('youtubeApiPromise = undefined')],
+  ['turntable keeps responsive geometry and iframe retry', css.includes('--tonearm-length') && turntablePlayer.includes('createYouTubePlayer') && turntablePlayer.includes('onLoadError')],
+  ['formal and preview players isolate provider code with a checked cross-origin protocol', turntablePlayer.includes("from '../scripts/youtube-player'") && !turntablePlayer.includes('iframe_api') && youtubePlayer.includes("const PLAYER_ORIGIN = 'https://www.youtube.com'") && youtubePlayer.includes('event.origin !== PLAYER_ORIGIN') && youtubePlayer.includes('event.source !== iframe.contentWindow') && youtubePlayer.includes('message.id !== id') && !youtubePlayer.includes("createElement('script')") && liveRenderer.includes('preservedSections') && liveRenderer.includes('currentWrapper.moveBefore')],
   ['Studio preview rebinds and retains the playable turntable', profileRenderer.includes('studio-turntable-template') && liveRenderer.includes('configureTurntableFeature') && liveRenderer.includes('retainedTurntable') && liveRenderer.includes("profile-renderer:updated") && turntablePlayer.includes("profile-renderer:updated")],
   ['Studio preview rebinds and retains the interactive fortune draw', profileRenderer.includes('studio-fortune-template') && liveRenderer.includes('configureFortuneFeature') && liveRenderer.includes('retainedFortune') && fortuneDraw.includes("profile-renderer:updated") && fortuneDraw.includes('fortuneBound')],
   ['fortune data and interaction remain valid', fortuneBucketIsValid && fortunes.length > 0 && fortuneDraw.includes('aria-live="polite"') && JSON.stringify(FORTUNE_GRADES) === JSON.stringify(['大吉', '中吉', '小吉', '吉', '末吉', '凶', '大凶'])],

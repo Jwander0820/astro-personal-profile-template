@@ -1,4 +1,4 @@
-import { isSafeHttpUrl, isSafeProfileUrl } from '../../scripts/content-safety.mjs';
+import { isSafeHttpUrl, isSafeInlineEmbedUrl, isSafeProfileUrl } from '../../scripts/content-safety.mjs';
 import { parseYoutubePlaylistId } from '../../scripts/youtube-playlist.mjs';
 import { markdownFragment } from './preview-markdown.js';
 import { createShareProfile } from '../../scripts/profile-sharing.mjs';
@@ -199,7 +199,7 @@ function renderEmbedBlock(item) {
     : item.provider === 'youtube'
       ? '在 YouTube 開啟'
       : '開啟完整內容';
-  if (item.embedMode === 'inline' && url !== '#') {
+  if (item.embedMode === 'inline' && isSafeInlineEmbedUrl(url)) {
     const embed = node('div', 'custom-block__embed');
     const frame = node('iframe');
     frame.src = url;
@@ -395,22 +395,51 @@ export function renderProfileDocument(root, answers, options) {
   }
   wrapper.append(footer);
 
+  const currentWrapper = root.querySelector(':scope > [data-profile-renderer]');
+  const preservedSections = new Map();
+  const preserveFeature = (previous, next) => {
+    const previousSection = previous.closest('.custom-block');
+    const nextSection = next.closest('.custom-block');
+    if (!currentWrapper || previousSection?.parentElement !== currentWrapper || !nextSection) return;
+    // Update copy around the interactive feature without detaching its iframe.
+    for (const selector of ['h2', '.custom-block__content']) {
+      const oldCopy = previousSection.querySelector(selector);
+      const newCopy = nextSection.querySelector(selector);
+      if (oldCopy && newCopy) oldCopy.replaceWith(newCopy);
+    }
+    preservedSections.set(nextSection, previousSection);
+  };
   const nextTurntable = wrapper.querySelector('[data-turntable-player]');
   if (
     retainedTurntable
     && nextTurntable
     && retainedTurntable.dataset.playlistId === nextTurntable.dataset.playlistId
   ) {
-    nextTurntable.replaceWith(retainedTurntable);
+    preserveFeature(retainedTurntable, nextTurntable);
   }
 
   const nextFortune = wrapper.querySelector('[data-fortune-draw]');
   const retainedFortuneData = retainedFortune?.querySelector('[data-fortune-data]')?.textContent;
   const nextFortuneData = nextFortune?.querySelector('[data-fortune-data]')?.textContent;
   if (retainedFortune && nextFortune && retainedFortuneData === nextFortuneData) {
-    nextFortune.replaceWith(retainedFortune);
+    preserveFeature(retainedFortune, nextFortune);
   }
 
-  root.replaceChildren(wrapper);
+  if (currentWrapper) {
+    const children = Array.from(wrapper.children, (child) => preservedSections.get(child) || child);
+    const retainedSections = new Set(preservedSections.values());
+    for (const child of Array.from(currentWrapper.children)) {
+      if (!retainedSections.has(child)) child.remove();
+    }
+    for (const [index, child] of children.entries()) {
+      const reference = currentWrapper.children[index] || null;
+      if (reference === child) continue;
+      // State-preserving moves also keep playback when section order changes.
+      if (child.parentElement === currentWrapper && typeof currentWrapper.moveBefore === 'function') {
+        currentWrapper.moveBefore(child, reference);
+      } else currentWrapper.insertBefore(child, reference);
+    }
+    Object.assign(currentWrapper.dataset, wrapper.dataset);
+  } else root.replaceChildren(wrapper);
   document.dispatchEvent(new CustomEvent('profile-renderer:updated', { detail: { root } }));
 }

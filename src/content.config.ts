@@ -2,7 +2,7 @@ import { defineCollection } from 'astro:content';
 import { file } from 'astro/loaders';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
-import { isSafeHttpUrl, isSafeImageSource, isSafeProfileUrl } from '../scripts/content-safety.mjs';
+import { isSafeHttpUrl, isSafeImageSource, isSafeInlineEmbedUrl, isSafeProfileUrl } from '../scripts/content-safety.mjs';
 import { contentText, contentTextArray, contentTextMax } from '../scripts/content-text-schema.mjs';
 import { FORTUNE_GRADES } from '../scripts/fortune-content.mjs';
 import { normalizeThemeColor } from '../scripts/theme-color.mjs';
@@ -121,6 +121,9 @@ const blocks = defineCollection({
         path: ['url'],
         message: 'Embed blocks require a public URL.',
       });
+    }
+    if (data.layout === 'embed' && data.embedMode === 'inline' && data.url && !isSafeInlineEmbedUrl(data.url)) {
+      context.addIssue({ code: 'custom', path: ['url'], message: 'Inline embeds cannot use local/private destinations or URL credentials.' });
     }
     if (data.layout === 'turntable' && data.provider !== 'youtube') {
       context.addIssue({

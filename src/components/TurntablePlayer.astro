@@ -64,88 +64,9 @@ const { playlistId, title, continuousPlayback } = Astro.props;
 </div>
 
 <script>
-  type YouTubePlayer = {
-    cuePlaylist(options: { listType: 'playlist'; list: string; index: number }): void;
-    getCurrentTime(): number;
-    getDuration(): number;
-    getIframe(): HTMLIFrameElement;
-    getPlaylist(): string[];
-    getPlayerState(): number;
-    getVideoData?(): { title?: string; author?: string };
-    loadVideoById(videoId: string): void;
-    pauseVideo(): void;
-    playVideo(): void;
-    seekTo(seconds: number, allowSeekAhead: boolean): void;
-  };
+  import { createYouTubePlayer, type YouTubePlayer } from '../scripts/youtube-player';
 
-  type YouTubeNamespace = {
-    Player: new (
-      element: HTMLElement,
-      options: {
-        host: string;
-        width: string;
-        height: string;
-        playerVars: Record<string, string | number>;
-        events: {
-          onReady: (event: { target: YouTubePlayer }) => void;
-          onStateChange: (event: { data: number; target: YouTubePlayer }) => void;
-          onError: (event: { data: number; target: YouTubePlayer }) => void;
-          onAutoplayBlocked: (event: { target: YouTubePlayer }) => void;
-        };
-      },
-    ) => YouTubePlayer;
-  };
-
-  const browserWindow = window as typeof window & {
-    YT?: YouTubeNamespace;
-    onYouTubeIframeAPIReady?: () => void;
-  };
-
-  let youtubeApiPromise: Promise<YouTubeNamespace> | undefined;
-
-  function loadYouTubeApi(): Promise<YouTubeNamespace> {
-    if (browserWindow.YT?.Player) return Promise.resolve(browserWindow.YT);
-    if (youtubeApiPromise) return youtubeApiPromise;
-
-    const previousCallback = browserWindow.onYouTubeIframeAPIReady;
-    let readyCallback: (() => void) | undefined;
-    let apiScript = document.querySelector<HTMLScriptElement>('script[src="https://www.youtube.com/iframe_api"]');
-    const pending = new Promise<YouTubeNamespace>((resolve, reject) => {
-      const timeout = window.setTimeout(() => reject(new Error('YouTube API timeout')), 15000);
-
-      readyCallback = () => {
-        previousCallback?.();
-        window.clearTimeout(timeout);
-        if (browserWindow.YT?.Player) resolve(browserWindow.YT);
-        else reject(new Error('YouTube API unavailable'));
-      };
-      browserWindow.onYouTubeIframeAPIReady = readyCallback;
-
-      if (!apiScript) {
-        apiScript = document.createElement('script');
-        apiScript.src = 'https://www.youtube.com/iframe_api';
-        apiScript.async = true;
-        apiScript.onerror = () => {
-          window.clearTimeout(timeout);
-          reject(new Error('YouTube API failed to load'));
-        };
-        document.head.append(apiScript);
-      }
-    });
-
-    youtubeApiPromise = pending.catch((error) => {
-      youtubeApiPromise = undefined;
-      if (browserWindow.onYouTubeIframeAPIReady === readyCallback) {
-        browserWindow.onYouTubeIframeAPIReady = previousCallback;
-      }
-      if (!browserWindow.YT?.Player) apiScript?.remove();
-      throw error;
-    });
-
-    return youtubeApiPromise;
-  }
-
-  function initializeTurntable(root: HTMLElement, YT: YouTubeNamespace, startOnReady = false) {
+  function initializeTurntable(root: HTMLElement, startOnReady = false) {
     const playlistId = root.dataset.playlistId;
     const playerHost = root.querySelector<HTMLElement>('[data-youtube-player]');
     const status = root.querySelector<HTMLElement>('[data-turntable-status]');
@@ -160,6 +81,7 @@ const { playlistId, title, continuousPlayback } = Astro.props;
     if (!playlistId || !playerHost || !status || !trackTitle || !scrubber || !scrubberPivot || !toggleButton || !toggleLabel || !nextButton) return;
 
     let player: YouTubePlayer;
+    const lifecycle = new AbortController();
     let playlistIds: string[] = [];
     let currentVideoId: string | undefined;
     let retryCount = 0;
@@ -388,7 +310,7 @@ const { playlistId, title, continuousPlayback } = Astro.props;
     };
 
     const waitForPlaylist = (token: number, attemptsLeft = 12) => {
-      if (token !== playlistProbeToken) return;
+      if (lifecycle.signal.aborted || token !== playlistProbeToken) return;
       if (refreshPlaylistIds()) return;
 
       if (attemptsLeft <= 0) {
@@ -442,6 +364,7 @@ const { playlistId, title, continuousPlayback } = Astro.props;
     };
 
     const playWhenPlayerVisible = (attemptsLeft = 16) => {
+      if (lifecycle.signal.aborted) return;
       if (isPlayerMostlyVisible) {
         playRandomVideo();
         return;
@@ -456,21 +379,33 @@ const { playlistId, title, continuousPlayback } = Astro.props;
       setStatus('播放器已展開 · 回到播放器後再按一次播放。');
     };
 
-    player = new YT.Player(playerHost, {
-      host: 'https://www.youtube.com',
-      width: '100%',
-      height: '100%',
-      playerVars: {
-        controls: 1,
-        list: playlistId,
-        listType: 'playlist',
-        playsinline: 1,
-        rel: 0,
-        origin: window.location.origin,
-      },
+    player = createYouTubePlayer(playerHost, {
+      playlistId,
+      title: `${playerHost.parentElement?.getAttribute('aria-label') ?? 'YouTube'} 播放器`,
       events: {
+        onInfoUpdate: () => {
+          if (!currentVideoId || player.getDuration() <= 0) return;
+          trackMetadataReady = true;
+          updateTrackTitle();
+          if (!root.classList.contains('is-scrubbing')) updateTonearmProgress();
+        },
+        onDispose: () => {
+          lifecycle.abort();
+          stopProgressTracker();
+          visibilityObserver.disconnect();
+        },
+        onLoadError: () => {
+          delete root.dataset.turntableInitialized;
+          delete root.dataset.turntableInitializing;
+          toggleButton.disabled = false;
+          nextButton.disabled = true;
+          toggleLabel.textContent = '再試一次';
+          setStatus('YouTube 播放器載入失敗，請稍後再試。', true);
+        },
         onReady: (event) => {
           player = event.target;
+          root.dataset.turntableInitialized = 'true';
+          delete root.dataset.turntableInitializing;
           const iframe = player.getIframe();
           iframe.referrerPolicy = 'strict-origin-when-cross-origin';
           iframe.title = `${iframe.parentElement?.getAttribute('aria-label') ?? 'YouTube'} 播放器`;
@@ -563,14 +498,14 @@ const { playlistId, title, continuousPlayback } = Astro.props;
       if (state === 1) player.pauseVideo();
       else if (playbackBlocked || (state === 2 && currentVideoId)) player.playVideo();
       else playRandomVideo();
-    });
+    }, { signal: lifecycle.signal });
 
-    nextButton.addEventListener('click', () => playRandomVideo());
-    scrubber.addEventListener('pointerdown', beginScrub);
-    scrubber.addEventListener('pointermove', moveScrub);
-    scrubber.addEventListener('pointerup', finishScrub);
-    scrubber.addEventListener('pointercancel', cancelScrub);
-    scrubber.addEventListener('keydown', seekWithKeyboard);
+    nextButton.addEventListener('click', () => playRandomVideo(), { signal: lifecycle.signal });
+    scrubber.addEventListener('pointerdown', beginScrub, { signal: lifecycle.signal });
+    scrubber.addEventListener('pointermove', moveScrub, { signal: lifecycle.signal });
+    scrubber.addEventListener('pointerup', finishScrub, { signal: lifecycle.signal });
+    scrubber.addEventListener('pointercancel', cancelScrub, { signal: lifecycle.signal });
+    scrubber.addEventListener('keydown', seekWithKeyboard, { signal: lifecycle.signal });
   }
 
   function bindTurntablePlayer(root: HTMLElement) {
@@ -599,19 +534,7 @@ const { playlistId, title, continuousPlayback } = Astro.props;
         videoReveal.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'nearest' });
       });
 
-      loadYouTubeApi()
-        .then((YT) => {
-          root.dataset.turntableInitialized = 'true';
-          delete root.dataset.turntableInitializing;
-          initializeTurntable(root, YT, true);
-        })
-        .catch(() => {
-          delete root.dataset.turntableInitializing;
-          toggleButton.disabled = false;
-          toggleLabel.textContent = '再試一次';
-          status.textContent = 'YouTube 播放器載入失敗，請稍後再試。';
-          root.classList.add('has-error');
-        });
+      initializeTurntable(root, true);
     });
   }
 

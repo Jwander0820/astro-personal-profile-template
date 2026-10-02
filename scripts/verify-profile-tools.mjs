@@ -37,10 +37,11 @@ import {
   isSafeHttpUrl,
   isSafeImagePath,
   isSafeImageSource,
+  isSafeInlineEmbedUrl,
   isSafeMarkdownUrl,
   isSafeProfileUrl,
 } from './content-safety.mjs';
-import { createSettingsZip, readSettingsZip } from '../src/scripts/settings-package.js';
+import { createSettingsZip, readSettingsZip, SETTINGS_PACKAGE_LIMITS, validateSettingsPackageExport } from '../src/scripts/settings-package.js';
 import { resolveOnlineStudioAccess } from './studio-access.mjs';
 import { extractIframeSource, normalizeEmbedSource } from './embed-source.mjs';
 import { contentText, contentTextArray, contentTextMax } from './content-text-schema.mjs';
@@ -1021,15 +1022,75 @@ try {
   assert.equal(exportedCurrentAnswers.media.avatar, currentStudioContent.profile.avatar ?? '/images/avatar.svg');
   assert.equal(exportedCurrentAnswers.media.background, currentStudioContent.profile.background ?? '/images/background.svg');
 
+  const zipFiles = (count) => Array.from({ length: count }, (_, index) => ({ name: `file-${index}.txt`, data: new Uint8Array() }));
+  const exportFiles = [
+    { name: 'profile.answers.json', data: new TextEncoder().encode(serializedCurrentAnswers) },
+    { name: 'images/avatar.png', size: 4 },
+  ];
+  assert.doesNotThrow(() => validateSettingsPackageExport(exportFiles));
+  assert.throws(() => validateSettingsPackageExport(Array.from({ length: 9 }, (_, index) => ({ name: `images/${index}.png`, size: 5 * 1024 * 1024 }))), /40 MB/);
+  assert.throws(() => validateSettingsPackageExport([{ name: 'profile.answers.json', size: SETTINGS_PACKAGE_LIMITS.answersBytes + 1 }]), /2 MB/);
+  assert.throws(() => validateSettingsPackageExport(zipFiles(129)), /128/);
+  assert.equal(readSettingsZip(createSettingsZip(zipFiles(SETTINGS_PACKAGE_LIMITS.entries))).size, 128);
+  assert.throws(() => readSettingsZip(createSettingsZip(zipFiles(129))), /128/);
+  assert.throws(() => readSettingsZip(createSettingsZip([{ name: 'same.txt', data: new Uint8Array() }, { name: 'same.txt', data: new Uint8Array() }])), /重複檔名/);
+  assert.throws(() => readSettingsZip(createSettingsZip([{ name: '../unsafe', data: new Uint8Array() }])), /不安全/);
+  assert.throws(() => readSettingsZip(createSettingsZip([{ name: 'x'.repeat(513), data: new Uint8Array() }])), /512/);
+  assert.throws(() => readSettingsZip(createSettingsZip(zipFiles(100).map((file) => ({ ...file, name: `${file.name}${'x'.repeat(400)}` })))), /64 KB/);
+  assert.throws(() => readSettingsZip(createSettingsZip([{ name: 'profile.answers.json', data: new Uint8Array(SETTINGS_PACKAGE_LIMITS.answersBytes + 1) }])), /2 MB/);
+  assert.throws(() => readSettingsZip(createSettingsZip(zipFiles(65).map((file) => ({ ...file, name: `${file.name}.png`.replace('file-', 'images/') })))), /64 張/);
+  assert.throws(() => readSettingsZip(createSettingsZip(Array.from({ length: 9 }, (_, index) => ({ name: `images/${index}.png`, data: new Uint8Array(5 * 1024 * 1024) })))), /40 MB/);
+  const corruptPackage = packageBytes.slice();
+  corruptPackage[30 + 'profile.answers.json'.length] ^= 1;
+  assert.throws(() => readSettingsZip(corruptPackage), /校驗失敗/);
+  assert.throws(() => readSettingsZip(packageBytes.slice(0, -1)), /不完整/);
+  const inconsistentDirectory = packageBytes.slice();
+  new DataView(inconsistentDirectory.buffer).setUint32(inconsistentDirectory.length - 6, 1, true);
+  assert.throws(() => readSettingsZip(inconsistentDirectory), /不完整|不一致/);
+
+  const blockedEmbeds = [
+    'http://localhost:4322/', 'http://sub.localhost./', 'http://127.0.0.1/', 'http://127.1/',
+    'http://2130706433/', 'http://0x7f000001/', 'http://0177.0.0.1/', 'http://%6cocalhost/',
+    'http://10.0.0.1/', 'http://172.31.0.1/', 'http://192.168.1.1/', 'http://100.64.0.1/',
+    'http://169.254.169.254/', 'http://0.0.0.0/', 'http://224.0.0.1/', 'http://198.18.0.1/',
+    'http://[::1]/', 'http://[0:0:0:0:0:0:0:1]/', 'http://[::ffff:127.0.0.1]/',
+    'http://[fc00::1]/', 'http://[fe80::1]/', 'http://[2001:db8::1]/', 'http://printer/',
+    'http://router.local/', 'http://router.home.arpa/', 'https://user:pass@example.com/',
+  ];
+  for (const url of blockedEmbeds) {
+    assert.equal(isSafeInlineEmbedUrl(url), false, url);
+    const embed = { id: 'restricted', title: 'Restricted', url, embedMode: 'inline' };
+    assert.throws(() => validateProfileAnswers({ ...exportedCurrentAnswers, embedBlocks: [embed] }), /本機、私人網路/);
+    assert.equal(validateProfileAnswers({ ...exportedCurrentAnswers, embedBlocks: [{ ...embed, embedMode: 'preview' }] }).embedBlocks[0].url, url);
+  }
+  for (const url of ['https://example.com/', 'https://www.youtube.com/embed/vfQvkPAjmws', 'http://8.8.8.8/', 'https://[2606:4700:4700::1111]/']) {
+    assert.equal(isSafeInlineEmbedUrl(url), true, url);
+  }
+
+  const testCapability = 'a'.repeat(64);
   const localPreviewRequest = {
     method: 'POST',
-    headers: { host: 'localhost:4322', origin: 'http://localhost:4321', 'content-type': 'application/json' },
+    headers: { host: 'localhost:4322', origin: 'http://localhost:4321', 'content-type': 'application/json', authorization: `Bearer ${testCapability}` },
   };
-  assert.doesNotThrow(() => validateStudioRequest(localPreviewRequest, 4322, 4321));
+  assert.doesNotThrow(() => validateStudioRequest(localPreviewRequest, 4322, 4321, testCapability));
+  for (const method of ['GET', 'POST', 'PUT', 'DELETE']) {
+    for (const authorization of ['', `Bearer ${'b'.repeat(64)}`, `Bearer ${'a'.repeat(63)}`]) {
+      assert.throws(() => validateStudioRequest({ ...localPreviewRequest, method, headers: { ...localPreviewRequest.headers, authorization } }, 4322, 4321, testCapability), (error) => error instanceof StudioRequestError && error.status === 401);
+    }
+    assert.doesNotThrow(() => validateStudioRequest({ ...localPreviewRequest, method }, 4322, 4321, testCapability));
+  }
+  assert.throws(() => validateStudioRequest(localPreviewRequest, 4322, 4321, 'b'.repeat(64)), (error) => error instanceof StudioRequestError && error.status === 401);
+  assert.doesNotThrow(() => validateStudioRequest({ ...localPreviewRequest, method: 'OPTIONS', headers: { host: 'localhost:4322', origin: 'http://localhost:4321' } }, 4322, 4321, testCapability));
   assert.throws(
-    () => validateStudioRequest({ ...localPreviewRequest, headers: { ...localPreviewRequest.headers, origin: 'https://attacker.example' } }, 4322, 4321),
+    () => validateStudioRequest({ ...localPreviewRequest, headers: { ...localPreviewRequest.headers, origin: 'https://attacker.example' } }, 4322, 4321, testCapability),
     (error) => error instanceof StudioRequestError && error.status === 403,
   );
+  for (const origin of ['https://www.youtube.com', 'null']) {
+    assert.throws(
+      () => validateStudioRequest({ ...localPreviewRequest, headers: { ...localPreviewRequest.headers, origin } }, 4322, 4321, testCapability),
+      (error) => error instanceof StudioRequestError && error.status === 403,
+    );
+  }
 
   const [onlineStudioPage, onlineStudioApp, renderer, previewBridge, studioServerSource, fortuneStudioPage, fortuneStudioPreviewPage, fortuneStudioApp, iconStudioPage, studioRouteNav, studioExampleLink, fortuneDraw] = await Promise.all([
     readFile(path.join(projectRoot, 'src', 'pages', 'studio.astro'), 'utf8'),

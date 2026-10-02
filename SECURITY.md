@@ -21,5 +21,10 @@
 
 - 公開 Profile Studio 只使用瀏覽器 localStorage 與 IndexedDB，不具備 GitHub 寫入權限。
 - 本機 adapter 只監聽 loopback，且不應暴露到靜態輸出或公開網路。
+- 本機 API 的讀取與寫入均要求每次啟動的隨機憑證；憑證只由終端機啟動連結的 fragment 傳入 Studio，不得由 HTML、靜態輸出或未驗證 API 發送。此控制不保護已能讀取終端機、瀏覽器或同帳號檔案的程式；同源 Studio 與預覽程式仍屬受信任程式。
+- ZIP 匯入必須限制總大小、項目數、metadata、回答文件與圖片總量，完整驗證結構與校驗碼後才保存引用圖片；保留既有撤銷與跨分頁使用的圖片。
+- 直接內嵌拒絕 URL 中的本機名稱、私人／保留 IP 及帳密。這是位址字面值檢查，無法保證公開 DNS 名稱、重新導向或日後 DNS 回應都不指向內網。
 - `ONLINE_STUDIO_MODE` 是 build-time 輸出規則，不是身份驗證。
 - 自介內容本身會公開；使用者應在發布前檢查地點、email、雇主與私人網址。
+- 唱盤只載入固定 YouTube HTTPS 網域的跨來源播放器 iframe，不在個人頁面或 Studio 預覽執行第三方 API 腳本。本站控制程式只交換播放指令與經驗證的播放器資料，不傳送 Studio 草稿、圖片備份或本機 adapter 資訊。
+- 播放器訊息必須同時符合 YouTube origin、該 iframe 的來源視窗與 widget ID；回傳文字只作為文字顯示。本機 adapter 不接受 YouTube 或 `null` origin 的寫入請求。

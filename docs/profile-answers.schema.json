@@ -171,7 +171,7 @@
           },
           "description": { "type": ["string", "number"], "maxLength": 5000 },
           "provider": { "enum": ["website", "notion", "youtube"], "default": "website" },
-          "embedMode": { "enum": ["preview", "inline"], "default": "preview" },
+          "embedMode": { "enum": ["preview", "inline"], "default": "preview", "description": "inline 只接受公開位址：禁止本機名稱、私人／保留 IP 與含帳密的網址；共用驗證器會正規化並檢查網址。preview 只顯示連結。" },
           "height": { "type": "integer", "minimum": 320, "maximum": 1200, "default": 600 },
           "tags": { "type": "array", "maxItems": 8, "items": { "type": ["string", "number"], "minLength": 1, "maxLength": 80 } }
         }

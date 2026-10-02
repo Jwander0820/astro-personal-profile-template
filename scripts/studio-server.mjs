@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { Buffer } from 'node:buffer';
+import { randomBytes } from 'node:crypto';
 import { dev } from 'astro';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -10,6 +11,8 @@ import { applyProfileProjectUpdate, planProfileProjectUpdate } from './profile-p
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Never put this capability in Astro/Vite env, HTML, API responses or redirects.
+const launchCapability = randomBytes(32).toString('hex');
 let studioPort;
 let previewPort;
 const MAX_BODY_SIZE = 70 * 1024 * 1024;
@@ -21,7 +24,7 @@ function corsHeaders(request) {
   return allowed.has(origin) ? {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     Vary: 'Origin',
   } : {};
 }
@@ -58,7 +61,7 @@ async function readJson(request) {
 
 const server = createServer(async (request, response) => {
   try {
-    validateStudioRequest(request, studioPort, previewPort);
+    validateStudioRequest(request, studioPort, previewPort, launchCapability);
     const url = new URL(request.url || '/', `http://${request.headers.host}`);
     if (request.method === 'OPTIONS') {
       response.writeHead(204, corsHeaders(request));
@@ -149,7 +152,7 @@ try {
   });
   previewPort = astro.address.port;
   console.log('');
-  console.log(`Profile Studio：http://localhost:${previewPort}/studio/`);
+  console.log(`Profile Studio：http://localhost:${previewPort}/studio/#studio-token=${launchCapability}`);
   console.log(`本機寫入服務：http://localhost:${studioPort}（背景使用）`);
   console.log('按 Ctrl+C 停止兩個服務。');
 } catch (error) {

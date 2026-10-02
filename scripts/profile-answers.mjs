@@ -1,4 +1,4 @@
-import { isSafeHttpUrl, isSafeImageSource, isSafeProfileUrl } from './content-safety.mjs';
+import { isSafeHttpUrl, isSafeImageSource, isSafeInlineEmbedUrl, isSafeProfileUrl } from './content-safety.mjs';
 import { validateFortuneBucket } from './fortune-schema.mjs';
 import { assertThemeColor } from './theme-color.mjs';
 import { coerceDisplayText } from './text-values.mjs';
@@ -249,6 +249,10 @@ export function validateProfileAnswers(input) {
     assertAllowedKeys(item, ['id', 'title', 'url', 'description', 'provider', 'embedMode', 'height', 'tags'], `第 ${index + 1} 個網頁內嵌板塊`);
     const requestedProvider = assertOptionalEnum(item.provider, EMBED_BLOCK_PROVIDERS, '網頁內嵌類型', 'website');
     const embedSource = atAnswerPath(`embedBlocks.${index}.url`, () => normalizeEmbedSource(item.url, requestedProvider));
+    const embedMode = atAnswerPath(`embedBlocks.${index}.embedMode`, () => assertOptionalEnum(item.embedMode, EMBED_BLOCK_MODES, '網頁內嵌模式', 'preview'));
+    if (embedMode === 'inline' && !isSafeInlineEmbedUrl(embedSource.url)) {
+      atAnswerPath(`embedBlocks.${index}.url`, () => { throw new Error('直接內嵌不可使用本機、私人網路位址或含帳密的網址；請改用公開網址或預覽連結。'); });
+    }
     const height = item.height === undefined ? embedSource.height ?? 600 : Number(item.height);
     if (!Number.isInteger(height) || height < 320 || height > 1200) {
       atAnswerPath(`embedBlocks.${index}.height`, () => { throw new Error(`第 ${index + 1} 個網頁內嵌高度必須介於 320～1200。`); });
@@ -259,7 +263,7 @@ export function validateProfileAnswers(input) {
       url: atAnswerPath(`embedBlocks.${index}.url`, () => assertHttpUrl(embedSource.url, '網頁內嵌網址', { max: EMBED_URL_MAX_LENGTH })),
       description: atAnswerPath(`embedBlocks.${index}.description`, () => assertProvidedDisplayText(item.description, '網頁內嵌板塊說明', { max: 5000 })),
       provider: embedSource.provider,
-      embedMode: atAnswerPath(`embedBlocks.${index}.embedMode`, () => assertOptionalEnum(item.embedMode, EMBED_BLOCK_MODES, '網頁內嵌模式', 'preview')),
+      embedMode,
       height,
       tags: atAnswerPath(`embedBlocks.${index}.tags`, () => assertStringArray(item.tags ?? [], '網頁內嵌板塊標籤', { max: 8 })),
     };

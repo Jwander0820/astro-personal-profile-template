@@ -21,6 +21,8 @@ Windows 建議直接雙擊 `start-studio.cmd`，或執行：
 
 所有欄位都即時送入嵌入的正式首頁；首頁與 Studio 使用同一份正式 CSS、ProfileRenderer 結構及 Icon catalog。唱盤會在 renderer 更新後重新掛載正式 YouTube Player；今日手氣也會重新綁定抽籤事件。播放清單或籤桶資料未變時會保留現有互動節點；修改籤桶時才換入新資料，避免編輯其它文字便中斷播放或清除已抽結果。寫入仍保持明確按鈕，不會因輸入事件自動修改檔案。
 
+唱盤共用 `src/scripts/youtube-player.ts`，直接使用 YouTube 跨來源 iframe，不在正式頁或 Studio 預覽載入第三方 API 腳本。控制介面只允許 cue、play、pause、load 與 seek，檢查回傳 origin、來源視窗、widget ID 與資料型別。其 widget 訊息格式來自 YouTube 的播放器實作，並非有版本保證的公開 wire API；若供應商調整格式，需重新驗證交握與播放控制。啟動失敗會顯示重試操作，不退回載入外部腳本。預覽更新會保留已連接的播放器 section，支援 `moveBefore` 的瀏覽器也會在重排 section 時保留 iframe 的播放狀態。
+
 連結管理分為個人資料下方的社群 Icons，以及首頁 Links 卡片。新增社群時先從內建服務與 Icon 選擇；「自訂網站」使用一般網站名稱、URL 與箭頭 Icon。若目前建置允許公開 Studio，Links 尾端會由程式加入「建立你的自介網站」入口；它不是使用者內容，不會寫進 `src/content/links` 或匯出的回答檔。
 
 圖片板塊是 `blocks/*.md` 中的 `layout: image`。Studio 可上傳圖片、使用 `/images/` 專案路徑，或保留公開 HTTPS 圖片網址，並建立滿版、左右分割、海報式版型，設定比例、裁切焦點、替代文字、Markdown 附文及顯示錨點。`placement` 會實際錨定在 Links 前、Links 後或 About 後；若對應首頁板塊被隱藏，圖片板塊會移到主要內容尾端，避免內容消失。
@@ -71,6 +73,10 @@ GitHub Pages 是靜態主機，無法安全地在公開頁面直接改 repositor
 `scripts/profile-project.mjs` 是本機寫入的深模組：它驗證圖片、建立 `src/content` 與 `public/images` 暫存副本、配置不覆蓋的檔名、執行 content writer、輸出帶 token 的唯讀 plan，最後以 project-level queue 和 atomic writes 提交。apply 必須帶回使用者確認的 plan token；若底層內容或套用結果已改變，就要求重新預覽。Studio 只透過 `/api/project/plan` 與 `/api/project/apply` 使用這個介面。
 
 前端 `src/scripts/studio-media.js` 封裝 IndexedDB 與圖片序列化，`src/scripts/studio-project.js` 封裝本機 plan/apply transport；`online-studio.js` 保留編輯狀態與 UI 協調，不再自行逐檔寫入。
+
+本機 transport 由 `createStudioApiClient()` 讀取終端機啟動連結中的 `studio-token` fragment，立即清除網址中的憑證，以同分頁 sessionStorage 保持主 Studio／籤詩頁與重新整理的連線，並在所有 API 請求附加 Authorization。服務只在記憶體保留本次隨機憑證，不加入 Astro env 或 bootstrap，也不在 API 回傳；未帶憑證的請求無法讀寫 adapter。新分頁需使用啟動連結，服務重啟後舊憑證失效。同源預覽仍受信任，此控制不提供 OS 使用者隔離。
+
+`readSettingsZip()` 在保存資料前驗證 local headers、central directory、EOCD、CRC 與資源預算（50 MB 整包／128 項目／64 KB metadata／2 MB 回答文件／64 張圖片／每張 5 MB／圖片總量 40 MB）。先驗證所有 ZIP 項目，再只保存回答文件引用的圖片；既有 immutable Blob 不因匯入而刪除。直接內嵌則共用 `isSafeInlineEmbedUrl()`：答案、Markdown schema 與兩個 renderer 都拒絕本機名稱、私人／保留 IP 與帳密；預覽連結仍接受一般 HTTP(S)。此位址檢查不包含 DNS 或重新導向驗證。
 
 `studio-draft.js` 集中管理主 Studio 與籤詩頁的草稿版本、跨分頁寫入鎖與衝突偵測。專案識別由 `scripts/studio-scope.mjs` 產生不含本機路徑的雜湊；IndexedDB 也依相同識別隔離。主 Studio 的撤銷記錄只存於目前分頁，保留 immutable Blob 以復原圖片。輸出前由 `referencedStudioImages()` 篩選目前引用的圖片；同名圖片的配置與圖片交易另受共同鎖保護。
 

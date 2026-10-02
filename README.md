@@ -60,7 +60,7 @@ Windows 可執行：
 npm run studio
 ```
 
-再開啟 `http://localhost:4321/studio/`。本機模式仍使用同一個 Studio 頁面，但會顯示「儲存到專案」按鈕。
+開啟終端機列出的 `Profile Studio` 啟動連結（含本次連線憑證）。本機模式仍使用同一個 Studio 頁面，但會顯示「儲存到專案」按鈕；重啟服務後請使用新的啟動連結。
 
 若 `4321` 或 `4322` 被占用或遭 Windows 保留，啟動器會自動改用可用埠；請以終端機列出的 `Profile Studio` 網址為準。按 `Ctrl+C` 可停止預覽與本機寫入服務。
 

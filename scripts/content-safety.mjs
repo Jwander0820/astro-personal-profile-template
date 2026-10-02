@@ -55,6 +55,39 @@ export function isSafeHttpUrl(value) {
   }
 }
 
+// This checks URL literals/local names, not DNS answers or later redirects.
+// Keep ordinary links separate: only automatically loaded embeds need this gate.
+export function isSafeInlineEmbedUrl(value) {
+  if (!isSafeHttpUrl(value)) return false;
+  const url = new URL(normalizedUrl(value));
+  if (url.username || url.password) return false;
+  const host = url.hostname.toLowerCase().replace(/\.$/, '');
+  if (host.startsWith('[')) {
+    // WHATWG URL canonicalizes compressed and IPv4-mapped IPv6 addresses.
+    // Permit global unicast only, excluding special/documentation allocations.
+    const words = host.slice(1, -1).split(':');
+    const first = Number.parseInt(words[0], 16) || 0;
+    const second = Number.parseInt(words[1], 16) || 0;
+    return first >= 0x2000 && first <= 0x3fff
+      && !(first === 0x2001 && (second <= 0x01ff || second === 0x0db8))
+      && !(first === 0x3fff && second < 0x1000);
+  }
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+    const [a, b, c] = host.split('.').map(Number);
+    return !(
+      [0, 10, 127].includes(a) || a >= 224
+      || (a === 100 && b >= 64 && b <= 127)
+      || (a === 169 && b === 254)
+      || (a === 172 && b >= 16 && b <= 31)
+      || (a === 192 && (b === 168 || (b === 0 && [0, 2].includes(c))))
+      || (a === 198 && ([18, 19].includes(b) || (b === 51 && c === 100)))
+      || (a === 203 && b === 0 && c === 113)
+    );
+  }
+  return host.includes('.') && !host.split('.').some((part) => !part)
+    && !/(?:^|\.)(?:localhost|local|localdomain|internal|lan|home|home\.arpa)$/.test(host);
+}
+
 export function isSafeMarkdownUrl(value) {
   const url = String(value ?? '').trim();
   if (!url) return true;

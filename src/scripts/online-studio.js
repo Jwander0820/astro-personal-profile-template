@@ -7,7 +7,7 @@ import {
 import { normalizeThemeColor } from '../../scripts/theme-color.mjs';
 import { normalizeEmbedSource } from '../../scripts/embed-source.mjs';
 import { icons } from '../lib/icons';
-import { createSettingsZip, readSettingsZip } from './settings-package.js';
+import { createSettingsZip, readSettingsZip, SETTINGS_PACKAGE_LIMITS, validateSettingsPackageExport } from './settings-package.js';
 import {
   readStoredMedia,
   referencedStudioImages,
@@ -16,7 +16,7 @@ import {
   storeStudioMedia,
   writeStoredMediaBatch,
 } from './studio-media.js';
-import { applyProjectPlan, formatProjectPlan, requestProjectPlan } from './studio-project.js';
+import { applyProjectPlan, createStudioApiClient, formatProjectPlan, requestProjectPlan } from './studio-project.js';
 import { createDraftStore, createDraftHistory } from './studio-draft.js';
 import { showValidationError, clearValidationError } from './studio-validation.js';
 import { applyProfilePreset, PROFILE_PRESETS } from '../../scripts/profile-presets.mjs';
@@ -252,6 +252,7 @@ export function mountOnlineStudio() {
   const bootstrapNode = document.querySelector('#online-studio-data');
   if (!bootstrapNode) return;
   const bootstrap = JSON.parse(bootstrapNode.textContent);
+  const localApi = createStudioApiClient(bootstrap.localApiUrl);
   const initialAnswers = normalizeDraft(bootstrap.initialAnswers);
   const defaultPublicUrl = bootstrap.defaultPublicUrl || '';
   if (!String(initialAnswers.sharing.publicUrl || '').trim()) initialAnswers.sharing.publicUrl = defaultPublicUrl;
@@ -596,8 +597,16 @@ export function mountOnlineStudio() {
     let exported;
     try { exported = exportAnswers(); } catch { return; }
     const files = [{ name: 'profile.answers.json', data: new TextEncoder().encode(exported.content) }];
-    for (const [path, blob] of referencedStudioImages(exported.result.answers, imageFiles)) {
-      files.push({ name: path.replace(/^\//, ''), data: new Uint8Array(await blob.arrayBuffer()) });
+    const images = referencedStudioImages(exported.result.answers, imageFiles);
+    try {
+      validateSettingsPackageExport([...files, ...[...images].map(([path, blob]) => ({ name: path.replace(/^\//, ''), size: blob.size }))]);
+      for (const [path, blob] of images) {
+        files.push({ name: path.replace(/^\//, ''), data: new Uint8Array(await blob.arrayBuffer()) });
+      }
+    } catch (error) {
+      status.textContent = '設定包未下載';
+      toast(error.message || '設定包無法下載，請縮小圖片後再試。', true);
+      return;
     }
     const blob = new Blob([createSettingsZip(files)], { type: 'application/zip' });
     const url = URL.createObjectURL(blob);
@@ -677,6 +686,7 @@ export function mountOnlineStudio() {
   async function importPackage(file) {
     if (file.size > 50 * 1024 * 1024) throw new Error('設定包不可超過 50 MB。');
     if (file.name.toLowerCase().endsWith('.json')) {
+      if (file.size > SETTINGS_PACKAGE_LIMITS.answersBytes) throw new Error('回答文件不可超過 2 MB。');
       await importJsonText(await file.text());
       return;
     }
@@ -695,6 +705,8 @@ export function mountOnlineStudio() {
       const blob = new Blob([bytes], { type: types[extension] });
       media.push({ path, blob });
     }
+    const referenced = referencedStudioImages(nextState, new Map(media.map(({ path, blob }) => [path, blob])));
+    media = media.filter(({ path }) => referenced.has(path));
     const nextUrls = new Map();
     try {
       media = await storeStudioMedia(media, bootstrap.draftScope);
@@ -730,14 +742,14 @@ export function mountOnlineStudio() {
       const answers = JSON.parse(exported.content);
       const payload = { mode: 'replace', answers, images: await serializeStudioImages(referencedStudioImages(answers, imageFiles)) };
       status.textContent = '正在建立套用計畫…';
-      const plan = await requestProjectPlan(bootstrap.localApiUrl, payload);
+      const plan = await requestProjectPlan(localApi, payload);
       if (plan.changes.length > 0 && !window.confirm(formatProjectPlan(plan))) {
         status.textContent = '已取消，專案未變更';
         return;
       }
       status.textContent = '正在一次寫入圖片與設定…';
       if (!draftStore.isCurrent()) { showConflict(); return; }
-      const result = await applyProjectPlan(bootstrap.localApiUrl, { ...payload, expectedPlanToken: plan.token });
+      const result = await applyProjectPlan(localApi, { ...payload, expectedPlanToken: plan.token });
       const renamedMedia = Object.entries(result.plan.imageReplacements || {})
         .filter(([from]) => imageFiles.has(from))
         .map(([from, path]) => ({ path, blob: imageFiles.get(from) }));
@@ -763,8 +775,9 @@ export function mountOnlineStudio() {
 
   async function detectLocalAdapter() {
     if (!['localhost', '127.0.0.1'].includes(window.location.hostname)) return;
+    if (!localApi) return;
     try {
-      const response = await fetch(`${bootstrap.localApiUrl}/api/status`, { cache: 'no-store' });
+      const response = await localApi.request('/api/status', { cache: 'no-store' });
       if (!response.ok) return;
       localMode = true;
       saveProjectButton.hidden = false;

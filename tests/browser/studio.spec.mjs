@@ -842,6 +842,7 @@ test('本機儲存排除舊圖片並保留寫入交易及 ZIP 再匯出', async 
     await page.route('http://localhost:4322/api/**', async (route) => {
       try {
         const request = route.request();
+        expect(request.headers().authorization).toBe(`Bearer ${'a'.repeat(64)}`);
         const url = new URL(request.url());
         if (url.pathname === '/api/status') return route.fulfill({ json: { ok: true } });
         const payload = request.postDataJSON();
@@ -853,7 +854,7 @@ test('本機儲存排除舊圖片並保留寫入交易及 ZIP 再匯出', async 
         return route.fulfill({ json: await applyProfileProjectUpdate(root, payload) });
       } catch (error) { return route.fulfill({ status: 400, json: { error: error.message } }); }
     });
-    await page.goto('/studio/');
+    await page.goto(`/studio/#studio-token=${'a'.repeat(64)}`);
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
     await page.locator('[data-image-target="media.avatar"]').setInputFiles({ name: 'old.png', mimeType: 'image/png', buffer: png });
     await expect(page.locator('[data-bind="media.avatar"]')).toHaveValue('/images/old.png');
