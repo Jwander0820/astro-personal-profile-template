@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { atomicWriteFile } from './file-writes.mjs';
 import { createProfileAnswersFromStudioContent, resolveProfileAnswerUpdate } from './profile-answers.mjs';
-import { applyProfileAnswers, loadStudioContent } from './profile-content.mjs';
+import { applyProfileAnswers, loadStudioContent, saveStudioBlock } from './profile-content.mjs';
+import { saveFortuneBucket } from './fortune-content.mjs';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const PROJECT_SURFACES = ['public/images', 'src/content'];
@@ -157,9 +158,9 @@ async function listFiles(root, relative = '') {
   return files;
 }
 
-async function collectOperations(projectRoot, stagingRoot) {
+async function collectOperations(projectRoot, stagingRoot, surfaces = PROJECT_SURFACES) {
   const operations = [];
-  for (const surface of PROJECT_SURFACES) {
+  for (const surface of surfaces) {
     for (const relativeFile of await listFiles(stagingRoot, surface)) {
       const stagedPath = path.join(stagingRoot, relativeFile);
       const targetPath = path.join(projectRoot, relativeFile);
@@ -316,4 +317,25 @@ export async function applyProfileProjectUpdate(projectRoot, payload) {
   } finally {
     await prepared.dispose();
   }
+}
+
+export async function saveFortuneProject(projectRoot, input) {
+  return withProjectWriteLock(projectRoot, async () => {
+    const stagingRoot = await mkdtemp(path.join(tmpdir(), 'fortune-project-'));
+    try {
+      await mkdir(path.join(stagingRoot, 'src', 'content', 'blocks'), { recursive: true });
+      for (const file of ['src/content/fortunes.json', 'src/content/blocks/fortune.md']) {
+        await cp(path.join(projectRoot, file), path.join(stagingRoot, file));
+      }
+      // Validate and stage both files before touching the project. Include the
+      // bucket backup in the same rollback-capable transaction.
+      const bucket = await saveFortuneBucket(stagingRoot, input);
+      const block = await saveStudioBlock(stagingRoot, 'fortune', input.block);
+      const operations = await collectOperations(projectRoot, stagingRoot, ['src/content', '.studio-backups']);
+      await commitOperations(operations);
+      return { ...bucket, block };
+    } finally {
+      await rm(stagingRoot, { recursive: true, force: true });
+    }
+  });
 }

@@ -49,6 +49,9 @@ export async function saveFortuneBucket(projectRoot, input) {
     if (typeof input?.expectedRevision !== 'string' || input.expectedRevision !== revisionFor(currentSource)) throw new FortuneConflictError();
     const fortunes = validateFortuneBucket(input.fortunes);
     const nextSource = `${JSON.stringify(fortunes, null, 2)}\n`;
+    if (nextSource === currentSource) {
+      return { fortunes, revision: revisionFor(currentSource), summary: summarizeFortuneBucket(fortunes) };
+    }
     const backup = backupPath(projectRoot);
     await mkdir(path.dirname(backup), { recursive: true });
     await writeFile(backup, currentSource, 'utf8');

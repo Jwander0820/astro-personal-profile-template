@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { cp, mkdir, mkdtemp, readFile, rm, stat, utimes } from 'node:fs/promises';
+import fs, { cp, mkdir, mkdtemp, readFile, rm, stat, utimes } from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -45,7 +46,7 @@ import { createSettingsZip, readSettingsZip, SETTINGS_PACKAGE_LIMITS, validateSe
 import { resolveOnlineStudioAccess } from './studio-access.mjs';
 import { extractIframeSource, normalizeEmbedSource } from './embed-source.mjs';
 import { contentText, contentTextArray, contentTextMax } from './content-text-schema.mjs';
-import { applyProfileProjectUpdate, planProfileProjectUpdate, prepareProfileProjectUpdate } from './profile-project.mjs';
+import { applyProfileProjectUpdate, planProfileProjectUpdate, prepareProfileProjectUpdate, saveFortuneProject } from './profile-project.mjs';
 import { createSatteriMarkdownProcessor } from '@astrojs/markdown-satteri';
 import { fromHtml } from 'hast-util-from-html';
 import { toHtml } from 'hast-util-to-html';
@@ -1012,6 +1013,86 @@ try {
   assert.equal(restoredBucket.fortunes.some((fortune) => fortune.id === 'studio-contract'), false);
   assert.equal(restoredBucket.summary.total, originalBucket.summary.total);
 
+  const fortuneProjectRoot = await createProjectCopy('fortune-transaction');
+  const bucketPath = path.join(fortuneProjectRoot, 'src/content/fortunes.json');
+  const blockPath = path.join(fortuneProjectRoot, 'src/content/blocks/fortune.md');
+  const backupPath = path.join(fortuneProjectRoot, '.studio-backups/fortunes-latest.json');
+  const originalBlock = parseMarkdown(await readFile(blockPath, 'utf8'));
+  originalBlock.data.order = 77;
+  originalBlock.data.tags = ['keep-me'];
+  await atomicWriteText(blockPath, stringifyMarkdown(originalBlock.data, originalBlock.body));
+  const beforeBucket = await readFile(bucketPath);
+  const beforeBlock = await readFile(blockPath);
+  const profilePath = path.join(fortuneProjectRoot, 'src/content/profile/main.md');
+  const beforeProfile = await readFile(profilePath);
+  const initialBucket = await loadFortuneBucket(fortuneProjectRoot);
+  const fortunePayload = {
+    expectedRevision: initialBucket.revision,
+    fortunes: initialBucket.fortunes.map((fortune, index) => ({ ...fortune, note: index === 0 ? 'Transaction test.' : fortune.note })),
+    block: { title: '一起儲存', body: '新的說明', visible: false },
+  };
+  await assert.rejects(
+    saveFortuneProject(fortuneProjectRoot, { ...fortunePayload, block: { title: 'x'.repeat(81) } }),
+    /板塊標題/,
+  );
+  assert.deepEqual(await readFile(bucketPath), beforeBucket, 'invalid metadata must not save the bucket');
+  assert.deepEqual(await readFile(blockPath), beforeBlock);
+  await assert.rejects(readFile(backupPath), { code: 'ENOENT' });
+  const savedFortuneProject = await saveFortuneProject(fortuneProjectRoot, fortunePayload);
+  assert.equal(savedFortuneProject.block.data.title, '一起儲存');
+  assert.equal(savedFortuneProject.block.body, '新的說明');
+  assert.equal(savedFortuneProject.block.data.visible, false);
+  assert.equal(savedFortuneProject.block.data.order, 77);
+  assert.deepEqual(savedFortuneProject.block.data.tags, ['keep-me']);
+  assert.deepEqual(await readFile(backupPath), beforeBucket);
+  assert.deepEqual(await readFile(profilePath), beforeProfile, 'fortune save must not rewrite other profile content');
+
+  const fortuneFiles = [blockPath, bucketPath, backupPath];
+  const fixedTime = new Date('2020-01-01T00:00:00Z');
+  for (const file of fortuneFiles) await utimes(file, fixedTime, fixedTime);
+  const mtimes = await Promise.all(fortuneFiles.map(async (file) => (await stat(file)).mtimeMs));
+  await saveFortuneProject(fortuneProjectRoot, { ...fortunePayload, expectedRevision: savedFortuneProject.revision });
+  assert.deepEqual(await Promise.all(fortuneFiles.map(async (file) => (await stat(file)).mtimeMs)), mtimes, 'no-op save must preserve content and backup mtimes');
+
+  const concurrentProjectWrites = await Promise.allSettled(['first', 'second'].map((note) => saveFortuneProject(fortuneProjectRoot, {
+    ...fortunePayload,
+    expectedRevision: savedFortuneProject.revision,
+    fortunes: fortunePayload.fortunes.map((fortune, index) => ({ ...fortune, note: index === 0 ? note : fortune.note })),
+  })));
+  assert.equal(concurrentProjectWrites.filter(({ status }) => status === 'fulfilled').length, 1);
+  assert.ok(concurrentProjectWrites.find(({ status }) => status === 'rejected')?.reason instanceof FortuneConflictError);
+
+  const rollbackBucket = await loadFortuneBucket(fortuneProjectRoot);
+  const rollbackSources = await Promise.all(fortuneFiles.map((file) => readFile(file)));
+  const rollbackPayload = {
+    ...fortunePayload,
+    expectedRevision: rollbackBucket.revision,
+    fortunes: rollbackBucket.fortunes.map((fortune, index) => ({ ...fortune, note: index === 0 ? 'Rollback test.' : fortune.note })),
+    block: { ...fortunePayload.block, title: '不能留下部分儲存' },
+  };
+  for (const failedPath of [bucketPath, backupPath]) {
+    const originalRename = fs.rename;
+    let injected = false;
+    fs.rename = async (from, to) => {
+      if (!injected && to === failedPath) {
+        injected = true;
+        throw Object.assign(new Error('Injected fortune write failure'), { code: 'EIO' });
+      }
+      return originalRename(from, to);
+    };
+    syncBuiltinESMExports();
+    try {
+      await assert.rejects(saveFortuneProject(fortuneProjectRoot, rollbackPayload), /Injected fortune write failure/);
+      assert.ok(injected, 'failure must occur during the real project commit');
+    } finally {
+      fs.rename = originalRename;
+      syncBuiltinESMExports();
+    }
+    assert.deepEqual(await Promise.all(fortuneFiles.map((file) => readFile(file))), rollbackSources, 'failed transaction must restore block, bucket and backup');
+  }
+  await saveFortuneProject(fortuneProjectRoot, rollbackPayload);
+  assert.deepEqual(await readFile(profilePath), beforeProfile);
+
   const packageBytes = createSettingsZip([
     { name: 'profile.answers.json', data: new TextEncoder().encode(serializedCurrentAnswers) },
     { name: 'images/avatar.png', data: new Uint8Array([1, 2, 3, 4]) },
@@ -1133,7 +1214,8 @@ try {
   assert.ok(fortuneDraw.includes("'fortune-draw:show'"));
   assert.ok(fortuneStudioApp.includes("draftStore.save(state)"));
   assert.ok(fortuneStudioApp.includes('/api/fortunes'));
-  assert.ok(fortuneStudioApp.includes('/api/blocks/fortune'));
+  assert.ok(!fortuneStudioApp.includes('/api/blocks/fortune'));
+  assert.ok(studioServerSource.includes('saveFortuneProject(projectRoot, await readJson(request))'));
   assert.ok(iconStudioPage.includes('data-copy={name}'));
   assert.ok(!iconStudioPage.includes('data-copy={`icon:'));
   assert.ok(iconStudioPage.includes('按下「複製」會取得該代號'));

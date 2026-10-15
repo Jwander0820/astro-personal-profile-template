@@ -4,10 +4,9 @@ import { randomBytes } from 'node:crypto';
 import { dev } from 'astro';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { saveStudioBlock } from './profile-content.mjs';
-import { FortuneConflictError, loadFortuneBucket, saveFortuneBucket } from './fortune-content.mjs';
+import { FortuneConflictError, loadFortuneBucket } from './fortune-content.mjs';
 import { findLocalPort, listenLocalServer, studioPort as parsePort } from './studio-network.mjs';
-import { applyProfileProjectUpdate, planProfileProjectUpdate } from './profile-project.mjs';
+import { applyProfileProjectUpdate, planProfileProjectUpdate, saveFortuneProject } from './profile-project.mjs';
 import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -82,16 +81,7 @@ const server = createServer(async (request, response) => {
       return;
     }
     if (request.method === 'PUT' && url.pathname === '/api/fortunes') {
-      await sendMutation(request, response, 200, saveFortuneBucket(projectRoot, await readJson(request)));
-      return;
-    }
-    if (request.method === 'PUT' && url.pathname === '/api/blocks/fortune') {
-      await sendMutation(
-        request,
-        response,
-        200,
-        saveStudioBlock(projectRoot, 'fortune', await readJson(request)).then((block) => ({ block })),
-      );
+      await sendMutation(request, response, 200, saveFortuneProject(projectRoot, await readJson(request)));
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/project/plan') {

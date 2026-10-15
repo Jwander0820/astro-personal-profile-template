@@ -6,7 +6,8 @@ import { PNG } from 'pngjs';
 import { fromHtml } from 'hast-util-from-html';
 import { toHtml } from 'hast-util-to-html';
 import { createSettingsZip, readSettingsZip } from '../../src/scripts/settings-package.js';
-import { applyProfileProjectUpdate, planProfileProjectUpdate } from '../../scripts/profile-project.mjs';
+import { applyProfileProjectUpdate, planProfileProjectUpdate, saveFortuneProject } from '../../scripts/profile-project.mjs';
+import { loadFortuneBucket } from '../../scripts/fortune-content.mjs';
 import {
   STUDIO_PREVIEW_QUERY_PARAM,
   STUDIO_PREVIEW_QUERY_VALUE,
@@ -881,6 +882,103 @@ test('本機儲存排除舊圖片並保留寫入交易及 ZIP 再匯出', async 
     expect(await readFile(path.join(root, 'src/content/links/generated-link-first-link.md'), 'utf8')).toContain('image: /images/saved-icon.png');
     expect([...(await downloadSettings(page)).keys()]).toEqual(['profile.answers.json', 'images/current.png', 'images/saved-icon.png']);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('籤詩單次儲存會鎖住編輯，失敗後保留草稿並可重試', async ({ page }) => {
+  const root = await mkdtemp(path.resolve('.astro', 'browser-fortune-'));
+  let releaseSave;
+  try {
+    await cp('src/content', path.join(root, 'src/content'), { recursive: true });
+    const writes = [];
+    let failNext = false;
+    await page.route('http://localhost:4322/api/**', async (route) => {
+      const request = route.request();
+      expect(request.headers().authorization).toBe(`Bearer ${'a'.repeat(64)}`);
+      expect(new URL(request.url()).pathname).toBe('/api/fortunes');
+      if (request.method() === 'GET') return route.fulfill({ json: await loadFortuneBucket(root) });
+      const payload = request.postDataJSON();
+      writes.push(payload);
+      await new Promise((resolve) => { releaseSave = resolve; });
+      if (failNext) {
+        failNext = false;
+        return route.fulfill({ status: 500, json: { error: '模擬寫入失敗' } });
+      }
+      return route.fulfill({ json: await saveFortuneProject(root, payload) });
+    });
+    await page.goto(`/studio/fortune-poem/#studio-token=${'a'.repeat(64)}`);
+    const heading = page.locator('#fortune-heading-input');
+    const save = page.locator('#save-fortune-project');
+    const editor = page.locator('#fortune-editor');
+    await expect(save).toBeVisible();
+    await heading.fill('一起儲存的標題');
+    await page.locator('#fortune-description-input').fill('一起儲存的說明');
+    await save.click();
+    await expect.poll(() => writes.length).toBe(1);
+    await expect(editor).toHaveAttribute('inert', '');
+    await expect(editor).toHaveAttribute('aria-busy', 'true');
+    await expect(save).toBeDisabled();
+    await heading.focus();
+    await expect(heading).not.toBeFocused();
+    await page.keyboard.type('儲存中不能改寫');
+    await expect(heading).toHaveValue('一起儲存的標題');
+    releaseSave();
+    await expect(page.locator('#fortune-status')).toHaveText('已同步到本機專案');
+    await expect(editor).not.toHaveAttribute('inert');
+    await expect(editor).not.toHaveAttribute('aria-busy');
+    expect(writes[0].block).toEqual({ title: '一起儲存的標題', body: '一起儲存的說明', visible: true });
+    const blockPath = path.join(root, 'src/content/blocks/fortune.md');
+    const bucketPath = path.join(root, 'src/content/fortunes.json');
+    const beforeFailure = await Promise.all([readFile(blockPath), readFile(bucketPath)]);
+    expect(beforeFailure[0].toString()).toContain('一起儲存的標題');
+    expect(JSON.parse(beforeFailure[1])).toEqual(writes[0].fortunes);
+
+    await heading.fill('失敗後重試的標題');
+    failNext = true;
+    await save.click();
+    await expect.poll(() => writes.length).toBe(2);
+    releaseSave();
+    await expect(page.locator('#fortune-status')).toHaveText('本機儲存失敗');
+    await expect(page.locator('#fortune-toast')).toHaveText('模擬寫入失敗');
+    await expect(editor).not.toHaveAttribute('inert');
+    await expect(save).toBeEnabled();
+    await expect(heading).toHaveValue('失敗後重試的標題');
+    expect(await Promise.all([readFile(blockPath), readFile(bucketPath)])).toEqual(beforeFailure);
+    await save.click();
+    await expect.poll(() => writes.length).toBe(3);
+    expect(writes[2].expectedRevision).toBe(writes[1].expectedRevision);
+    releaseSave();
+    await expect(page.locator('#fortune-status')).toHaveText('已同步到本機專案');
+    expect(await readFile(blockPath, 'utf8')).toContain('失敗後重試的標題');
+  } finally {
+    releaseSave?.();
+    await page.unrouteAll({ behavior: 'wait' });
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('籤詩儲存完成不覆蓋其他分頁的草稿衝突提示', async ({ page, context }) => {
+  let releaseSave;
+  await page.route('http://localhost:4322/api/**', async (route) => {
+    if (route.request().method() === 'PUT') await new Promise((resolve) => { releaseSave = resolve; });
+    return route.fulfill({ json: { local: true, revision: 'fixture' } });
+  });
+  await page.goto(`/studio/fortune-poem/#studio-token=${'a'.repeat(64)}`);
+  await expect(page.locator('#save-fortune-project')).toBeVisible();
+  await page.locator('#save-fortune-project').click();
+  await expect.poll(() => Boolean(releaseSave)).toBe(true);
+  const other = await context.newPage();
+  try {
+    await other.goto('/studio/fortune-poem/');
+    await other.locator('#fortune-heading-input').fill('另一分頁的新標題');
+    await expect(page.locator('#draft-conflict')).toBeVisible();
+    releaseSave();
+    await expect(page.locator('#fortune-editor')).not.toHaveAttribute('inert');
+    await expect(page.locator('#fortune-status')).toHaveText('草稿有分頁衝突，請選擇要保留的版本');
+    await expect(page.locator('#draft-conflict')).toBeVisible();
+  } finally {
+    releaseSave?.();
+    await other.close();
+  }
 });
 
 test('驗證失敗定位第二張卡片的網址，修正後可匯出', async ({ page }) => {

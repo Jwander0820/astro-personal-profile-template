@@ -50,6 +50,7 @@ export function mountFortuneStudio() {
   const toastNode = document.querySelector('#fortune-toast');
   const frame = document.querySelector('#fortune-preview-frame');
   const saveButton = document.querySelector('#save-fortune-project');
+  const editor = document.querySelector('#fortune-editor');
 
   function toast(message, isError = false) {
     window.clearTimeout(toastTimer);
@@ -286,42 +287,45 @@ export function mountFortuneStudio() {
   }
 
   async function saveToProject() {
-    if (!localMode || !await persist()) return;
-    let answers;
-    try {
-      answers = previewProfileAnswers(state).answers;
-    } catch (error) {
-      toast(error.message || '籤詩格式需要修正。', true);
-      return;
-    }
+    if (!localMode || saveButton.disabled) return;
     const buttonLabel = saveButton.textContent;
     saveButton.disabled = true;
     saveButton.textContent = '正在儲存…';
+    editor.inert = true;
+    editor.setAttribute('aria-busy', 'true');
     try {
+      if (!await persist()) return;
+      const answers = previewProfileAnswers(state).answers;
+      status.textContent = '正在儲存到本機專案…';
       const fortuneResponse = await localApi.request('/api/fortunes', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fortunes: answers.fortune.fortunes, expectedRevision: fortuneRevision }),
-      });
-      const fortuneResult = await fortuneResponse.json();
-      if (!fortuneResponse.ok) throw new Error(fortuneResult.error || '籤桶儲存失敗。');
-      fortuneRevision = fortuneResult.revision;
-      const blockResponse = await localApi.request('/api/blocks/fortune', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: answers.fortune.title,
-          body: answers.fortune.description,
-          visible: answers.features.fortune,
+          fortunes: answers.fortune.fortunes,
+          expectedRevision: fortuneRevision,
+          block: {
+            title: answers.fortune.title,
+            body: answers.fortune.description,
+            visible: answers.features.fortune,
+          },
         }),
       });
-      const blockResult = await blockResponse.json();
-      if (!blockResponse.ok) throw new Error(blockResult.error || '今日手氣標題儲存失敗。');
+      const fortuneResult = await fortuneResponse.json();
+      if (!fortuneResponse.ok) throw new Error(fortuneResult.error || '籤詩儲存失敗。');
+      fortuneRevision = fortuneResult.revision;
+      if (!draftStore.isCurrent()) {
+        showConflict();
+        toast('此分頁內容已儲存到專案；其他分頁另有草稿變更，請確認要保留的版本。');
+        return;
+      }
       status.textContent = '已同步到本機專案';
       toast('籤詩、標題與說明已儲存到專案。');
     } catch (error) {
+      status.textContent = '本機儲存失敗';
       toast(error.message || '無法儲存到本機專案。', true);
     } finally {
+      editor.inert = false;
+      editor.removeAttribute('aria-busy');
       saveButton.disabled = false;
       saveButton.textContent = buttonLabel;
     }

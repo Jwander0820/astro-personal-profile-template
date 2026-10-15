@@ -38,7 +38,7 @@ test('本機啟動憑證不進入 HTML，重新整理與籤詩頁保留連線，
   await page.locator('#fortune-heading-input').fill('安全連線測試');
   await page.locator('#save-fortune-project').click();
   await expect(page.locator('#fortune-status')).toHaveText('已同步到本機專案');
-  expect(requests.filter((request) => request.method === 'PUT').map((request) => request.path)).toEqual(['/api/fortunes', '/api/blocks/fortune']);
+  expect(requests.filter((request) => request.method === 'PUT').map((request) => request.path)).toEqual(['/api/fortunes']);
   expect(requests.every((request) => request.auth === `Bearer ${capability}`)).toBe(true);
   capability = 'b'.repeat(64);
   await page.goto('/studio/');
