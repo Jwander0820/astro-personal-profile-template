@@ -170,9 +170,9 @@ iframe 中真正必要的是 `src`；`title` 是無障礙說明，`height` 是�
 
 ## 問題排除
 
-### 為什麼上游 Actions 的品質檢查有警告，網站仍然部署成功？
+### 為什麼 Actions 的 CI 失敗，網站仍然部署成功？
 
-這是預期行為。部署的硬性條件只有依賴安裝、Astro 診斷、內容驗證、靜態建置、artifact 上傳與 Pages 發布。Studio matrix、Playwright、UI contracts、Profile tools、模板安全與預設內容是上游範本的維護訊號，失敗時應修正，但不再阻擋一份可正常建置的網站上線；一般 fork 不執行這組範本專用品質鏈。
+這是預期行為。部署的硬性條件只有依賴安裝、Astro 診斷、內容驗證、靜態建置、artifact 上傳與 Pages 發布。Studio matrix、Playwright、UI contracts、Profile tools、模板安全與預設內容由獨立的 `CI` workflow 檢查；失敗會讓 CI 顯示失敗，但不阻擋一份可正常建置的網站上線。啟用 Actions 的 fork 也會在 pull request 與 `main` push 執行 CI，只有模板預設內容檢查限上游執行。瀏覽器測試失敗時，可在該次 CI 的 artifacts 下載 `playwright-failure-*` 截圖與 trace，保存 7 天。
 
 ### 儲存後 Git 顯示很多不相關變更怎麼辦？
 

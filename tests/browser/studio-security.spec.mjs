@@ -107,12 +107,16 @@ test('ZIP 只保存引用圖片，拒絕損壞與重複檔名並保留草稿及�
 });
 
 test('未經答案驗證的即時預覽也不建立本機或私人位址 iframe', async ({ page }) => {
+  await page.clock.install();
   const privateRequests = [];
   page.on('request', (request) => { if (request.url().startsWith('http://127.0.0.1:4322/')) privateRequests.push(request.url()); });
   await page.route('https://example.com/**', (route) => route.fulfill({ contentType: 'text/html', body: '<p>Public embed</p>' }));
   await page.goto('/studio/');
   const preview = page.frameLocator('#profile-preview');
-  await expect(preview.locator('h1')).toBeVisible();
+  // Finish initialization and its delayed redraw before injecting preview-only answers.
+  await page.locator('[data-bind="identity.displayName"]').fill('Iframe guard fixture');
+  await expect(preview.locator('h1')).toHaveText('Iframe guard fixture');
+  await page.clock.fastForward(500);
   const sendEmbed = (url) => page.evaluate((destination) => {
     const answers = JSON.parse(document.querySelector('#online-studio-data').textContent).initialAnswers;
     answers.embedBlocks = [{ id: 'guard-test', title: 'Guard test', url: destination, embedMode: 'inline', provider: 'website', height: 600, tags: [], description: '' }];
