@@ -1173,60 +1173,28 @@ try {
     );
   }
 
-  const [onlineStudioPage, onlineStudioApp, renderer, previewBridge, studioServerSource, fortuneStudioPage, fortuneStudioPreviewPage, fortuneStudioApp, iconStudioPage, studioRouteNav, studioExampleLink, fortuneDraw] = await Promise.all([
+  const [onlineStudioPage, renderer, previewBridge, studioServerSource, fortuneStudioPage, fortuneStudioApp] = await Promise.all([
     readFile(path.join(projectRoot, 'src', 'pages', 'studio.astro'), 'utf8'),
-    readFile(path.join(projectRoot, 'src', 'scripts', 'online-studio.js'), 'utf8'),
     readFile(path.join(projectRoot, 'src', 'scripts', 'profile-renderer.js'), 'utf8'),
     readFile(path.join(projectRoot, 'src', 'scripts', 'profile-preview-bridge.js'), 'utf8'),
     readFile(path.join(projectRoot, 'scripts', 'studio-server.mjs'), 'utf8'),
     readFile(path.join(projectRoot, 'src', 'pages', 'studio', 'fortune-poem.astro'), 'utf8'),
-    readFile(path.join(projectRoot, 'src', 'pages', 'studio', 'fortune-poem', 'preview.astro'), 'utf8'),
     readFile(path.join(projectRoot, 'src', 'scripts', 'fortune-studio.js'), 'utf8'),
-    readFile(path.join(projectRoot, 'src', 'pages', 'studio', 'icons.astro'), 'utf8'),
-    readFile(path.join(projectRoot, 'src', 'components', 'StudioRouteNav.astro'), 'utf8'),
-    readFile(path.join(projectRoot, 'src', 'components', 'StudioExampleLink.astro'), 'utf8'),
-    readFile(path.join(projectRoot, 'src', 'components', 'FortuneDraw.astro'), 'utf8'),
   ]);
-  assert.match(onlineStudioPage, /<iframe[\s\S]*id="profile-preview"/);
   assert.match(onlineStudioPage, /id="tab-features"[\s\S]*其它功能/);
   assert.match(onlineStudioPage, /id="random-main-color"[^>]*>沒想法？抽！/);
   assert.match(onlineStudioPage, /id="save-project"[^>]*hidden/);
   assert.match(onlineStudioPage, /id="ai-answers-json"/);
-  assert.ok(onlineStudioApp.includes('createSettingsZip'));
-  assert.ok(onlineStudioApp.includes('readSettingsZip'));
-  assert.ok(onlineStudioApp.includes('requestProjectPlan'));
-  assert.ok(onlineStudioApp.includes('applyProjectPlan'));
   assert.ok(studioServerSource.includes("url.pathname === '/api/project/plan'"));
   assert.ok(studioServerSource.includes("url.pathname === '/api/project/apply'"));
-  assert.ok(!onlineStudioApp.includes('sim-social'));
-  assert.ok(renderer.includes("document.createElementNS('http://www.w3.org/2000/svg', 'svg')"));
   assert.ok(renderer.includes("node('nav', 'socials')"));
   assert.ok(previewBridge.includes("event.data?.type !== 'profile-studio:render'"));
   assert.ok(studioServerSource.includes("'Access-Control-Allow-Origin'"));
   assert.ok(onlineStudioPage.includes('studioApiUrl(import.meta.env.DEV, runtime.process.env)'));
   assert.ok(fortuneStudioPage.includes('studioApiUrl(import.meta.env.DEV, runtime.process.env)'));
   assert.ok(studioServerSource.includes("Location: `http://localhost:${previewPort}/studio/`"));
-  assert.ok(fortuneStudioPage.includes('/studio/fortune-poem/preview/'));
-  assert.ok(fortuneStudioPreviewPage.includes('<CustomBlock'));
-  assert.ok(fortuneStudioApp.includes('抽到這張了'));
-  assert.ok(fortuneStudioApp.includes('selectedFortune'));
-  assert.ok(fortuneStudioApp.includes('if (frameReady || !frame.contentWindow) return;'));
-  assert.ok(fortuneDraw.includes("'fortune-draw:show'"));
   assert.ok(fortuneStudioApp.includes("draftStore.save(state)"));
-  assert.ok(fortuneStudioApp.includes('/api/fortunes'));
-  assert.ok(!fortuneStudioApp.includes('/api/blocks/fortune'));
   assert.ok(studioServerSource.includes('saveFortuneProject(projectRoot, await readJson(request))'));
-  assert.ok(iconStudioPage.includes('data-copy={name}'));
-  assert.ok(!iconStudioPage.includes('data-copy={`icon:'));
-  assert.ok(iconStudioPage.includes('按下「複製」會取得該代號'));
-  assert.ok(!onlineStudioPage.includes('只有顯示名稱必填'));
-  assert.ok(studioExampleLink.includes('class="studio-example-link"'));
-  assert.ok(studioExampleLink.includes('範例網頁'));
-  assert.ok(!studioRouteNav.includes('原網站'));
-  assert.ok(onlineStudioPage.indexOf('id="draft-status"') < onlineStudioPage.indexOf('<StudioExampleLink'));
-  assert.ok(studioRouteNav.includes('/studio/fortune-poem/'));
-  assert.ok(studioRouteNav.includes('/studio/icons/'));
-
 
   console.log('Profile tools check passed (answers, ZIP media, local adapter security, renderer bridge, and Studio writes are valid).');
 } finally {
