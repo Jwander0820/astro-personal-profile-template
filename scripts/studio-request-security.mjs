@@ -10,6 +10,20 @@ export class StudioRequestError extends Error {
   }
 }
 
+// Validation failures are plain Errors written for the user. Anything else
+// (filesystem codes, TypeError, AggregateError…) is internal: log it locally
+// and never echo paths or stack details back to the page.
+export function studioErrorResponse(error) {
+  if (error instanceof StudioRequestError || (error?.name === 'FortuneConflictError' && Number.isInteger(error.status))) {
+    return { status: error.status, message: error.message, internal: false };
+  }
+  const isValidation = error instanceof Error && error.constructor === Error
+    && error.code === undefined && Boolean(error.message);
+  return isValidation
+    ? { status: 400, message: error.message, internal: false }
+    : { status: 500, message: '本機 Studio 發生內部錯誤，請查看終端機訊息後再試一次。', internal: true };
+}
+
 function getHeader(headers, name) {
   const value = headers?.[name];
   return Array.isArray(value) ? value[0] ?? '' : String(value ?? '');

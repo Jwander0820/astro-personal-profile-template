@@ -88,6 +88,19 @@ export function isSafeInlineEmbedUrl(value) {
     && !/(?:^|\.)(?:localhost|local|localdomain|internal|lan|home|home\.arpa)$/.test(host);
 }
 
+// Third-party embeds never get top-level navigation, modals or clipboard
+// access. allow-same-origin keeps the provider's own origin (never ours), so
+// only use this policy for cross-origin http(s) frames.
+const EMBED_SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox';
+export function embedFramePolicy(provider) {
+  return provider === 'youtube'
+    ? {
+      sandbox: `${EMBED_SANDBOX} allow-presentation`,
+      allow: 'accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen',
+    }
+    : { sandbox: EMBED_SANDBOX, allow: 'fullscreen' };
+}
+
 export function isSafeMarkdownUrl(value) {
   const url = String(value ?? '').trim();
   if (!url) return true;

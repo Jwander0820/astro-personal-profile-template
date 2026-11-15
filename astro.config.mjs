@@ -47,5 +47,30 @@ export default defineConfig({
       mdastPlugins: [createContentSafetyMdastPlugin()],
     }),
   },
+  security: {
+    // Emitted as a <meta> tag in production builds (GitHub Pages cannot set
+    // headers). Scripts are limited to Astro's own hashed/bundled output, so
+    // injected markup cannot run code even if content escaping ever fails.
+    csp: {
+      directives: [
+        "default-src 'self'",
+        // Profile images may be project files, Studio blobs or public HTTPS URLs.
+        "img-src 'self' data: blob: https:",
+        "font-src 'self' https://fonts.gstatic.com",
+        // User-chosen embeds and the YouTube player; each frame is sandboxed.
+        "frame-src 'self' https: http:",
+        // Loopback is only for the explicit `npm run studio` project adapter.
+        "connect-src 'self' http://localhost:* http://127.0.0.1:*",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ],
+      // Theme variables, cover images and preview updates use style attributes
+      // and a live <style> element, which hashes cannot cover.
+      styleDirective: {
+        resources: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      },
+    },
+  },
   integrations: [onlineStudioGate],
 });

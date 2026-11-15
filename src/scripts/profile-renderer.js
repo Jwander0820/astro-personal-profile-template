@@ -1,4 +1,4 @@
-import { isSafeHttpUrl, isSafeInlineEmbedUrl, isSafeProfileUrl } from '../../scripts/content-safety.mjs';
+import { embedFramePolicy, isSafeHttpUrl, isSafeInlineEmbedUrl, isSafeProfileUrl } from '../../scripts/content-safety.mjs';
 import { parseYoutubePlaylistId } from '../../scripts/youtube-playlist.mjs';
 import { markdownFragment } from './preview-markdown.js';
 import { createShareProfile } from '../../scripts/profile-sharing.mjs';
@@ -202,14 +202,15 @@ function renderEmbedBlock(item) {
   if (item.embedMode === 'inline' && isSafeInlineEmbedUrl(url)) {
     const embed = node('div', 'custom-block__embed');
     const frame = node('iframe');
-    frame.src = url;
     frame.title = item.title;
     frame.height = String(item.height || 600);
     frame.loading = 'lazy';
     frame.referrerPolicy = 'strict-origin-when-cross-origin';
-    frame.allow = item.provider === 'youtube'
-      ? 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen'
-      : 'clipboard-write; fullscreen';
+    const policy = embedFramePolicy(item.provider);
+    // Set the sandbox before src so the first navigation is already confined.
+    frame.setAttribute('sandbox', policy.sandbox);
+    frame.allow = policy.allow;
+    frame.src = url;
     frame.allowFullscreen = true;
     embed.append(frame);
     const link = node('a', 'custom-block__embed-link', `${embedLabel} ↗`);

@@ -134,3 +134,39 @@ test('未經答案驗證的即時預覽也不建立本機或私人位址 iframe'
   await sendEmbed('https://example.com/public');
   await expect(preview.locator('.custom-block--embed iframe')).toHaveAttribute('src', 'https://example.com/public');
 });
+
+test('正式建置的 CSP 不擋既有功能，並阻止注入的行內與外部腳本', async ({ page }) => {
+  const violations = [];
+  await page.exposeFunction('reportCspViolation', (violation) => violations.push(violation));
+  await page.addInitScript(() => {
+    document.addEventListener('securitypolicyviolation', (event) => {
+      window.reportCspViolation({ directive: event.effectiveDirective, blocked: event.blockedURI, page: location.pathname });
+    });
+  });
+  for (const route of ['/', '/studio/', '/studio/fortune-poem/', '/studio/icons/']) {
+    await page.goto(route);
+    await expect(page.locator('meta[http-equiv="content-security-policy"]')).toHaveAttribute('content', /script-src 'self' 'sha256-/);
+    await page.waitForLoadState('networkidle');
+  }
+  await page.goto('/');
+  // The inline theme bootstrap is the script most likely to lose its hash.
+  await expect(page.locator('html')).toHaveAttribute('data-theme', /^(light|dark)$/);
+  expect(violations).toEqual([]);
+  const executed = await page.evaluate(async () => {
+    const inline = document.createElement('script');
+    inline.textContent = 'window.__cspInline = true;';
+    document.body.append(inline);
+    const handler = document.createElement('img');
+    handler.setAttribute('onerror', 'window.__cspHandler = true');
+    handler.src = '/missing-csp-probe.png';
+    document.body.append(handler);
+    const external = document.createElement('script');
+    external.src = 'https://attacker.example/x.js';
+    document.body.append(external);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return { inline: window.__cspInline === true, handler: window.__cspHandler === true };
+  });
+  expect(executed).toEqual({ inline: false, handler: false });
+  expect(violations.map((violation) => violation.directive)).toEqual(expect.arrayContaining(['script-src-elem', 'script-src-attr']));
+  expect(violations.some((violation) => violation.blocked.startsWith('https://attacker.example'))).toBe(true);
+});

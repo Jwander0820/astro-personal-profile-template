@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { after, test } from 'node:test';
 import fs, { cp, mkdir, mkdtemp, readFile, rm, stat, utimes } from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -25,7 +26,7 @@ import {
 } from './profile-content.mjs';
 import { FORTUNE_GRADES, FortuneConflictError, loadFortuneBucket, restoreFortuneBucket, saveFortuneBucket, validateFortuneBucket } from './fortune-content.mjs';
 import { resolvePackageBin } from './package-bin.mjs';
-import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
+import { StudioRequestError, studioErrorResponse, validateStudioRequest } from './studio-request-security.mjs';
 import { atomicWriteFile, atomicWriteText } from './file-writes.mjs';
 import { buildThemeCss, colorContrast, createThemePalette, normalizeThemeColor } from './theme-color.mjs';
 import {
@@ -34,6 +35,7 @@ import {
 } from './profile-answers.mjs';
 import {
   createContentSafetyMdastPlugin,
+  embedFramePolicy,
   enforceContentSafety,
   isSafeHttpUrl,
   isSafeImagePath,
@@ -68,9 +70,21 @@ async function createProjectCopy(name) {
   return root;
 }
 
-try {
-  const presetRoot = await createProjectCopy('presets');
-  const presetSource = createProfileAnswersFromStudioContent(await loadStudioContent(presetRoot));
+after(() => rm(temporaryRoot, { recursive: true, force: true }));
+
+// Cases run in order and share these fixtures. Each case reports on its own, so
+// one failure no longer hides the rest; rerun a single case with
+//   node --test --test-name-pattern="<name>" scripts/verify-profile-tools.mjs
+let presetRoot, presetSource, notionIframe, answers, answersSchema, minimalAnswers;
+let sensitiveRefusalAnswers, invalidUrlAnswers, lunaAnswers, pngA, pngB, dataUrl;
+let answersPreview, minimalPreview, sensitiveRefusalPreview, lunaPreview, numericTextAnswers, currentStudioContent;
+let exportedCurrentAnswers, serializedCurrentAnswers, fixedTimestamp, result, social, reorderedSocials;
+let featured, imageBlock, home, turntable, about, visibleSocials;
+let visibleFeatured, visibleSections;
+
+test('版面預設組合只改外觀並可往返', async () => {
+  presetRoot = await createProjectCopy('presets');
+  presetSource = createProfileAnswersFromStudioContent(await loadStudioContent(presetRoot));
   for (const preset of PROFILE_PRESETS) {
     const next = validateProfileAnswers(applyProfilePreset(presetSource, preset.id));
     for (const key of ['identity', 'media', 'socials', 'links', 'sections', 'imageBlocks', 'embedBlocks', 'playlist', 'fortune', 'features']) assert.deepEqual(next[key], presetSource[key], `${preset.id} preserves ${key}`);
@@ -82,6 +96,9 @@ try {
   }
   assert.throws(() => validateProfileAnswers({ ...presetSource, appearance: { hiddenSections: ['about', 'about'] } }), /隱藏板塊/);
   assert.throws(() => validateProfileAnswers({ ...presetSource, appearance: { showImages: 'false' } }), /布林/);
+});
+
+test('公開網址推導與分享設定', async () => {
   assert.equal(normalizePublicUrl('https://cards.example/my-profile/'), 'https://cards.example/my-profile/');
   for (const remote of ['https://github.com/SomeUser/profile.git', 'git@github.com:SomeUser/profile.git', 'ssh://git@github.com/SomeUser/profile.git']) {
     assert.equal(githubPagesUrlFromRemote(remote), 'https://someuser.github.io/profile/');
@@ -108,6 +125,9 @@ try {
   assert.deepEqual((await loadStudioContent(presetRoot)).profile.sharing, { ...shareAnswers.sharing, enabled: true });
   await applyProfileAnswers(presetRoot, { version: 1, applyMode: 'merge', media: { socialImage: '' } });
   assert.equal((await loadStudioContent(presetRoot)).profile.socialImage, undefined);
+});
+
+test('Studio 連接埠解析與備援', async () => {
   assert.equal(studioPort(undefined, 4322), 4322);
   assert.equal(studioPort('0', 4322), 0);
   for (const value of ['-1', '65536', 'abc', '4322.5']) assert.throws(() => studioPort(value, 4322), /連接埠/);
@@ -145,6 +165,9 @@ try {
   } finally {
     if (releasedProbe.listening) await new Promise((resolve) => releasedProbe.close(resolve));
   }
+});
+
+test('Markdown 序列化與正式、預覽語法一致', async () => {
   const multilineFields = { displayName: '第一行\n第二行', title: '引號 " 與反斜線 \\ 路徑', tags: ['一\n二', '1e3', 'NULL', '2026-09-08', 'tab\there', 'CR\rLF\nNEL\u0085LS\u2028PS\u2029', 'control\u0080'] };
   assert.deepEqual(parseMarkdown(stringifyMarkdown(multilineFields)).data, multilineFields);
   assert.equal(parseMarkdown('---\ntitle: >-\n  第一行\n  第二行\n---\n').data.title, '第一行 第二行');
@@ -205,7 +228,10 @@ try {
   }), true);
   assert.equal(resolveOnlineStudioAccess({ mode: 'public' }), true);
   assert.throws(() => resolveOnlineStudioAccess({ mode: 'private' }), /auto、public 或 off/);
-  const notionIframe = '<iframe src="https://jwander.notion.site/ebd/page?v=view&amp;mode=full" width="100%" height="600" frameborder="0" allowfullscreen />';
+});
+
+test('iframe 內嵌來源解析', async () => {
+  notionIframe = '<iframe src="https://jwander.notion.site/ebd/page?v=view&amp;mode=full" width="100%" height="600" frameborder="0" allowfullscreen />';
   assert.deepEqual(extractIframeSource(notionIframe), {
     url: 'https://jwander.notion.site/ebd/page?v=view&mode=full',
     height: 600,
@@ -241,19 +267,21 @@ try {
     () => normalizeEmbedSource('<iframe src="javascript:alert(1)"></iframe>'),
     /iframe 的 src 必須是公開的 http\(s\) 網址/,
   );
+});
 
+test('專案交易：社群封面寫入與無變更不動檔案', async () => {
   await mkdir(path.join(temporaryRoot, 'src'), { recursive: true });
   await cp(path.join(projectRoot, 'src', 'content'), path.join(temporaryRoot, 'src', 'content'), { recursive: true });
-  const answers = JSON.parse(await readFile(path.join(projectRoot, 'profile.answers.example.json'), 'utf8'));
-  const answersSchema = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'profile-answers.schema.json'), 'utf8'));
-  const minimalAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'minimal.json'), 'utf8'));
-  const sensitiveRefusalAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'sensitive-data-refusal.json'), 'utf8'));
-  const invalidUrlAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'invalid-url.json'), 'utf8'));
-  const lunaAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'luna-persona.json'), 'utf8'));
+  answers = JSON.parse(await readFile(path.join(projectRoot, 'profile.answers.example.json'), 'utf8'));
+  answersSchema = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'profile-answers.schema.json'), 'utf8'));
+  minimalAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'minimal.json'), 'utf8'));
+  sensitiveRefusalAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'sensitive-data-refusal.json'), 'utf8'));
+  invalidUrlAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'invalid-url.json'), 'utf8'));
+  lunaAnswers = JSON.parse(await readFile(path.join(projectRoot, 'docs', 'ai', 'examples', 'luna-persona.json'), 'utf8'));
   const pngHeader = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-  const pngA = Buffer.from([...pngHeader, 0x01]);
-  const pngB = Buffer.from([...pngHeader, 0x02]);
-  const dataUrl = (buffer) => `data:image/png;base64,${buffer.toString('base64')}`;
+  pngA = Buffer.from([...pngHeader, 0x01]);
+  pngB = Buffer.from([...pngHeader, 0x02]);
+  dataUrl = (buffer) => `data:image/png;base64,${buffer.toString('base64')}`;
   const socialRoot = await createProjectCopy('social-cover-project');
   await atomicWriteFile(path.join(socialRoot, 'public/images/social.png'), pngA);
   const socialPayload = { answers: { version: 1, applyMode: 'merge', media: { socialImage: '/images/social.png' }, sharing: { publicUrl: 'https://cards.example/profile/' } }, images: [{ path: '/images/social.png', dataUrl: dataUrl(pngB) }] };
@@ -269,7 +297,9 @@ try {
   const socialNoop = await applyProfileProjectUpdate(socialRoot, { answers: { version: 1, applyMode: 'merge', media: { socialImage: socialPath } } });
   assert.equal(socialNoop.plan.changes.length, 0);
   assert.equal((await stat(socialProfilePath)).mtimeMs, socialMtime);
+});
 
+test('專案交易：連結圖示往返與媒體重新命名', async () => {
   // Link icons survive answer/content round trips and transactional media renaming.
   assert.equal(answersSchema.properties.links.items.properties.image.$ref, '#/$defs/imageSource');
   const iconLink = { id: 'custom-icon', title: 'Custom icon', url: 'https://example.com', description: 'Icon fixture', icon: 'github', image: '/images/link-icon.png' };
@@ -307,7 +337,9 @@ try {
   for (const image of ['http://images.example/icon.png', '/images/../private.png', 'javascript:alert(1)', 'data:image/png;base64,AAAA']) {
     assert.throws(() => validateProfileAnswers({ ...minimalAnswers, links: [{ ...iconLink, image }] }), (error) => error.path === 'links.0.image');
   }
+});
 
+test('專案交易：被拒絕的更新不留下任何檔案', async () => {
   const rejectedProjectRoot = await createProjectCopy('rejected-project-update');
   const rejectedProfilePath = path.join(rejectedProjectRoot, 'src', 'content', 'profile', 'main.md');
   const rejectedProfileBefore = await readFile(rejectedProfilePath);
@@ -323,7 +355,9 @@ try {
     readFile(path.join(rejectedProjectRoot, 'public', 'images', 'profile-image.png')),
     (error) => error?.code === 'ENOENT',
   );
+});
 
+test('專案交易：圖片檔名衝突改用新檔名', async () => {
   const collisionRoot = await createProjectCopy('collision-project-update');
   const collisionPath = path.join(collisionRoot, 'public', 'images', 'profile-image.png');
   await atomicWriteFile(collisionPath, pngA);
@@ -346,7 +380,9 @@ try {
   assert.equal(collisionResult.answers.media.avatar, resolvedCollisionPath);
   assert.deepEqual(await readFile(collisionPath), pngA);
   assert.deepEqual(await readFile(path.join(collisionRoot, 'public', resolvedCollisionPath)), pngB);
+});
 
+test('專案交易：merge 模式保留未指定內容', async () => {
   const mergeRoot = await createProjectCopy('merge-project-update');
   const preservedLinkPath = path.join(mergeRoot, 'src', 'content', 'links', 'github.md');
   const preservedEmbedPath = path.join(mergeRoot, 'src', 'content', 'blocks', 'notion-embed.md');
@@ -377,7 +413,9 @@ try {
     }),
     /未被這次更新引用/,
   );
+});
 
+test('專案交易：計畫 token 必須相符', async () => {
   const planTokenRoot = await createProjectCopy('plan-token-project-update');
   const tokenPayload = {
     answers: { version: 1, applyMode: 'merge', identity: { title: 'Confirmed plan' } },
@@ -392,7 +430,9 @@ try {
     /預覽後改變/,
   );
   assert.equal((await loadStudioContent(planTokenRoot)).profile.title, 'Intervening update');
+});
 
+test('專案交易：過期計畫不可覆蓋較新的寫入', async () => {
   const conflictRoot = await createProjectCopy('conflicting-project-update');
   const firstPrepared = await prepareProfileProjectUpdate(conflictRoot, {
     answers: { version: 1, applyMode: 'merge', identity: { title: 'First plan' } },
@@ -408,11 +448,13 @@ try {
     await firstPrepared.dispose();
     await stalePrepared.dispose();
   }
+});
 
-  const answersPreview = previewProfileAnswers(answers);
-  const minimalPreview = previewProfileAnswers(minimalAnswers);
-  const sensitiveRefusalPreview = previewProfileAnswers(sensitiveRefusalAnswers);
-  const lunaPreview = previewProfileAnswers(lunaAnswers);
+test('回答檔預覽、iframe 輸入與數字文字正規化', async () => {
+  answersPreview = previewProfileAnswers(answers);
+  minimalPreview = previewProfileAnswers(minimalAnswers);
+  sensitiveRefusalPreview = previewProfileAnswers(sensitiveRefusalAnswers);
+  lunaPreview = previewProfileAnswers(lunaAnswers);
   const iframeAnswers = validateProfileAnswers({
     ...minimalAnswers,
     embedBlocks: [{
@@ -425,7 +467,7 @@ try {
   assert.equal(iframeAnswers.embedBlocks[0].url, 'https://jwander.notion.site/ebd/page?v=view&mode=full');
   assert.equal(iframeAnswers.embedBlocks[0].provider, 'notion');
   assert.equal(iframeAnswers.embedBlocks[0].height, 600);
-  const numericTextAnswers = structuredClone(answers);
+  numericTextAnswers = structuredClone(answers);
   numericTextAnswers.identity = {
     ...numericTextAnswers.identity,
     displayName: 2026,
@@ -512,8 +554,11 @@ try {
     }),
     /顯示名稱格式不正確/,
   );
-  const currentStudioContent = await loadStudioContent(temporaryRoot);
-  const exportedCurrentAnswers = createProfileAnswersFromStudioContent(currentStudioContent);
+});
+
+test('現有內容可匯出為完整回答檔', async () => {
+  currentStudioContent = await loadStudioContent(temporaryRoot);
+  exportedCurrentAnswers = createProfileAnswersFromStudioContent(currentStudioContent);
   assert.equal(exportedCurrentAnswers.$schema, './docs/profile-answers.schema.json');
   assert.equal(typeof exportedCurrentAnswers.identity.displayName, 'string');
   assert.ok(exportedCurrentAnswers.identity.displayName.trim().length > 0);
@@ -552,7 +597,7 @@ try {
   assert.deepEqual(answersWithoutOptionalCards.links, []);
   assert.deepEqual(answersWithoutOptionalCards.sections, []);
   assert.doesNotThrow(() => validateProfileAnswers(answersWithoutOptionalCards));
-  const serializedCurrentAnswers = serializeProfileAnswers(exportedCurrentAnswers);
+  serializedCurrentAnswers = serializeProfileAnswers(exportedCurrentAnswers);
   assert.match(serializedCurrentAnswers, /^\{\n  "\$schema": "\.\/docs\/profile-answers\.schema\.json"/);
   assert.ok(serializedCurrentAnswers.endsWith('\n'));
   const astroCli = await resolvePackageBin('astro');
@@ -561,6 +606,9 @@ try {
   assert.equal(normalizeThemeColor('#7a58a6'), '#7A58A6');
   assert.equal(normalizeThemeColor('abc'), '#AABBCC');
   assert.equal(normalizeThemeColor('#12GG34'), null);
+});
+
+test('主題色盤對比', async () => {
   const brightPalette = createThemePalette('#FFFFFF');
   assert.ok(colorContrast(brightPalette.light.accent, '#FFFFFF') >= 4.5);
   assert.ok(colorContrast(brightPalette.dark.accent, '#15111B') >= 4.5);
@@ -568,17 +616,21 @@ try {
   assert.match(tealPalette.light['turntable-record-label-bg'], /#137C8B/);
   assert.match(tealPalette.dark['turntable-record-label-bg'], /^radial-gradient/);
   assert.match(buildThemeCss('#3568A8'), /:root\[data-theme="dark"\]/);
+});
 
+test('原子寫入在內容相同時保留 mtime', async () => {
   const unchangedWritePath = path.join(temporaryRoot, 'unchanged-write.txt');
   assert.equal(await atomicWriteText(unchangedWritePath, 'same content'), true);
-  const fixedTimestamp = new Date('2001-01-01T00:00:00.000Z');
+  fixedTimestamp = new Date('2001-01-01T00:00:00.000Z');
   await utimes(unchangedWritePath, fixedTimestamp, fixedTimestamp);
   const timestampBeforeNoOp = (await stat(unchangedWritePath)).mtimeMs;
   assert.equal(await atomicWriteText(unchangedWritePath, 'same content'), false);
   assert.equal((await stat(unchangedWritePath)).mtimeMs, timestampBeforeNoOp);
   assert.equal(await atomicWriteText(unchangedWritePath, 'updated content'), true);
   assert.equal(await readFile(unchangedWritePath, 'utf8'), 'updated content');
+});
 
+test('套用回答檔與 Studio 單項儲存', async () => {
   await applyProfileAnswers(temporaryRoot, answers);
   await applyProfileAnswers(temporaryRoot, answersPreview.answers);
   const numericAppliedResult = await applyProfileAnswers(temporaryRoot, numericTextAnswers);
@@ -587,10 +639,10 @@ try {
   assert.equal(typeof numericAppliedLink?.data.title, 'string');
   assert.equal(numericAppliedLink?.data.style, 'subtle');
   assert.equal(numericAppliedLink?.body, '4096');
-  const result = await applyProfileAnswers(temporaryRoot, answers);
+  result = await applyProfileAnswers(temporaryRoot, answers);
   assert.equal(result.blocks.find((block) => block.id === 'fortune')?.data.title, answers.fortune.title);
   assert.equal(result.fortunes.length, answers.fortune.fortunes.length);
-  const social = await saveStudioLink(temporaryRoot, 'studio-social-instagram', {
+  social = await saveStudioLink(temporaryRoot, 'studio-social-instagram', {
     title: 'Instagram',
     url: 'https://www.instagram.com/example',
     icon: 'instagram',
@@ -602,13 +654,13 @@ try {
     tags: [],
     body: '',
   });
-  const reorderedSocials = await saveStudioSocialOrder(temporaryRoot, {
+  reorderedSocials = await saveStudioSocialOrder(temporaryRoot, {
     links: [
       { id: 'generated-social-github', order: 20 },
       { id: 'generated-social-email', order: 10 },
     ],
   });
-  const featured = await createStudioLink(temporaryRoot, {
+  featured = await createStudioLink(temporaryRoot, {
     title: 'Portfolio',
     url: 'https://example.com/portfolio',
     icon: 'arrow',
@@ -621,7 +673,7 @@ try {
     tags: ['Work'],
     body: 'Selected work.',
   });
-  const imageBlock = await createStudioImageBlock(temporaryRoot, {
+  imageBlock = await createStudioImageBlock(temporaryRoot, {
     id: 'studio-photo',
     title: 'Studio photo',
     placement: 'before-links',
@@ -635,13 +687,13 @@ try {
     tags: ['Photo'],
     body: 'Image block copy.',
   });
-  const home = await saveHomeSettings(temporaryRoot, {
+  home = await saveHomeSettings(temporaryRoot, {
     homeOrder: ['links', 'about', 'turntable', 'fortune', 'notion'],
     homeVisibility: ['links', 'about', 'turntable'],
     aboutHeading: 'Profile',
     linksHeading: 'Explore',
   });
-  const turntable = await saveStudioBlock(temporaryRoot, 'turntable', {
+  turntable = await saveStudioBlock(temporaryRoot, 'turntable', {
     title: 'Now playing',
     playlist: 'https://youtube.com/playlist?list=PL1234567890abcdef&si=UHVN7ue5z4pT-Byi',
     continuousPlayback: false,
@@ -652,7 +704,7 @@ try {
   const turntableTimestampBeforeNoOp = (await stat(unchangedTurntablePath)).mtimeMs;
   await saveHomeSettings(temporaryRoot, home);
   assert.equal((await stat(unchangedTurntablePath)).mtimeMs, turntableTimestampBeforeNoOp);
-  const about = await saveStudioSection(temporaryRoot, 'about', {
+  about = await saveStudioSection(temporaryRoot, 'about', {
     title: 'About this person',
     slug: 'about',
     image: '/images/about.svg',
@@ -662,10 +714,12 @@ try {
     tags: ['Profile'],
     body: 'Updated card.',
   });
-  const visibleSocials = result.links.filter((item) => item.data.group === 'social' && item.data.visible);
-  const visibleFeatured = result.links.filter((item) => ['main', 'featured'].includes(item.data.group) && item.data.visible);
-  const visibleSections = result.sections.filter((item) => item.data.visible);
+  visibleSocials = result.links.filter((item) => item.data.group === 'social' && item.data.visible);
+  visibleFeatured = result.links.filter((item) => ['main', 'featured'].includes(item.data.group) && item.data.visible);
+  visibleSections = result.sections.filter((item) => item.data.visible);
+});
 
+test('回答檔 schema 與選填身分欄位', async () => {
   assert.equal(result.profile.displayName, '你的名字');
   assert.equal(answersPreview.summary.displayName, '你的名字');
   assert.equal(answersPreview.answers.version, 1);
@@ -729,6 +783,9 @@ try {
   const optionalIdentityMarkdown = await readFile(path.join(optionalIdentityRoot, 'src', 'content', 'profile', 'main.md'), 'utf8');
   assert.doesNotMatch(optionalIdentityMarkdown, /^title:/m);
   assert.doesNotMatch(optionalIdentityMarkdown, /^tagline:/m);
+});
+
+test('遠端圖片來源與欄位驗證', async () => {
   const remoteImageUrl = 'https://cdn.jwander.net/codexpet/Justaway/spritesheet.webp';
   const remoteImageAnswers = {
     ...minimalAnswers,
@@ -856,6 +913,9 @@ try {
   assert.equal(isSafeImageSource('javascript:alert(1)'), false);
   assert.equal(isSafeMarkdownUrl('/notes/example'), true);
   assert.equal(isSafeMarkdownUrl('javascript:alert(1)'), false);
+});
+
+test('Markdown 內容安全外掛', async () => {
   const rawHtmlTree = { type: 'root', children: [{ type: 'html', value: '<script>alert(1)</script>' }] };
   enforceContentSafety(rawHtmlTree);
   assert.deepEqual(rawHtmlTree.children[0], { type: 'text', value: '<script>alert(1)</script>' });
@@ -930,7 +990,9 @@ try {
     }),
     /精選連結樣式包含不支援的值/,
   );
+});
 
+test('並行內容寫入不互相覆蓋', async () => {
   const concurrencyRoot = path.join(temporaryRoot, 'concurrency');
   await mkdir(path.join(concurrencyRoot, 'src'), { recursive: true });
   await cp(path.join(projectRoot, 'src', 'content'), path.join(concurrencyRoot, 'src', 'content'), { recursive: true });
@@ -954,7 +1016,9 @@ try {
   assert.equal(concurrentResult.profile.displayName, 'Mutex Test');
   assert.equal(concurrentResult.profile.aboutHeading, 'Concurrent About');
   assert.deepEqual(concurrentResult.profile.homeVisibility, ['about', 'links']);
+});
 
+test('籤桶修訂、衝突與復原', async () => {
   const originalBucket = await loadFortuneBucket(temporaryRoot);
   const concurrentFortuneWrites = await Promise.allSettled([
     saveFortuneBucket(temporaryRoot, {
@@ -1012,7 +1076,9 @@ try {
   const restoredBucket = await restoreFortuneBucket(temporaryRoot, { expectedRevision: savedBucket.revision });
   assert.equal(restoredBucket.fortunes.some((fortune) => fortune.id === 'studio-contract'), false);
   assert.equal(restoredBucket.summary.total, originalBucket.summary.total);
+});
 
+test('籤詩專案交易、無變更與回滾', async () => {
   const fortuneProjectRoot = await createProjectCopy('fortune-transaction');
   const bucketPath = path.join(fortuneProjectRoot, 'src/content/fortunes.json');
   const blockPath = path.join(fortuneProjectRoot, 'src/content/blocks/fortune.md');
@@ -1092,7 +1158,9 @@ try {
   }
   await saveFortuneProject(fortuneProjectRoot, rollbackPayload);
   assert.deepEqual(await readFile(profilePath), beforeProfile);
+});
 
+test('設定 ZIP 往返與大小限制', async () => {
   const packageBytes = createSettingsZip([
     { name: 'profile.answers.json', data: new TextEncoder().encode(serializedCurrentAnswers) },
     { name: 'images/avatar.png', data: new Uint8Array([1, 2, 3, 4]) },
@@ -1128,7 +1196,9 @@ try {
   const inconsistentDirectory = packageBytes.slice();
   new DataView(inconsistentDirectory.buffer).setUint32(inconsistentDirectory.length - 6, 1, true);
   assert.throws(() => readSettingsZip(inconsistentDirectory), /不完整|不一致/);
+});
 
+test('行內嵌入拒絕本機與私人網路位址', async () => {
   const blockedEmbeds = [
     'http://localhost:4322/', 'http://sub.localhost./', 'http://127.0.0.1/', 'http://127.1/',
     'http://2130706433/', 'http://0x7f000001/', 'http://0177.0.0.1/', 'http://%6cocalhost/',
@@ -1147,7 +1217,9 @@ try {
   for (const url of ['https://example.com/', 'https://www.youtube.com/embed/vfQvkPAjmws', 'http://8.8.8.8/', 'https://[2606:4700:4700::1111]/']) {
     assert.equal(isSafeInlineEmbedUrl(url), true, url);
   }
+});
 
+test('本機 adapter 請求驗證', async () => {
   const testCapability = 'a'.repeat(64);
   const localPreviewRequest = {
     method: 'POST',
@@ -1172,7 +1244,45 @@ try {
       (error) => error instanceof StudioRequestError && error.status === 403,
     );
   }
+});
 
+test('本機 adapter 只回傳驗證訊息，內部錯誤不外洩細節', () => {
+  assert.deepEqual(studioErrorResponse(new Error('顯示名稱為必填欄位。')), { status: 400, message: '顯示名稱為必填欄位。', internal: false });
+  assert.deepEqual(studioErrorResponse(new StudioRequestError(403, '拒絕')), { status: 403, message: '拒絕', internal: false });
+  assert.equal(studioErrorResponse(new FortuneConflictError()).status, 409);
+  const privatePath = 'C:\Users\someone\project\src\content\profile\main.md';
+  const internalErrors = [
+    Object.assign(new Error(`ENOENT: no such file or directory, open '${privatePath}'`), { code: 'ENOENT' }),
+    new TypeError(`Cannot read properties of undefined (reading '${privatePath}')`),
+    new AggregateError([new Error(privatePath)], privatePath),
+    new Error(''),
+    privatePath,
+    null,
+  ];
+  for (const error of internalErrors) {
+    const response = studioErrorResponse(error);
+    assert.equal(response.status, 500);
+    assert.equal(response.internal, true);
+    assert.ok(!response.message.includes('someone'), String(error));
+  }
+});
+
+test('內嵌 iframe 一律套用不含頂層導覽的 sandbox', () => {
+  for (const provider of ['website', 'notion', 'youtube', undefined]) {
+    const { sandbox, allow } = embedFramePolicy(provider);
+    const tokens = sandbox.split(' ');
+    assert.ok(tokens.includes('allow-scripts') && tokens.includes('allow-same-origin'), provider);
+    for (const blocked of ['allow-top-navigation', 'allow-top-navigation-by-user-activation', 'allow-modals', 'allow-downloads', 'allow-pointer-lock']) {
+      assert.ok(!tokens.includes(blocked), `${provider} ${blocked}`);
+    }
+    assert.ok(!allow.includes('clipboard'), provider);
+    assert.ok(allow.includes('fullscreen'), provider);
+  }
+  assert.ok(embedFramePolicy('youtube').allow.includes('autoplay'));
+  assert.ok(!embedFramePolicy('website').allow.includes('autoplay'));
+});
+
+test('原始碼接線契約', async () => {
   const [onlineStudioPage, renderer, previewBridge, studioServerSource, fortuneStudioPage, fortuneStudioApp] = await Promise.all([
     readFile(path.join(projectRoot, 'src', 'pages', 'studio.astro'), 'utf8'),
     readFile(path.join(projectRoot, 'src', 'scripts', 'profile-renderer.js'), 'utf8'),
@@ -1195,8 +1305,4 @@ try {
   assert.ok(studioServerSource.includes("Location: `http://localhost:${previewPort}/studio/`"));
   assert.ok(fortuneStudioApp.includes("draftStore.save(state)"));
   assert.ok(studioServerSource.includes('saveFortuneProject(projectRoot, await readJson(request))'));
-
-  console.log('Profile tools check passed (answers, ZIP media, local adapter security, renderer bridge, and Studio writes are valid).');
-} finally {
-  await rm(temporaryRoot, { recursive: true, force: true });
-}
+});

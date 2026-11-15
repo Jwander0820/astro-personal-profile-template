@@ -4,10 +4,10 @@ import { randomBytes } from 'node:crypto';
 import { dev } from 'astro';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { FortuneConflictError, loadFortuneBucket } from './fortune-content.mjs';
+import { loadFortuneBucket } from './fortune-content.mjs';
 import { findLocalPort, listenLocalServer, studioPort as parsePort } from './studio-network.mjs';
 import { applyProfileProjectUpdate, planProfileProjectUpdate, saveFortuneProject } from './profile-project.mjs';
-import { StudioRequestError, validateStudioRequest } from './studio-request-security.mjs';
+import { studioErrorResponse, validateStudioRequest } from './studio-request-security.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Never put this capability in Astro/Vite env, HTML, API responses or redirects.
@@ -94,9 +94,9 @@ const server = createServer(async (request, response) => {
     }
     sendJson(request, response, 404, { error: '找不到此本機 Studio API。' });
   } catch (error) {
-    if (!(error instanceof StudioRequestError)) console.error(error);
-    const status = error instanceof StudioRequestError || error instanceof FortuneConflictError ? error.status : 400;
-    sendJson(request, response, status, { error: error.message || '未知的錯誤。' });
+    const { status, message, internal } = studioErrorResponse(error);
+    if (internal) console.error(error);
+    sendJson(request, response, status, { error: message });
   }
 });
 
