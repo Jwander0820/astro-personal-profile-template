@@ -10,8 +10,12 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 30_000,
+  // CI gates deployment: a stray test.only must fail the run, and one retry
+  // (reported as flaky, with a trace) keeps a transient stall from blocking it.
+  forbidOnly: Boolean(process.env.CI),
+  retries: process.env.CI ? 1 : 0,
   expect: { timeout: 5_000 },
-  reporter: 'list',
+  reporter: process.env.CI ? [['list'], ['github']] : 'list',
   globalTeardown: './tests/browser/global-teardown.mjs',
   use: {
     baseURL,
@@ -19,7 +23,7 @@ export default defineConfig({
     channel: 'chromium',
     headless: true,
     screenshot: 'only-on-failure',
-    trace: 'retain-on-failure',
+    trace: process.env.CI ? 'on-first-retry' : 'retain-on-failure',
   },
   webServer: {
     command: 'node scripts/studio-browser-test-server.mjs',

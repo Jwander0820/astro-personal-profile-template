@@ -106,12 +106,23 @@ for (const relativePath of scannedFiles) {
   }
 }
 
-const workflow = await readFile(path.join(projectRoot, '.github', 'workflows', 'deploy.yml'), 'utf8');
-const actionReferences = [...workflow.matchAll(/uses:\s+([^\s@]+)@([^\s#]+)/g)];
-assert.ok(actionReferences.length > 0, '部署 workflow 必須使用明確的 Actions。');
-for (const [, action, reference] of actionReferences) {
-  assert.match(reference, /^[0-9a-f]{40}$/, `${action} 必須固定到完整 commit SHA。`);
+const workflowDirectory = path.join(projectRoot, '.github', 'workflows');
+const workflowNames = (await readdir(workflowDirectory)).filter((name) => /\.ya?ml$/.test(name)).sort();
+assert.ok(workflowNames.includes('deploy.yml') && workflowNames.includes('ci.yml'), '必須保留 CI 與部署 workflow。');
+// CI now gates deployment, so every workflow is held to the same pinning rule.
+for (const name of workflowNames) {
+  const source = await readFile(path.join(workflowDirectory, name), 'utf8');
+  const uses = [...source.matchAll(/uses:\s+(\S+)/g)].map(([, target]) => target);
+  assert.ok(uses.length > 0, `${name} 必須使用明確的 Actions。`);
+  for (const target of uses) {
+    if (target.startsWith('./')) continue; // Local reusable workflow, versioned with this repository.
+    assert.match(target, /^[^@\s]+@[0-9a-f]{40}$/, `${name} 的 ${target} 必須固定到完整 commit SHA。`);
+  }
+  assert.match(source, /timeout-minutes:\s*\d+/, `${name} 的 job 必須設定 timeout-minutes。`);
 }
+const workflow = await readFile(path.join(workflowDirectory, 'deploy.yml'), 'utf8');
+assert.match(workflow, /verify:[\s\S]*?uses:\s*\.\/\.github\/workflows\/ci\.yml/, '部署前必須先呼叫 CI workflow。');
+assert.match(workflow, /^  build:\s+needs:\s*verify\s*$/m, 'build job 必須等待 verify。');
 assert.match(workflow, /^permissions:\s*\{\}\s*$/m, 'workflow 預設權限必須為空。');
 assert.match(workflow, /build:[\s\S]*?permissions:\s*\r?\n\s+contents:\s*read/, 'build job 只能取得 contents: read。');
 assert.match(workflow, /deploy:[\s\S]*?permissions:\s*\r?\n\s+pages:\s*write\s*\r?\n\s+id-token:\s*write/, 'deploy job 只能取得 Pages 部署所需權限。');

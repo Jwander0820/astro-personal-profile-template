@@ -16,6 +16,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -32,6 +33,8 @@ jobs:
         run: npm run check:quality
       - name: Verify Studio deployment matrix
         run: npm run check:studio-deployment
+      - name: Verify share metadata under a project base path
+        run: npm run check:share-build
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps --no-shell chromium
       - name: Verify Profile Studio in Chromium

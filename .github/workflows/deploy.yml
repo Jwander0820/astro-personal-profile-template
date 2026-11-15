@@ -26,6 +26,7 @@ jobs:
     needs: verify
     if: ${{ !cancelled() && (needs.verify.result == 'success' || needs.verify.result == 'skipped') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     env:
@@ -50,6 +51,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: build
     # Explicit so a skipped verify job on forks does not skip deployment too.
     if: ${{ !cancelled() && needs.build.result == 'success' }}

@@ -22,6 +22,8 @@
 ### 維護
 
 - 上游模板推到 `main` 時，完整 CI 通過才會部署；fork 可用 repository variable `DEPLOY_RUN_CHECKS=true` 啟用同樣的把關。
+- 正式頁與 Studio 即時預覽改由同一份名片視圖（`scripts/profile-view.mjs`）產生，並新增瀏覽器測試逐節點比對兩邊輸出；預覽因此會顯示自訂的 About／Links 標題，區塊標題錨點也與正式頁一致。
+- 瀏覽器測試不再連到外部網路（Google Fonts、YouTube 改為攔截），消除偶發逾時；CI 內失敗會重試一次並加上 job 逾時上限，`check:share-build` 納入 CI。
 - `check:profile-tools` 改以 `node:test` 分成獨立案例，可一次看到所有失敗並以 `--test-name-pattern` 單獨重跑。
 
 ### 修正
