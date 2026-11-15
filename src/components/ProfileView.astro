@@ -1,0 +1,18 @@
+---
+// Serializes a shared profile view and fills its named slots with Astro
+// content (rendered Markdown, interactive components).
+import { SLOT_COMMENT, viewToHtml } from '../../scripts/profile-view.mjs';
+
+interface Props { view: unknown; }
+const { view } = Astro.props;
+const markup = viewToHtml(view);
+let html = '';
+let cursor = 0;
+for (const match of markup.matchAll(SLOT_COMMENT)) {
+  html += markup.slice(cursor, match.index);
+  if (Astro.slots.has(match[1])) html += await Astro.slots.render(match[1]);
+  cursor = match.index + match[0].length;
+}
+html += markup.slice(cursor);
+---
+<Fragment set:html={html} />

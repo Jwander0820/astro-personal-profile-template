@@ -1,4 +1,3 @@
-import { icons } from '../lib/icons';
 import { withBase } from '../lib/paths';
 import { getProfileFonts } from '../lib/font-presets';
 import { buildThemeCss, normalizeThemeColor } from '../../scripts/theme-color.mjs';
@@ -30,6 +29,11 @@ if (window.parent !== window) {
   const studioEnabled = initialProfileRenderer?.dataset.studioEnabled === 'true'
     && !isStudioPreviewSearch(window.location.search);
   const studioHref = initialProfileRenderer?.dataset.studioHref || withBase('/studio/');
+  // Custom section headings are content-file settings the draft does not carry.
+  const headings = {
+    about: document.querySelector('#about-heading')?.textContent || undefined,
+    links: document.querySelector('#links-heading')?.textContent || undefined,
+  };
   const turntableTemplate = document.querySelector('#studio-turntable-template');
   const fortuneTemplate = document.querySelector('#studio-fortune-template');
   const templates = {
@@ -62,9 +66,9 @@ if (window.parent !== window) {
       twitterImage.content = new URL(socialImage, location.href).href;
     } else twitterImage?.remove();
     renderProfileDocument(rendererRoot, answers, {
-      icons,
       assets,
       templates,
+      headings,
       studioEnabled,
       studioHref,
       assetHref: (path) => isSafeImageSource(path) ? (assets.objectUrls?.[path] || withBase(path)) : '',

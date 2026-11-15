@@ -1,14 +1,12 @@
 ---
 import type { CollectionEntry } from 'astro:content';
-import ProfileHeader from './ProfileHeader.astro';
-import SocialIcons from './SocialIcons.astro';
-import LinkCard from './LinkCard.astro';
-import SectionCard from './SectionCard.astro';
-import Footer from './Footer.astro';
 import CustomBlock from './CustomBlock.astro';
-import StudioLinkCard from './StudioLinkCard.astro';
+import EntryBody from './EntryBody.astro';
+import ProfileView from './ProfileView.astro';
 import { createShareProfile } from '../../scripts/profile-sharing.mjs';
+import { arrangeHome, slot } from '../../scripts/profile-view.mjs';
 import { withBase } from '../lib/paths';
+import { views } from '../lib/profile-views.js';
 
 interface Props {
   profile: CollectionEntry<'profile'>;
@@ -21,6 +19,7 @@ interface Props {
   studioEnabled?: boolean;
   studioHref?: string;
 }
+type HomeItem = { kind: 'about' } | { kind: 'links' } | { kind: 'block'; block: CollectionEntry<'blocks'> };
 
 const {
   profile,
@@ -33,22 +32,42 @@ const {
   studioEnabled = false,
   studioHref = '/studio/',
 } = Astro.props;
+const { tagline } = profile.data;
 const iconLinks = links.filter((link) => link.data.group !== 'footer' && link.data.layout === 'icon');
 const featuredLinks = links.filter((link) => ['main', 'featured'].includes(link.data.group) && link.data.layout === 'card');
-const turntableBlocks = blocks.filter((block) => block.data.layout === 'turntable');
-const fortuneBlocks = blocks.filter((block) => block.data.layout === 'fortune');
-const embedBlocks = blocks.filter((block) => block.data.layout === 'embed');
-const orderedBlockIds = new Set([...turntableBlocks, ...fortuneBlocks, ...embedBlocks].map((block) => block.id));
-const remainingBlocks = blocks.filter((block) => !orderedBlockIds.has(block.id) && (block.data.layout !== 'image' || profile.data.showImages));
-const blocksBeforeLinks = remainingBlocks.filter((block) => block.data.placement === 'before-links');
-const blocksAfterLinks = remainingBlocks.filter((block) => block.data.placement === 'between-links-sections');
-const blocksAfterAbout = remainingBlocks.filter((block) => block.data.placement === 'after-sections');
+const blocksOf = (layout: string) => blocks.filter((block) => block.data.layout === layout);
+const featureLayouts = ['turntable', 'fortune', 'embed'];
+const freeBlocks = blocks.filter((block) => !featureLayouts.includes(block.data.layout) && (block.data.layout !== 'image' || profile.data.showImages));
 const visibleHomeSections = profile.data.homeOrder.filter((section) => profile.data.homeVisibility.includes(section) && !profile.data.hiddenSections.includes(section));
-const fallbackBlocks = remainingBlocks.filter((block) => (
-  (block.data.placement === 'before-links' || block.data.placement === 'between-links-sections')
-    ? !visibleHomeSections.includes('links')
-    : !visibleHomeSections.includes('about')
-));
+const blockItem = (block: CollectionEntry<'blocks'>): HomeItem => ({ kind: 'block', block });
+// Markup and ordering come from scripts/profile-view.mjs, shared with the
+// Studio live preview. This file only maps content entries onto those views.
+const homeItems = arrangeHome({
+  sections: visibleHomeSections,
+  parts: {
+    about: sections.length > 0 && { kind: 'about' },
+    turntable: blocksOf('turntable').map(blockItem),
+    links: (featuredLinks.length > 0 || studioEnabled) && { kind: 'links' },
+    fortune: blocksOf('fortune').map(blockItem),
+    notion: blocksOf('embed').map(blockItem),
+  },
+  blocks: freeBlocks.map((block) => ({ placement: block.data.placement, view: blockItem(block) })),
+}) as HomeItem[];
+const headerView = views.profileHeader({
+  displayName: profile.data.displayName,
+  title: profile.data.title,
+  location: profile.data.location,
+  tagline: Array.isArray(tagline) ? tagline : (tagline ?? '').split(',').map((item) => item.trim()).filter(Boolean),
+  avatarUrl: withBase(profile.data.avatar),
+  backgroundUrl: withBase(profile.data.background),
+  bio: slot('body'),
+});
+const socialsView = views.socials(iconLinks.map((link) => ({
+  title: link.data.title,
+  url: link.data.url,
+  icon: link.data.icon,
+  imageUrl: withBase(link.data.image),
+})));
 ---
 <div
   data-profile-renderer
@@ -56,45 +75,33 @@ const fallbackBlocks = remainingBlocks.filter((block) => (
   data-studio-enabled={String(studioEnabled)}
   data-studio-href={studioHref}
 >
-  <ProfileHeader profile={profile} />
-  <SocialIcons links={iconLinks} />
-  {visibleHomeSections.map((section) => (
-    <>
-      {section === 'links' && blocksBeforeLinks.map((block) => <CustomBlock block={block} />)}
-      {section === 'about' ? sections.length > 0 && (
-        <section class="content-section" aria-labelledby="about-heading">
-          <h2 id="about-heading">{profile.data.aboutHeading}</h2>
-          <div class:list={['section-list', `section-list--${profile.data.sectionsLayout}`]}>
-            {sections.map((item) => <SectionCard section={item} />)}
-          </div>
-        </section>
-      ) : section === 'turntable' ? (
-        turntableBlocks.map((block) => <CustomBlock block={block} />)
-      ) : section === 'links' ? (
-        (featuredLinks.length > 0 || studioEnabled) && (
-          <section
-            class="content-section"
-            aria-labelledby="links-heading"
-            data-studio-only-section={featuredLinks.length === 0 ? '' : undefined}
-          >
-            <h2 id="links-heading">{profile.data.linksHeading}</h2>
-            <div class="link-list">
-              {featuredLinks.map((link) => <LinkCard link={link} />)}
-              {studioEnabled && <StudioLinkCard href={studioHref} />}
-            </div>
-          </section>
-        )
-      ) : section === 'fortune' ? (
-        fortuneBlocks.map((block) => <CustomBlock block={block} fortunes={fortunes} />)
-      ) : (
-        embedBlocks.map((block) => <CustomBlock block={block} />)
-      )}
-      {section === 'links' && blocksAfterLinks.map((block) => <CustomBlock block={block} />)}
-      {section === 'about' && blocksAfterAbout.map((block) => <CustomBlock block={block} />)}
-    </>
+  <ProfileView view={headerView}><EntryBody slot="body" entry={profile} /></ProfileView>
+  <ProfileView view={socialsView} />
+  {homeItems.map((item) => item.kind === 'about' ? (
+    <ProfileView view={views.aboutSection({ heading: profile.data.aboutHeading, layout: profile.data.sectionsLayout, cards: slot('cards') })}>
+      <Fragment slot="cards">
+        {sections.map((section) => (
+          <ProfileView view={views.sectionCard({ title: section.data.title, imageUrl: withBase(section.data.image), tags: section.data.tags, body: slot('body') })}>
+            <EntryBody slot="body" entry={section} />
+          </ProfileView>
+        ))}
+      </Fragment>
+    </ProfileView>
+  ) : item.kind === 'links' ? (
+    <ProfileView view={views.linksSection({ heading: profile.data.linksHeading, cards: slot('cards'), studioOnly: featuredLinks.length === 0 })}>
+      <Fragment slot="cards">
+        {featuredLinks.map((link) => (
+          <ProfileView view={views.linkCard({ title: link.data.title, url: link.data.url, style: link.data.style, imageUrl: withBase(link.data.image), icon: link.data.icon, tags: link.data.tags, body: slot('body') })}>
+            <EntryBody slot="body" entry={link} />
+          </ProfileView>
+        ))}
+        {studioEnabled && <ProfileView view={views.studioLinkCard(studioHref)} />}
+      </Fragment>
+    </ProfileView>
+  ) : (
+    <CustomBlock block={item.block} fortunes={fortunes} />
   ))}
-  {fallbackBlocks.map((block) => <CustomBlock block={block} />)}
-  <Footer name={profile.data.displayName} {studioEnabled} {studioHref} />
+  <ProfileView view={views.footer({ name: profile.data.displayName, studioEnabled, studioHref })} />
 </div>
 {studioEnabled && turntableTemplate && (
   <template id="studio-turntable-template"><CustomBlock block={turntableTemplate} /></template>

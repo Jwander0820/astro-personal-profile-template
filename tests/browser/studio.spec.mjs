@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { blockExternalNetwork } from './network.mjs';
 import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import jsQR from 'jsqr';
@@ -45,7 +46,8 @@ const browserFixtureAnswers = {
   },
 };
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ context, page }) => {
+  await blockExternalNetwork(context);
   await page.addInitScript((draft) => {
     if (!window.localStorage.getItem('profile-online-studio-draft-v2')) {
       window.localStorage.setItem('profile-online-studio-draft-v2', JSON.stringify(draft));
@@ -146,11 +148,12 @@ test('Studio 預填專案部署網址，可產生名片並保留自訂網址', a
   const urlInput = page.getByLabel('正式網站網址', { exact: true });
   const card = page.locator('[data-studio-share]');
   await expect(urlInput).toHaveValue(defaultUrl);
-  await expect(card.locator('[data-share-download]')).toBeEnabled();
+  // Card rendering waits on fonts and the avatar; match the other card tests.
+  await expect(card.locator('[data-share-download]')).toBeEnabled({ timeout: 15000 });
   const initialCanvas = PNG.sync.read(Buffer.from(await card.locator('canvas').evaluate((canvas) => canvas.toDataURL().split(',')[1]), 'base64'));
   expect(jsQR(new Uint8ClampedArray(initialCanvas.data), initialCanvas.width, initialCanvas.height)?.data).toBe(defaultUrl);
   await urlInput.fill('https://jwander.net');
-  await expect(card.locator('canvas')).toHaveAttribute('aria-label', /QR Code 指向 https:\/\/jwander.net\//);
+  await expect(card.locator('canvas')).toHaveAttribute('aria-label', /QR Code 指向 https:\/\/jwander.net\//, { timeout: 15000 });
   const downloadEvent = page.waitForEvent('download');
   await card.locator('[data-share-download]').click();
   const download = await downloadEvent;

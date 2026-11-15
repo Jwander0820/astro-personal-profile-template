@@ -17,7 +17,7 @@ npm run dev
 
 - `src/content/` 是正式網站與 Studio 預設值的來源。
 - `/studio/` 是唯一的 Studio UI；預覽必須載入正式首頁 renderer。
-- 正式 Astro components 與 `src/scripts/profile-renderer.js` 必須保持可見結構一致。
+- 名片的可見結構、文案與排序只寫在 `scripts/profile-view.mjs`；正式頁與 Studio 預覽都由它產生，請勿在 `ProfileRenderer.astro` 或 `src/scripts/profile-renderer.js` 另寫標記。
 - 新增設定欄位時，請同步更新 content schema、答案驗證、JSON Schema、Studio、writer、preview、renderer、文件與測試。
 - 公開 Studio 不得持有 repository credential、寫入 GitHub 或靜默上傳草稿。
 - 本機 no-op 儲存不得改變 mtime 或產生無意義的 Git diff。

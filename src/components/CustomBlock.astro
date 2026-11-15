@@ -1,80 +1,50 @@
 ---
-import { render, type CollectionEntry } from 'astro:content';
+import type { CollectionEntry } from 'astro:content';
 import { withBase } from '../lib/paths';
+import { views } from '../lib/profile-views.js';
+import { slot } from '../../scripts/profile-view.mjs';
+import EntryBody from './EntryBody.astro';
 import FortuneDraw from './FortuneDraw.astro';
+import ProfileView from './ProfileView.astro';
 import TurntablePlayer from './TurntablePlayer.astro';
-import { embedFramePolicy, isSafeInlineEmbedUrl } from '../../scripts/content-safety.mjs';
 
 interface Props {
   block: CollectionEntry<'blocks'>;
   fortunes?: CollectionEntry<'fortunes'>[];
 }
 const { block, fortunes = [] } = Astro.props;
-const { Content } = await render(block);
-const imageUrl = withBase(block.data.image);
-const isEmbed = block.data.layout === 'embed';
-const isImage = block.data.layout === 'image';
-const isTurntable = block.data.layout === 'turntable';
-const isFortune = block.data.layout === 'fortune';
-const embedUrl = block.data.url;
-const embedLabel = block.data.provider === 'notion'
-  ? '在 Notion 開啟'
-  : block.data.provider === 'youtube'
-    ? '在 YouTube 開啟'
-    : '開啟完整內容';
-const embedPolicy = embedFramePolicy(block.data.provider);
-const imagePosition = block.data.imagePosition.replace('-', ' ');
+const { data } = block;
+const isTurntable = data.layout === 'turntable' && Boolean(data.playlistId);
+const isFortune = data.layout === 'fortune';
+// Structure, embed policy and copy live in scripts/profile-view.mjs so the
+// Studio preview renders the same block.
+const view = views.customBlock({
+  id: block.id,
+  layout: data.layout,
+  title: data.title,
+  image: {
+    url: withBase(data.image),
+    alt: data.imageAlt,
+    layout: data.imageLayout,
+    aspect: data.imageAspect,
+    position: data.imagePosition,
+  },
+  body: slot('body'),
+  feature: (isTurntable || isFortune) && slot('feature'),
+  embed: { url: data.url, provider: data.provider, mode: data.embedMode, height: data.height },
+  tags: data.tags,
+});
 ---
-<section class:list={['content-section', 'custom-block', `custom-block--${block.data.layout}`]} aria-labelledby={`block-${block.id}`}>
-  <h2 id={`block-${block.id}`}>{block.data.title}</h2>
-  <div
-    class:list={[
-      'custom-block__body',
-      isImage && `image-block--${block.data.imageLayout}`,
-      isImage && `image-block--${block.data.imageAspect}`,
-    ]}
-    style={isImage ? `--image-position: ${imagePosition};` : undefined}
-  >
-    {imageUrl && <img src={imageUrl} alt={block.data.imageAlt} loading="lazy" />}
-    <div class="custom-block__content"><Content /></div>
-    {isTurntable && block.data.playlistId && (
+<ProfileView view={view}>
+  <EntryBody slot="body" entry={block} />
+  <Fragment slot="feature">
+    {isTurntable && data.playlistId && (
       <TurntablePlayer
-        playlistId={block.data.playlistId}
-        title={block.data.title}
-        continuousPlayback={block.data.continuousPlayback}
+        playlistId={data.playlistId}
+        title={data.title}
+        continuousPlayback={data.continuousPlayback}
       />
     )}
     {isFortune && <FortuneDraw fortunes={fortunes} />}
-    {isEmbed && embedUrl && block.data.embedMode === 'inline' && isSafeInlineEmbedUrl(embedUrl) && (
-      <>
-        <div class="custom-block__embed">
-          <iframe
-            src={embedUrl}
-            title={block.data.title}
-            height={block.data.height}
-            loading="lazy"
-            referrerpolicy="strict-origin-when-cross-origin"
-            sandbox={embedPolicy.sandbox}
-            allow={embedPolicy.allow}
-            allowfullscreen
-          ></iframe>
-        </div>
-        <a class="custom-block__embed-link" href={embedUrl} target="_blank" rel="noopener noreferrer">{embedLabel} ↗</a>
-      </>
-    )}
-    {isEmbed && embedUrl && block.data.embedMode === 'preview' && (
-      <a
-        class="custom-block__embed-preview"
-        href={embedUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`${embedLabel}：${block.data.title}`}
-      >
-        <span class="custom-block__embed-kicker">Personal archive</span>
-        <strong>查看完整的 {block.data.title}</strong>
-        <span class="custom-block__embed-cta">{embedLabel} <span aria-hidden="true">↗</span></span>
-      </a>
-    )}
-    {block.data.tags.length > 0 && <ul>{block.data.tags.map((tag) => <li>{tag}</li>)}</ul>}
-  </div>
-</section>
+  </Fragment>
+</ProfileView>

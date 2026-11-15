@@ -185,7 +185,7 @@ ONLINE_STUDIO_ALLOWED_SITES=https://example.com
 
 ## 專案架構
 
-正式 Astro components 與 `src/scripts/profile-renderer.js` 是同一份可見文件的兩個 renderer 入口；Studio iframe 直接載入正式首頁，不維護模擬預覽。
+正式頁與 Studio 預覽共用 `scripts/profile-view.mjs` 這一份名片視圖：正式頁輸出成 HTML，預覽轉成 DOM；Studio iframe 直接載入正式首頁，不維護模擬預覽。
 
 答案檔、內容 schema、Studio UI、project writer 與 renderer 共享同一組契約。新增設定欄位時必須同步涵蓋：
 

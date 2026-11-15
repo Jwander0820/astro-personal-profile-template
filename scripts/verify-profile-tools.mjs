@@ -57,6 +57,7 @@ import { findLocalPort, listenLocalServer, studioApiUrl, studioPort } from './st
 import { PROFILE_PRESETS, applyProfilePreset } from './profile-presets.mjs';
 import { normalizePublicUrl, validateSharing } from './profile-sharing.mjs';
 import { githubPagesUrlFromRemote, resolveStudioPublicUrl } from './studio-public-url.mjs';
+import { arrangeHome, createProfileViews, h, slot, viewToHtml } from './profile-view.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), 'profile-tools-'));
@@ -1282,6 +1283,81 @@ test('內嵌 iframe 一律套用不含頂層導覽的 sandbox', () => {
   assert.ok(!embedFramePolicy('website').allow.includes('autoplay'));
 });
 
+test('共用視圖跳脫文字與屬性，只有圖示目錄可輸出原始標記', () => {
+  const views = createProfileViews({ arrow: '<path d="ARROW"/>', code: '<path d="CODE"/>' });
+  const hostile = '"><img src=x onerror=alert(1)><script>alert(1)</script>&';
+  const card = viewToHtml(views.linkCard({ title: hostile, url: 'https://example.com/?a=1&b="2"', style: hostile, icon: hostile, tags: [hostile], body: slot('body') }));
+  const parsedCard = fromHtml(card, { fragment: true });
+  const elements = [];
+  const collect = (node) => { if (node.type === 'element') elements.push(node); node.children?.forEach(collect); };
+  collect(parsedCard);
+  assert.deepEqual([...new Set(elements.map((node) => node.tagName))].sort(), ['a', 'path', 'small', 'span', 'strong', 'svg']);
+  assert.ok(elements.every((node) => Object.keys(node.properties).every((name) => !/^on/i.test(name))));
+  assert.equal(elements[0].properties.href, 'https://example.com/?a=1&b="2"');
+  assert.deepEqual(elements[0].properties.className, ['link-card', 'is-normal']);
+  assert.ok(card.includes('<path d="ARROW"/>'), 'unknown icon names fall back to the arrow');
+  assert.ok(card.includes('<!--profile-slot:body-->'));
+  for (const name of ['constructor', '__proto__', 'toString']) assert.ok(viewToHtml(views.icon(name)).includes('ARROW'), name);
+  assert.ok(viewToHtml(views.icon('code')).includes('CODE'));
+
+  for (const url of ['javascript:alert(1)', 'data:text/html,x', ' JAVASCRIPT:alert(1)', '//evil.example']) {
+    assert.match(viewToHtml(views.linkCard({ title: 't', url })), /^<a class="link-card is-normal" href="#">/, url);
+    assert.match(viewToHtml(views.socials([{ title: 't', url, icon: 'code' }])), /<a href="#"/, url);
+  }
+  assert.match(viewToHtml(views.linkCard({ title: 't', url: 'https://example.com/' })), /target="_blank" rel="noopener noreferrer"/);
+  assert.doesNotMatch(viewToHtml(views.linkCard({ title: 't', url: '#about-heading' })), /target=/);
+
+  const header = (backgroundUrl) => viewToHtml(views.profileHeader({ displayName: '名字', tagline: [], backgroundUrl, avatarUrl: '' }));
+  assert.match(header('/images/background.svg'), /style="--cover-image: url\('\/images\/background\.svg'\)"/);
+  for (const url of ["x'); background: url('https://evil.example", 'a b', 'a)b', 'a\\b', 'a\bb']) assert.doesNotMatch(header(url), /style=/, url);
+  assert.match(header(''), /<span class="avatar avatar-fallback">名字<\/span>/);
+
+  assert.throws(() => viewToHtml(h('div onclick=x', {})), /Invalid view tag/);
+  assert.throws(() => viewToHtml(h('div', { 'on click': 'x' })), /Invalid view attribute/);
+  assert.throws(() => viewToHtml(slot('x-->')), /Invalid view slot/);
+  assert.throws(() => viewToHtml({ dom: {} }), /browser/);
+  assert.equal(viewToHtml(h('p', { hidden: true, title: undefined, 'data-x': false }, 'a', null, false, ['b', [0]])), '<p hidden>ab0</p>');
+  assert.equal(viewToHtml(h('img', { src: '/a.png', alt: '' })), '<img src="/a.png" alt="">');
+});
+
+test('共用視圖的內嵌區塊套用 sandbox 並在不安全時降級為連結', () => {
+  const views = createProfileViews({ arrow: '' });
+  const block = (embed) => viewToHtml(views.customBlock({ id: 'generated-embed-x', layout: 'embed', title: '內嵌', embed, tags: ['a'] }));
+  const inline = block({ url: 'https://example.com/page', provider: 'website', mode: 'inline', height: 480 });
+  assert.match(inline, /<section class="content-section custom-block custom-block--embed" aria-labelledby="block-generated-embed-x"><h2 id="block-generated-embed-x">內嵌<\/h2>/);
+  assert.match(inline, /<iframe sandbox="[^"]*" src="https:\/\/example\.com\/page" title="內嵌" height="480" loading="lazy"/);
+  assert.doesNotMatch(inline, /allow-top-navigation|clipboard/);
+  assert.match(inline, /allowfullscreen><\/iframe>/);
+  for (const url of ['http://127.0.0.1:8080/', 'http://192.168.1.1/', 'https://user:pass@example.com/', 'http://localhost/']) {
+    const guarded = block({ url, provider: 'website', mode: 'inline' });
+    assert.doesNotMatch(guarded, /<iframe/, url);
+    assert.match(guarded, /class="custom-block__embed-preview"/, url);
+  }
+  const unsafe = block({ url: 'javascript:alert(1)', provider: 'website', mode: 'preview' });
+  assert.match(unsafe, /class="custom-block__embed-preview" href="#"/);
+  assert.match(block({ url: 'https://www.notion.so/x', provider: 'notion', mode: 'preview' }), /aria-label="在 Notion 開啟：內嵌"/);
+  const image = viewToHtml(views.customBlock({ id: 'i', layout: 'image', title: '圖', image: { url: '/images/a.png', alt: '"alt"', layout: 'split-left', aspect: 'square', position: 'top-left' } }));
+  assert.match(image, /class="custom-block__body image-block--split-left image-block--square" style="--image-position: top left;"/);
+  assert.match(image, /<img src="\/images\/a\.png" alt="&quot;alt&quot;" loading="lazy">/);
+});
+
+test('首頁板塊排序與錨點退回規則由共用函式決定', () => {
+  const blocks = [
+    { placement: 'before-links', view: 'B1' },
+    { placement: 'after-sections', view: 'A1' },
+    { placement: 'between-links-sections', view: 'M1' },
+    { placement: 'before-links', view: 'B2' },
+  ];
+  const parts = { about: 'about', turntable: ['t1', 't2'], links: 'links', fortune: false, notion: [] };
+  assert.deepEqual(
+    arrangeHome({ sections: ['about', 'turntable', 'links', 'fortune', 'notion'], parts, blocks }),
+    ['about', 'A1', 't1', 't2', 'B1', 'B2', 'links', 'M1'],
+  );
+  assert.deepEqual(arrangeHome({ sections: ['links', 'about'], parts, blocks }), ['B1', 'B2', 'links', 'M1', 'about', 'A1']);
+  assert.deepEqual(arrangeHome({ sections: ['turntable'], parts, blocks }), ['t1', 't2', 'B1', 'A1', 'M1', 'B2']);
+  assert.deepEqual(arrangeHome({ sections: ['about', 'unknown'], parts: { about: null }, blocks }), ['A1', 'B1', 'M1', 'B2']);
+});
+
 test('原始碼接線契約', async () => {
   const [onlineStudioPage, renderer, previewBridge, studioServerSource, fortuneStudioPage, fortuneStudioApp] = await Promise.all([
     readFile(path.join(projectRoot, 'src', 'pages', 'studio.astro'), 'utf8'),
@@ -1297,7 +1373,7 @@ test('原始碼接線契約', async () => {
   assert.match(onlineStudioPage, /id="ai-answers-json"/);
   assert.ok(studioServerSource.includes("url.pathname === '/api/project/plan'"));
   assert.ok(studioServerSource.includes("url.pathname === '/api/project/apply'"));
-  assert.ok(renderer.includes("node('nav', 'socials')"));
+  assert.ok(renderer.includes('views.socials(answers.socials || [])'));
   assert.ok(previewBridge.includes("event.data?.type !== 'profile-studio:render'"));
   assert.ok(studioServerSource.includes("'Access-Control-Allow-Origin'"));
   assert.ok(onlineStudioPage.includes('studioApiUrl(import.meta.env.DEV, runtime.process.env)'));

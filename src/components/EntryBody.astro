@@ -1,0 +1,7 @@
+---
+import { render, type CollectionEntry } from 'astro:content';
+
+interface Props { entry: CollectionEntry<'profile' | 'links' | 'sections' | 'blocks'>; }
+const { Content } = await render(Astro.props.entry);
+---
+<Content />

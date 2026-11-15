@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { blockExternalNetwork } from './network.mjs';
 import { createSettingsZip } from '../../src/scripts/settings-package.js';
 
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
@@ -14,6 +15,8 @@ const storedPaths = (page) => page.evaluate(() => new Promise((resolve, reject) 
   };
   request.onerror = () => reject(request.error);
 }));
+
+test.beforeEach(async ({ context }) => { await blockExternalNetwork(context); });
 
 test('本機啟動憑證不進入 HTML，重新整理與籤詩頁保留連線，舊憑證失效', async ({ page }) => {
   let capability = 'a'.repeat(64);
@@ -169,4 +172,49 @@ test('正式建置的 CSP 不擋既有功能，並阻止注入的行內與外部
   expect(executed).toEqual({ inline: false, handler: false });
   expect(violations.map((violation) => violation.directive)).toEqual(expect.arrayContaining(['script-src-elem', 'script-src-attr']));
   expect(violations.some((violation) => violation.blocked.startsWith('https://attacker.example'))).toBe(true);
+});
+
+test('正式首頁與 Studio 即時預覽輸出相同的名片結構', async ({ page }) => {
+  // Both sides render through scripts/profile-view.mjs; this compares the real
+  // output so an adapter or serializer difference cannot go unnoticed.
+  const snapshot = (root) => {
+    const clone = root.cloneNode(true);
+    // Platform navigation is intentionally omitted from the preview.
+    clone.querySelectorAll('[data-studio-link-card], .footer-studio-link').forEach((node) => node.remove());
+    // Astro places bundled component scripts next to their first use.
+    clone.querySelectorAll('script').forEach((node) => node.remove());
+    // Interactive features keep runtime state; their shells are compared.
+    clone.querySelectorAll('[data-turntable-player], [data-fortune-draw]').forEach((node) => node.replaceChildren());
+    clone.querySelectorAll('[data-turntable-player], [data-fortune-draw]').forEach((node) => {
+      [...node.attributes].forEach((attribute) => { if (attribute.name !== 'class') node.removeAttribute(attribute.name); });
+      node.className = node.className.split(' ')[0];
+    });
+    const lines = [];
+    const walk = (node, depth) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent.replace(/\s+/g, ' ').trim();
+        if (text) lines.push(`${'  '.repeat(depth)}"${text}"`);
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const attributes = [...node.attributes]
+        .map((attribute) => `${attribute.name}=${JSON.stringify(attribute.value.replace(/\s+/g, ' ').trim())}`)
+        .sort();
+      lines.push(`${'  '.repeat(depth)}<${node.localName}${attributes.length ? ` ${attributes.join(' ')}` : ''}>`);
+      node.childNodes.forEach((child) => walk(child, depth + 1));
+    };
+    [...clone.children].forEach((child) => walk(child, 0));
+    return lines;
+  };
+
+  await page.goto('/');
+  const formal = await page.locator('[data-profile-renderer]').evaluate(snapshot);
+  await page.goto('/studio/');
+  const preview = page.frameLocator('#profile-preview');
+  // The formal markup first loads with the Studio card; the live render drops it.
+  await expect(preview.locator('[data-studio-link-card]')).toHaveCount(0);
+  await expect(preview.locator('[data-profile-renderer] > header.profile')).toBeVisible();
+  const live = await preview.locator('[data-profile-renderer]').evaluate(snapshot);
+  expect(formal.length).toBeGreaterThan(40);
+  expect(live).toEqual(formal);
 });

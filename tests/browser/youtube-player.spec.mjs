@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { blockExternalNetwork } from './network.mjs';
 
 // An actual cross-origin document, with deterministic YouTube widget messages.
 // Provider code must be unable to see the editor even when its response is hostile.
@@ -60,6 +61,8 @@ async function setup(page) {
   const frame = await (await iframe.elementHandle()).contentFrame();
   return { preview, turntable, iframe, frame, scriptRequests };
 }
+
+test.beforeEach(async ({ context }) => { await blockExternalNetwork(context); });
 
 test('播放器只在 YouTube iframe 執行並拒絕越界與偽造訊息', async ({ page }) => {
   const { preview, turntable, iframe, frame, scriptRequests } = await setup(page);
