@@ -148,7 +148,7 @@ npm run check:browser
 npm run check:template-defaults
 ```
 
-上游 repository 的 pull request 與 `main` 都有阻擋式 CI；任何 build、契約、部署矩陣、瀏覽器測試或模板預設檢查失敗都不會被當成成功。
+上游 repository 的 pull request 與 `main` 都有阻擋式 CI；任何 build、契約、部署矩陣、瀏覽器測試或模板預設檢查失敗都不會被當成成功，推到 `main` 時也不會部署，線上網站會維持上一個成功版本。個人 fork 預設只以 `npm run build`（Astro 診斷與內容驗證）把關；想在自己的 fork 啟用完整檢查，可設定 repository variable `DEPLOY_RUN_CHECKS=true`。
 
 ## 部署
 
@@ -157,7 +157,7 @@ npm run check:template-defaults
 1. 在 repository 的 **Settings → Pages → Build and deployment** 選擇 **GitHub Actions**。
 2. 確認 `origin` 是你自己的 fork，不是上游模板。
 3. 將已檢查的公開內容推到 `main`。
-4. 確認 `CI` workflow 成功，並等待 `.github/workflows/deploy.yml` 完成 build 與部署。
+4. 等待 `.github/workflows/deploy.yml` 完成 build 與部署；上游模板會先在同一個 workflow 內跑完整 CI，失敗就不會部署。
 
 workflow 會依 GitHub repository 名稱計算 Astro 的 `site` 與 `base`。如果你的正式網域不同，可設定 repository variable `SITE_URL`。
 

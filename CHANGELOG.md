@@ -12,6 +12,18 @@
 - 驗證失敗會切換步驟、展開卡片並聚焦錯誤欄位，保留可供輔助工具讀取的錯誤說明。
 - 主 Studio 與籤詩頁共用專案隔離的草稿儲存與分頁衝突提示，使用者可選擇載入最新草稿或明確覆蓋。
 
+### 安全
+
+- 正式建置加入 Content-Security-Policy：腳本只允許 Astro 產生並雜湊的輸出，注入的行內或外部腳本不會執行。
+- 網頁內嵌 iframe 一律加上 sandbox，嵌入頁面不能導覽上層視窗、開啟對話框或存取剪貼簿。
+- 本機 Studio 寫入服務的內部錯誤改回 500 與通用訊息，不再把檔案路徑回傳給頁面。
+- 升級 Astro、Vite、zod 與相關相依套件，`npm audit` 無已知弱點。
+
+### 維護
+
+- 上游模板推到 `main` 時，完整 CI 通過才會部署；fork 可用 repository variable `DEPLOY_RUN_CHECKS=true` 啟用同樣的把關。
+- `check:profile-tools` 改以 `node:test` 分成獨立案例，可一次看到所有失敗並以 `--test-name-pattern` 單獨重跑。
+
 ### 修正
 
 - 圖片替換或移除後，ZIP 與本機儲存只送出目前內容引用的圖片，避免舊圖片造成寫入失敗。

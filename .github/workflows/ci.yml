@@ -1,9 +1,10 @@
 name: CI
 
+# Pushes to main are verified through deploy.yml, which calls this workflow
+# and only deploys when it succeeds.
 on:
   pull_request:
-  push:
-    branches: [main]
+  workflow_call:
 
 permissions:
   contents: read

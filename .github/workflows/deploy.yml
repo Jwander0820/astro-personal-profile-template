@@ -11,7 +11,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The full regression suite gates deployment of the upstream template: a
+  # failure stops here and the published site keeps serving the last good
+  # build. The browser suite assumes the starter content, so personal forks are
+  # gated by `npm run build` (Astro diagnostics and content validation) only,
+  # unless they opt in with the repository variable DEPLOY_RUN_CHECKS=true.
+  verify:
+    if: ${{ github.repository == 'Jwander0820/astro-personal-profile-template' || vars.DEPLOY_RUN_CHECKS == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: verify
+    if: ${{ !cancelled() && (needs.verify.result == 'success' || needs.verify.result == 'skipped') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -38,6 +51,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    # Explicit so a skipped verify job on forks does not skip deployment too.
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     permissions:
       pages: write
       id-token: write

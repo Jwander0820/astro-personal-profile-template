@@ -170,9 +170,11 @@ iframe 中真正必要的是 `src`；`title` 是無障礙說明，`height` 是�
 
 ## 問題排除
 
-### 為什麼 Actions 的 CI 失敗，網站仍然部署成功？
+### CI 失敗時網站還會部署嗎？
 
-這是預期行為。部署的硬性條件只有依賴安裝、Astro 診斷、內容驗證、靜態建置、artifact 上傳與 Pages 發布。Studio matrix、Playwright、UI contracts、Profile tools、模板安全與預設內容由獨立的 `CI` workflow 檢查；失敗會讓 CI 顯示失敗，但不阻擋一份可正常建置的網站上線。啟用 Actions 的 fork 也會在 pull request 與 `main` push 執行 CI，只有模板預設內容檢查限上游執行。瀏覽器測試失敗時，可在該次 CI 的 artifacts 下載 `playwright-failure-*` 截圖與 trace，保存 7 天。
+上游模板不會。推到 `main` 時，`deploy.yml` 會先呼叫 `CI` workflow（Studio matrix、Playwright、UI contracts、Profile tools、模板安全與預設內容），全部通過才建置並發布；失敗時線上網站維持上一個成功版本。
+
+個人 fork 預設不跑這組完整檢查，因為瀏覽器測試是以模板的預設內容為前提；fork 的部署條件是依賴安裝、Astro 診斷、內容驗證、靜態建置、artifact 上傳與 Pages 發布。想在自己的 fork 也用完整檢查把關，可設定 repository variable `DEPLOY_RUN_CHECKS=true`。Pull request 一律會執行 CI，只有模板預設內容檢查限上游執行。瀏覽器測試失敗時，可在該次執行的 artifacts 下載 `playwright-failure-*` 截圖與 trace，保存 7 天。
 
 ### 儲存後 Git 顯示很多不相關變更怎麼辦？
 
